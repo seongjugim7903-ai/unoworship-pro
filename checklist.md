@@ -4,17 +4,17 @@
 
 ## 착수 전 (사용자 확인 필요)
 - [x] 자막 시스템 구조 확정 (2026-07-08 — PRODUCT_PLAN.md §5. 필앤키 유지 + 서브 직결 + 제어 로컬 + 리모트 특화)
-- [ ] PRODUCT_PLAN.md §6 UI 영역 해석 확인 (①~⑤ 매핑이 디자인 의도와 맞는지)
+- [x] PRODUCT_PLAN.md §6 UI 영역 해석 확인 (2026-07-09 — 인터랙티브 목업으로 사용자 확인 완료)
 - [ ] v1.0 기능 범위 확정 (PRODUCT_PLAN.md §7)
 - [ ] 제품명 확정 (현재 가칭 UnoWorship Pro)
 - [ ] HDMI↔DisplayLink 할당 최종 확정 (권장: 서브=HDMI, 제어=DisplayLink — Phase 6 리허설)
 - [ ] 사전 체험 실험 — HDMI 서브 직결 + IP 컴포저 조작 (PRODUCT_PLAN §5-6 절차, 주중 실험 후 예배 전 복원)
 
-## Phase 0 — 스캐폴드
-- [ ] Next.js 15 + 커스텀 서버 + socket.io 초기화 → 검증: 소켓 에코
-- [ ] zod, vitest, eslint boundary(renderer↛editor) 설정 → 검증: 경계 위반 시 lint 실패
-- [ ] `UNOWORSHIP_FIELD_MODE` env 체계 → 검증: production 빌드 기동 + /health 200
-- [ ] git 초기화 + 첫 커밋
+## Phase 0 — 스캐폴드 ✅ (2026-07-09 완료)
+- [x] Next.js 15 + 커스텀 서버 + socket.io 초기화 → 검증: 소켓 에코 2건 통과 (vitest)
+- [x] zod, vitest, eslint boundary(renderer↛editor) 설정 → 검증: 위반 파일 lint 실패 확인
+- [x] `UNOWORSHIP_FIELD_MODE` env 체계 → 검증: production 빌드 기동(:3100) + /health 200 + fieldMode=true
+- [x] git 초기화 + 첫 커밋 (5df9c82)
 
 ## Phase 1 — 코어 런타임 이식
 - [ ] 소켓 페이로드 zod 스키마 정의 (레퍼런스 socketEvents.ts 기반)
