@@ -5,10 +5,10 @@ import { FlatCompat } from '@eslint/eslintrc';
 
 const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta.url)) });
 
-export default [
+const eslintConfig = [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
-    ignores: ['.next/**', 'node_modules/**'],
+    ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts'],
   },
   {
     // 렌더러(출력 라우트)는 에디터를 import하지 않는다 — 소켓 수신이 유일한 입력
@@ -28,3 +28,5 @@ export default [
     },
   },
 ];
+
+export default eslintConfig;

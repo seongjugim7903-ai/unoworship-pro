@@ -2,25 +2,17 @@
 
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'UnoWorship Pro',
-  description: '교회 예배 자막·화면 송출 시스템 — 제품화 버전',
+  title: 'UnoWorship Pro · 찬양대 자막 요청',
+  description: '찬양대 가사를 예배용 자막 이미지로 만들어 공유합니다.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko">
-      <body
-        style={{
-          margin: 0,
-          background: '#0b0d12',
-          color: '#e8ebf2',
-          fontFamily: "'Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif",
-        }}
-      >
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
