@@ -378,31 +378,37 @@ export default function ChoirRequestPage() {
   };
 
   const handleSaveAndShareAll = async () => {
-    handleDownloadAll();
     const files = images.map((image, index) => new File(
       [image.blob],
       `${sanitizeFileName(songTitle)}_${String(index + 1).padStart(2, '0')}.png`,
       { type: 'image/png' },
     ));
+    const canShareFiles = typeof navigator.share === 'function'
+      && (!navigator.canShare || navigator.canShare({ files }));
 
-    if (typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare({ files }))) {
+    if (canShareFiles) {
       try {
         await navigator.share({
           files,
           title: `${songTitle} 찬양대 자막`,
           text: `${songTitle} 찬양대 자막 ${files.length}장`,
         });
+        handleDownloadAll();
         setMessage(`전체 이미지 ${files.length}장을 저장하고 공유창으로 전달했습니다.`);
         return;
       } catch (error) {
+        handleDownloadAll();
         if (error instanceof DOMException && error.name === 'AbortError') {
           setMessage(`공유를 취소했습니다. 전체 이미지 ${files.length}장은 저장되었습니다.`);
           return;
         }
+        setMessage(`공유창을 열지 못해 전체 이미지 ${files.length}장만 저장했습니다. 모바일 Chrome 또는 Safari에서 다시 시도해 주세요.`);
+        return;
       }
     }
 
-    setMessage(`전체 이미지 ${files.length}장을 저장했습니다. 이 기기는 다중 파일 공유창을 지원하지 않아 저장된 이미지를 카카오톡에 첨부해 주세요.`);
+    handleDownloadAll();
+    setMessage(`전체 이미지 ${files.length}장을 저장했습니다. 이 브라우저는 파일 공유창을 지원하지 않아 저장된 이미지를 카카오톡에 첨부해 주세요.`);
   };
 
   return (
