@@ -48,6 +48,10 @@ function formatWorshipName(value: string, serviceType: string) {
   return `${new Date().toISOString().slice(0, 10).replaceAll('-', '.')} ${serviceType}`;
 }
 
+function makeHephzibahProgramId(title: string, dateKey: string) {
+  return `헵시바-${sanitizeSegment(title)}-${dateKey}`;
+}
+
 function getNestedRecord(source: JsonRecord, key: string): JsonRecord | undefined {
   const value = source[key];
   return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : undefined;
@@ -200,7 +204,7 @@ export async function writeFieldProgram(payload: FieldProgramPayload) {
   const existingData = existing?.data ?? {};
   const existingItem = getNestedRecord(existingData, 'item') ?? {};
   const existingFormData = getNestedRecord(existingData, 'formData') ?? {};
-  const id = String(existingData.id ?? existingItem.id ?? `choir-${dateKey}-${sanitizeSegment(title)}`);
+  const id = String(existingData.id ?? existingItem.id ?? makeHephzibahProgramId(title, dateKey));
   const fileName = existing?.fileName ?? `${id}.json`;
   const filePath = existing?.filePath ?? path.join(programsDir, fileName);
   const sections = buildSections(id, lyrics);
