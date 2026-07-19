@@ -44,6 +44,16 @@ interface SearchChoirRequest {
   status: string;
 }
 
+interface ApiResult {
+  ok?: boolean;
+  message?: string;
+  requestId?: string;
+  programId?: string;
+  imageCount?: number;
+  sectionCount?: number;
+  storagePath?: string;
+}
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -58,6 +68,21 @@ function formatSavedAt(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '저장 시간 없음';
   return date.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+async function readApiResult(response: Response): Promise<ApiResult> {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text) as ApiResult;
+  } catch {
+    return {
+      message: response.status === 413
+        ? '생성 이미지 용량이 서버 요청 한도를 초과했습니다.'
+        : `서버 응답을 읽지 못했습니다. (HTTP ${response.status})`,
+    };
+  }
 }
 
 export default function ChoirRequestPage() {
@@ -127,7 +152,12 @@ export default function ChoirRequestPage() {
     }
 
     setCloudSaveStatus('saving');
-    setCloudSaveMessage(imagesToSave.length > 0 ? '가사와 생성 이미지를 저장하고 있습니다.' : '가사를 저장하고 있습니다.');
+    const originalBytes = imagesToSave.reduce((sum, image) => sum + image.blob.size, 0);
+    const uploadBytes = imagesToSave.reduce((sum, image) => sum + image.uploadBlob.size, 0);
+    const savedPercent = originalBytes > 0 ? Math.max(0, Math.round((1 - uploadBytes / originalBytes) * 100)) : 0;
+    setCloudSaveMessage(imagesToSave.length > 0
+      ? `고품질 압축 이미지 ${imagesToSave.length}장을 저장하고 있습니다. (용량 ${savedPercent}% 절감)`
+      : '가사를 저장하고 있습니다.');
 
     try {
       const formData = new FormData();
@@ -136,26 +166,23 @@ export default function ChoirRequestPage() {
         source: 'unoworship-pro',
       }));
       imagesToSave.forEach((image) => {
-        const fileName = `${sanitizeFileName(currentRequest.songTitle)}_${String(image.index).padStart(2, '0')}.png`;
-        formData.append(`image-${String(image.index).padStart(3, '0')}`, new File([image.blob], fileName, { type: 'image/png' }));
+        const isWebp = image.uploadBlob.type === 'image/webp';
+        const extension = isWebp ? 'webp' : 'png';
+        const fileName = `${sanitizeFileName(currentRequest.songTitle)}_${String(image.index).padStart(2, '0')}.${extension}`;
+        formData.append(
+          `image-${String(image.index).padStart(3, '0')}`,
+          new File([image.uploadBlob], fileName, { type: image.uploadBlob.type || 'image/png' }),
+        );
       });
 
       const response = await fetch('/api/choir-requests', {
         method: 'POST',
         body: formData,
       });
-      const result = await response.json() as {
-        ok?: boolean;
-        message?: string;
-        requestId?: string;
-        imageCount?: number;
-        sectionCount?: number;
-      };
+      const result = await readApiResult(response);
 
       if (!response.ok || !result.ok) {
-        setCloudSaveStatus('error');
-        setCloudSaveMessage(result.message ?? '저장에 실패했습니다.');
-        return;
+        throw new Error(result.message ?? `저장에 실패했습니다. (HTTP ${response.status})`);
       }
 
       setCloudSaveStatus('done');
@@ -165,7 +192,7 @@ export default function ChoirRequestPage() {
     } catch (error) {
       console.error('[choir-request] cloud save failed', error);
       setCloudSaveStatus('error');
-      setCloudSaveMessage('저장 중 오류가 발생했습니다.');
+      setCloudSaveMessage(error instanceof Error ? error.message : '저장 중 오류가 발생했습니다.');
     }
   };
 

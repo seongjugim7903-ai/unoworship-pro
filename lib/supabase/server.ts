@@ -21,6 +21,14 @@ interface UploadObjectInput {
   upsert?: boolean;
 }
 
+interface EnsureBucketInput {
+  bucket: string;
+  fileSizeLimit: number;
+  allowedMimeTypes: string[];
+}
+
+const ensuredBuckets = new Map<string, Promise<void>>();
+
 export function getSupabaseServerConfig(): SupabaseServerConfig {
   const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -125,4 +133,39 @@ export async function uploadSupabaseObject(input: UploadObjectInput) {
   }
 
   return body;
+}
+
+export async function ensureSupabaseBucket(input: EnsureBucketInput) {
+  const cacheKey = `${input.bucket}:${input.fileSizeLimit}:${input.allowedMimeTypes.join(',')}`;
+  const existing = ensuredBuckets.get(cacheKey);
+  if (existing) return existing;
+
+  const operation = (async () => {
+    const config = getSupabaseServerConfig();
+    const headers = createHeaders(config, { 'content-type': 'application/json' });
+    const response = await fetch(`${config.url}/storage/v1/bucket/${encodeURIComponent(input.bucket)}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({
+        public: false,
+        file_size_limit: input.fileSizeLimit,
+        allowed_mime_types: input.allowedMimeTypes,
+      }),
+      cache: 'no-store',
+    });
+    const body = await parseSupabaseResponse(response);
+
+    if (!response.ok) {
+      ensuredBuckets.delete(cacheKey);
+      const message = typeof body === 'string'
+        ? body
+        : body && typeof body === 'object' && 'message' in body
+          ? String(body.message)
+          : `Supabase Storage 버킷 설정 실패 (${response.status})`;
+      throw new Error(message);
+    }
+  })();
+
+  ensuredBuckets.set(cacheKey, operation);
+  return operation;
 }

@@ -12,6 +12,7 @@ export interface ChoirImage {
   index: number;
   label: string;
   blob: Blob;
+  uploadBlob: Blob;
   url: string;
 }
 
@@ -47,7 +48,17 @@ export async function renderChoirImages(input: ChoirImageInput): Promise<ChoirIm
     if (!context) throw new Error('Canvas 2D 컨텍스트를 만들 수 없습니다.');
     renderSection(context, input, input.sections[index], index);
     const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('PNG 변환 실패')), 'image/png'));
-    images.push({ index: index + 1, label: `${index + 1}번 섹션`, blob, url: URL.createObjectURL(blob) });
+    const webpBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.92));
+    const uploadBlob = webpBlob?.type === 'image/webp' && webpBlob.size < blob.size
+      ? webpBlob
+      : blob;
+    images.push({
+      index: index + 1,
+      label: `${index + 1}번 섹션`,
+      blob,
+      uploadBlob,
+      url: URL.createObjectURL(blob),
+    });
   }
   return images;
 }

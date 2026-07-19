@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildChoirProgramPayload, parseLyricSections } from '../../../lib/choirProgramPayload';
 import {
+  ensureSupabaseBucket,
   SupabaseServerConfigError,
   supabaseRest,
   uploadSupabaseObject,
@@ -158,24 +159,34 @@ export async function POST(request: Request) {
     const imageRows: GeneratedImageRow[] = [];
     const imagePaths: string[] = [];
 
+    if (imageFiles.length > 0) {
+      await ensureSupabaseBucket({
+        bucket: BUCKET_NAME,
+        fileSizeLimit: 10_485_760,
+        allowedMimeTypes: ['image/png', 'image/webp'],
+      });
+    }
+
     for (let index = 0; index < imageFiles.length; index += 1) {
       const file = imageFiles[index];
       const buffer = Buffer.from(await file.arrayBuffer());
       const checksum = createHash('sha256').update(buffer).digest('hex');
       const sectionIndex = index + 1;
+      const contentType = file.type === 'image/webp' ? 'image/webp' : 'image/png';
+      const extension = contentType === 'image/webp' ? 'webp' : 'png';
       const storagePath = [
         'choir',
         dateSegment,
         titleSegment,
         requestRow.id,
-        `${String(sectionIndex).padStart(2, '0')}.png`,
+        `${String(sectionIndex).padStart(2, '0')}.${extension}`,
       ].join('/');
 
       await uploadSupabaseObject({
         bucket: BUCKET_NAME,
         path: storagePath,
         body: buffer,
-        contentType: file.type || 'image/png',
+        contentType,
         upsert: true,
       });
 
@@ -190,7 +201,7 @@ export async function POST(request: Request) {
             label: `${sectionIndex}번 섹션`,
             bucket: BUCKET_NAME,
             storage_path: storagePath,
-            content_type: file.type || 'image/png',
+            content_type: contentType,
             size_bytes: buffer.byteLength,
             width: 1920,
             height: 1080,
