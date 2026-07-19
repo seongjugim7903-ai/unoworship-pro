@@ -377,12 +377,13 @@ export default function ChoirRequestPage() {
     });
   };
 
-  const handleSaveAndShareAll = async () => {
+  const handleShareAll = async () => {
     const files = images.map((image, index) => new File(
       [image.blob],
       `${sanitizeFileName(songTitle)}_${String(index + 1).padStart(2, '0')}.png`,
       { type: 'image/png' },
     ));
+    const totalMegabytes = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
     const canShareFiles = typeof navigator.share === 'function'
       && (!navigator.canShare || navigator.canShare({ files }));
 
@@ -393,22 +394,22 @@ export default function ChoirRequestPage() {
           title: `${songTitle} 찬양대 자막`,
           text: `${songTitle} 찬양대 자막 ${files.length}장`,
         });
-        handleDownloadAll();
-        setMessage(`전체 이미지 ${files.length}장을 저장하고 공유창으로 전달했습니다.`);
+        setMessage(`전체 이미지 ${files.length}장을 공유창으로 전달했습니다.`);
         return;
       } catch (error) {
-        handleDownloadAll();
         if (error instanceof DOMException && error.name === 'AbortError') {
-          setMessage(`공유를 취소했습니다. 전체 이미지 ${files.length}장은 저장되었습니다.`);
+          setMessage('공유를 취소했습니다. 이미지를 저장하려면 전체 이미지 저장 버튼을 눌러 주세요.');
           return;
         }
-        setMessage(`공유창을 열지 못해 전체 이미지 ${files.length}장만 저장했습니다. 모바일 Chrome 또는 Safari에서 다시 시도해 주세요.`);
+        const errorName = error instanceof DOMException ? error.name : 'UnknownError';
+        setMessage(
+          `공유창을 열지 못했습니다. ${files.length}장 · ${totalMegabytes.toFixed(1)}MB · 오류 ${errorName}. 모바일 Chrome 또는 Safari에서 다시 시도해 주세요.`,
+        );
         return;
       }
     }
 
-    handleDownloadAll();
-    setMessage(`전체 이미지 ${files.length}장을 저장했습니다. 이 브라우저는 파일 공유창을 지원하지 않아 저장된 이미지를 카카오톡에 첨부해 주세요.`);
+    setMessage('이 브라우저는 여러 이미지 파일 공유를 지원하지 않습니다. 전체 이미지 저장 후 카카오톡에 첨부해 주세요.');
   };
 
   return (
@@ -521,7 +522,7 @@ export default function ChoirRequestPage() {
 
       {status === 'done' && (
         <section className="panel result-panel">
-          <div className="result-heading"><div><span className="step-number success">03</span><h2>생성된 자막 이미지</h2><p>{images.length}장의 PNG 파일이 준비되었습니다.</p></div><div className="result-actions"><button className="secondary-button" onClick={handleReset}>새 요청</button><button className="primary-button compact" onClick={() => void handleSaveAndShareAll()}>전체 저장 후 톡으로 보내기</button></div></div>
+          <div className="result-heading"><div><span className="step-number success">03</span><h2>생성된 자막 이미지</h2><p>{images.length}장의 PNG 파일이 준비되었습니다.</p></div><div className="result-actions"><button className="secondary-button" onClick={handleReset}>새 요청</button><button className="secondary-button" onClick={handleDownloadAll}>전체 이미지 저장</button><button className="primary-button compact" onClick={() => void handleShareAll()}>카카오톡으로 공유</button></div></div>
           {message && <p className="info-message">{message}</p>}
           <div className="image-grid">{images.map((image) => <article className="image-card" key={image.index}><img src={image.url} alt={`${songTitle} ${image.label}`} /><div className="image-card-footer"><span>{image.label}</span><button className="text-button" onClick={() => downloadBlob(image.blob, `${sanitizeFileName(songTitle)}_${image.index}.png`)}>저장</button></div></article>)}</div>
         </section>
