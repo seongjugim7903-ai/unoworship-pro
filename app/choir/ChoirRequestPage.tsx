@@ -64,12 +64,6 @@ function createRequestId() {
     : `choir-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function formatSavedAt(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '저장 시간 없음';
-  return date.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
-
 async function readApiResult(response: Response): Promise<ApiResult> {
   const text = await response.text();
   if (!text) return {};
@@ -319,22 +313,6 @@ export default function ChoirRequestPage() {
     createSavedRequest('새 요청으로 저장했습니다.');
   };
 
-  const handleEditSavedRequest = (request: SavedChoirRequest) => {
-    images.forEach((image) => URL.revokeObjectURL(image.url));
-    setActiveRequestId(request.id);
-    setServiceType(request.serviceType);
-    setServiceDate(request.serviceDate || todayISO());
-    setSongTitle(request.songTitle);
-    setComposer(request.composer);
-    setArranger(request.arranger);
-    setLyrics(request.lyrics);
-    setNote(request.note);
-    setImages([]);
-    setStatus('idle');
-    setMessage('');
-    setSaveMessage('저장된 요청을 수정 모드로 불러왔습니다.');
-  };
-
   const handleSearch = async () => {
     setSearchStatus('loading');
     setSearchMessage('');
@@ -511,19 +489,6 @@ export default function ChoirRequestPage() {
             </div>
             {saveMessage && <p className="save-message">{saveMessage}</p>}
             {cloudSaveMessage && <p className={`field-program-message ${cloudSaveStatus}`}>{cloudSaveMessage}</p>}
-            {savedRequests.length > 0 && (
-              <div className="saved-request-list">
-                {savedRequests.slice(0, 5).map((request) => (
-                  <article className={request.id === activeRequestId ? 'saved-request active' : 'saved-request'} key={request.id}>
-                    <div>
-                      <strong>{request.songTitle || '제목 없는 요청'}</strong>
-                      <span>{request.serviceType} · {request.serviceDate || '날짜 없음'} · {formatSavedAt(request.updatedAt)}</span>
-                    </div>
-                    <button className="text-button" onClick={() => handleEditSavedRequest(request)}>수정</button>
-                  </article>
-                ))}
-              </div>
-            )}
           </div>
 
           <button className="primary-button" onClick={handleGenerate} disabled={!isValid || status === 'rendering'}>
