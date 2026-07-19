@@ -39,11 +39,17 @@ function formatStorageDate(value: string) {
 }
 
 function sanitizePathSegment(value: string) {
-  return value
-    .trim()
-    .replace(/[\\/:*?"<>|#%{}\[\]^`]/g, '')
-    .replace(/\s+/g, '-')
-    .slice(0, 80) || 'choir';
+  const asciiSlug = value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+
+  if (asciiSlug) return asciiSlug;
+
+  const digest = createHash('sha1').update(value).digest('hex').slice(0, 12);
+  return `choir-${digest}`;
 }
 
 async function readPayload(formData: FormData) {
