@@ -9,17 +9,19 @@ import {
   sanitizeFileName,
   type ChoirImage,
 } from '../../lib/choirImageRenderer';
+import {
+  clearChoirImageCache,
+  loadChoirImageCache,
+  saveChoirImageCache,
+} from '../../lib/choirImageCache';
 
 /* Blob URL 미리보기는 next/image보다 일반 img가 적합하다. */
 /* eslint-disable @next/next/no-img-element */
 
 const SERVICE_TYPES = ['주일낮예배', '주일오후예배', '수요예배', '금요기도회', '기타'];
-const SAVED_REQUESTS_KEY = 'unoworship-pro:choir-requests';
+const DRAFT_KEY = 'unoworship-pro:choir-request-draft:v1';
 
-interface SavedChoirRequest {
-  id: string;
-  createdAt: string;
-  updatedAt: string;
+interface ChoirRequestDraft {
   serviceType: string;
   serviceDate: string;
   songTitle: string;
@@ -58,12 +60,6 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function createRequestId() {
-  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `choir-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 async function readApiResult(response: Response): Promise<ApiResult> {
   const text = await response.text();
   if (!text) return {};
@@ -91,9 +87,8 @@ export default function ChoirRequestPage() {
   const [images, setImages] = useState<ChoirImage[]>([]);
   const [status, setStatus] = useState<'idle' | 'rendering' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
-  const [savedRequests, setSavedRequests] = useState<SavedChoirRequest[]>([]);
-  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState('');
+  const [draftReady, setDraftReady] = useState(false);
+  const [fieldProgramMessage, setFieldProgramMessage] = useState('');
   const [cloudSaveStatus, setCloudSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const [cloudSaveMessage, setCloudSaveMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,18 +97,60 @@ export default function ChoirRequestPage() {
   const [searchResults, setSearchResults] = useState<SearchChoirRequest[]>([]);
 
   useEffect(() => {
-    setServiceDate(todayISO());
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw) as Partial<ChoirRequestDraft>;
+        setServiceType(draft.serviceType || '주일낮예배');
+        setServiceDate(draft.serviceDate || todayISO());
+        setSongTitle(draft.songTitle || '');
+        setComposer(draft.composer || '');
+        setArranger(draft.arranger || '');
+        setLyrics(draft.lyrics || '');
+        setNote(draft.note || '');
+      } else {
+        setServiceDate(todayISO());
+      }
+    } catch (error) {
+      console.warn('[choir-request] draft load failed', error);
+      setServiceDate(todayISO());
+    } finally {
+      setDraftReady(true);
+    }
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(SAVED_REQUESTS_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as SavedChoirRequest[];
-      if (Array.isArray(parsed)) setSavedRequests(parsed);
-    } catch (error) {
-      console.warn('[choir-request] saved requests load failed', error);
-    }
+    if (!draftReady) return;
+
+    const draft: ChoirRequestDraft = {
+      serviceType,
+      serviceDate,
+      songTitle,
+      composer,
+      arranger,
+      lyrics,
+      note,
+    };
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }, [arranger, composer, draftReady, lyrics, note, serviceDate, serviceType, songTitle]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadChoirImageCache()
+      .then((cachedImages) => {
+        if (cancelled || cachedImages.length === 0) return;
+        setImages(cachedImages);
+        setStatus('done');
+        setMessage('새로고침 전에 생성한 자막 이미지를 복원했습니다.');
+      })
+      .catch((error) => {
+        console.warn('[choir-request] image cache load failed', error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const sections = useMemo(
@@ -132,7 +169,6 @@ export default function ChoirRequestPage() {
   }), [arranger, composer, lyrics, note, serviceDate, serviceType, songTitle]);
 
   const isValid = Boolean(songTitle.trim() && lyrics.trim());
-  const hasSavableContent = Boolean(songTitle.trim() || composer.trim() || arranger.trim() || lyrics.trim() || note.trim());
 
   useEffect(() => {
     return () => images.forEach((image) => URL.revokeObjectURL(image.url));
@@ -212,9 +248,9 @@ export default function ChoirRequestPage() {
       };
 
       if (response.ok && result.ok) {
-        setSaveMessage(`현장 프로그램 파일 자동 저장 완료: ${result.fileName} · ${result.sectionCount ?? 0}개 섹션`);
+        setFieldProgramMessage(`현장 프로그램 파일 자동 저장 완료: ${result.fileName} · ${result.sectionCount ?? 0}개 섹션`);
       } else if (result.message) {
-        setSaveMessage(result.message);
+        setFieldProgramMessage(result.message);
       }
     } catch (error) {
       console.warn('[choir-request] field program auto save skipped', error);
@@ -240,6 +276,11 @@ export default function ChoirRequestPage() {
       });
       setImages(generated);
       setStatus('done');
+      try {
+        await saveChoirImageCache(generated);
+      } catch (error) {
+        console.warn('[choir-request] image cache save failed', error);
+      }
       await saveCloudRequest(generated);
       await saveFieldProgramFile();
     } catch (error) {
@@ -254,63 +295,9 @@ export default function ChoirRequestPage() {
     setImages([]);
     setStatus('idle');
     setMessage('');
-  };
-
-  const persistSavedRequests = (nextRequests: SavedChoirRequest[]) => {
-    setSavedRequests(nextRequests);
-    window.localStorage.setItem(SAVED_REQUESTS_KEY, JSON.stringify(nextRequests));
-  };
-
-  const createSavedRequest = (notice: string) => {
-    const now = new Date().toISOString();
-    const nextRequest: SavedChoirRequest = {
-      id: createRequestId(),
-      createdAt: now,
-      updatedAt: now,
-      ...currentRequest,
-    };
-    persistSavedRequests([nextRequest, ...savedRequests]);
-    setActiveRequestId(nextRequest.id);
-    setSaveMessage(notice);
-  };
-
-  const updateSavedRequest = (notice: string) => {
-    if (!activeRequestId) {
-      createSavedRequest(notice);
-      return;
-    }
-
-    const now = new Date().toISOString();
-    let didUpdate = false;
-    const nextRequests = savedRequests.map((request) => {
-      if (request.id !== activeRequestId) return request;
-      didUpdate = true;
-      return {
-        ...request,
-        ...currentRequest,
-        updatedAt: now,
-      };
+    void clearChoirImageCache().catch((error) => {
+      console.warn('[choir-request] image cache clear failed', error);
     });
-
-    if (!didUpdate) {
-      createSavedRequest(notice);
-      return;
-    }
-
-    persistSavedRequests(nextRequests);
-    setSaveMessage(notice);
-  };
-
-  const handleSavePrimary = async () => {
-    updateSavedRequest(activeRequestId ? '수정 내용을 저장했습니다.' : '요청을 저장했습니다.');
-  };
-
-  const handleSaveUpdate = async () => {
-    updateSavedRequest('저장된 요청을 업데이트했습니다.');
-  };
-
-  const handleSaveAsNew = async () => {
-    createSavedRequest('새 요청으로 저장했습니다.');
   };
 
   const handleSearch = async () => {
@@ -352,7 +339,6 @@ export default function ChoirRequestPage() {
 
   const handleEditSearchResult = (request: SearchChoirRequest) => {
     images.forEach((image) => URL.revokeObjectURL(image.url));
-    setActiveRequestId(`cloud:${request.id}`);
     setServiceType(request.service_type || '주일낮예배');
     setServiceDate(request.service_date || todayISO());
     setSongTitle(request.song_title || '');
@@ -366,7 +352,10 @@ export default function ChoirRequestPage() {
     setSearchResults([]);
     setSearchStatus('idle');
     setSearchMessage('');
-    setSaveMessage('지난 곡을 수정 모드로 불러왔습니다. 편집 후 자막 이미지를 다시 생성해 주세요.');
+    setMessage('지난 곡을 수정 모드로 불러왔습니다. 편집 후 자막 이미지를 다시 생성해 주세요.');
+    void clearChoirImageCache().catch((error) => {
+      console.warn('[choir-request] image cache clear failed', error);
+    });
   };
 
   const handleDownloadAll = () => {
@@ -488,19 +477,11 @@ export default function ChoirRequestPage() {
           </label>
           <label>방송실 메모<input value={note} onChange={(event) => setNote(event.target.value)} placeholder="선택 입력" /></label>
 
-          <div className="save-panel">
-            <div className="save-actions">
-              <button className="secondary-button" onClick={() => void handleSavePrimary()} disabled={!hasSavableContent}>저장하기</button>
-              <button className="secondary-button" onClick={() => void handleSaveUpdate()} disabled={!activeRequestId || !hasSavableContent}>저장</button>
-              <button className="secondary-button" onClick={() => void handleSaveAsNew()} disabled={!hasSavableContent}>새로저장</button>
-            </div>
-            {saveMessage && <p className="save-message">{saveMessage}</p>}
-            {cloudSaveMessage && <p className={`field-program-message ${cloudSaveStatus}`}>{cloudSaveMessage}</p>}
-          </div>
-
           <button className="primary-button" onClick={handleGenerate} disabled={!isValid || status === 'rendering'}>
             {status === 'rendering' ? '이미지 생성 중...' : '자막 이미지 생성'}
           </button>
+          {cloudSaveMessage && <p className={`field-program-message ${cloudSaveStatus}`}>{cloudSaveMessage}</p>}
+          {fieldProgramMessage && <p className="field-program-message">{fieldProgramMessage}</p>}
           {status === 'error' && <p className="error-message">{message}</p>}
         </section>
 
