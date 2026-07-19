@@ -7,6 +7,16 @@ body { margin: 0; background: #f5f7fb; color: #172033; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
+.pwa-install-banner { position: sticky; z-index: 100; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 12px max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left)); border-bottom: 1px solid #dfe4ee; color: #172033; background: rgba(255, 255, 255, .98); box-shadow: 0 6px 20px rgba(30, 48, 80, .08); }
+.pwa-install-copy { display: grid; gap: 2px; min-width: 0; }
+.pwa-install-copy strong { font-size: 13px; }
+.pwa-install-copy span, .pwa-install-copy small { color: #728096; font-size: 11px; line-height: 1.45; }
+.pwa-install-steps { display: flex; flex-wrap: wrap; gap: 5px 10px; margin: 5px 0 0; padding: 0; list-style: none; }
+.pwa-install-steps li { display: flex; align-items: center; gap: 4px; color: #4f5d73; font-size: 10px; white-space: nowrap; }
+.pwa-install-steps b { display: inline-grid; width: 17px; height: 17px; place-items: center; border-radius: 50%; color: #fff; background: #6754d9; font-size: 9px; }
+.pwa-install-actions { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
+.pwa-install-actions button { height: 34px; padding: 0 12px; border: 0; border-radius: 6px; color: #fff; background: #6754d9; font-size: 11px; font-weight: 800; }
+.pwa-install-actions .pwa-install-close { width: 34px; padding: 0; border: 1px solid #dfe4ee; color: #6f7b8f; background: #fff; font-size: 18px; }
 .site-shell { min-height: 100vh; max-width: 1260px; margin: 0 auto; padding: 36px 28px 28px; }
 .site-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
 .eyebrow { margin: 0 0 10px; color: #6754d9; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
@@ -95,6 +105,10 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .page-footer { padding: 24px 0 0; color: #9ca7b8; font-size: 11px; text-align: center; }
 @media (max-width: 880px) { .site-shell { padding: 24px 16px; } .site-header { align-items: flex-start; flex-direction: column; } .content-grid { grid-template-columns: 1fr; } .empty-state { min-height: 230px; } .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
+  .pwa-install-banner { align-items: flex-start; gap: 10px; padding-top: max(10px, env(safe-area-inset-top)); }
+  .pwa-install-copy span { max-width: 220px; }
+  .pwa-install-steps { display: grid; gap: 4px; }
+  .pwa-install-actions button { height: 32px; padding: 0 9px; white-space: nowrap; }
   .site-shell { padding: 20px 12px 24px; }
   .site-header { gap: 14px; margin-bottom: 20px; }
   .site-header h1 { font-size: 21px; }
