@@ -153,8 +153,10 @@
 - 수정 모드 진입·새 요청 시 이전 저장 메시지(cloudSave/fieldProgram) 초기화.
 - **보류(사용자 결정 필요)** — `/api/choir-requests`가 무인증 공개 쓰기 엔드포인트 (service role 사용).
   접근 코드 게이트 등 보호를 넣을지 결정 대기.
-- **푸시 차단** — 이 PC의 git 자격증명이 `tbakorea` 계정이라 `seongjugim7903-ai/unoworship-pro`에
-  push 403. GitHub MCP 토큰도 만료(Bad credentials). 해결 전까지 커밋은 로컬 보관.
+- **푸시 차단 → 해결(같은 날)** — 이 PC의 git 자격증명이 `tbakorea` 계정뿐이라 push 403이었음.
+  GCM에 `seongjugim7903-ai` 계정 추가 로그인 후, 이 저장소에
+  `git config --local credential.https://github.com.username seongjugim7903-ai`로 계정 고정.
+  GitHub MCP 토큰은 여전히 만료 상태(Bad credentials) — 필요 시 갱신 대상.
 
 ## 2026-07-20 — 전체 저장 버튼 제거, 파일 공유가 기본 경로로 확정
 
