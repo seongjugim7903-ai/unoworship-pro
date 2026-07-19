@@ -6,3 +6,5 @@ out/
 .env*.local
 .gstack/
 tsconfig.tsbuildinfo
+.vercel
+supabase/.temp/

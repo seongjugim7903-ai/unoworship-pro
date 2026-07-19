@@ -1,0 +1,197 @@
+import { createHash } from 'node:crypto';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { buildChoirProgramPayload, parseLyricSections } from '../../../lib/choirProgramPayload';
+import {
+  SupabaseServerConfigError,
+  supabaseRest,
+  uploadSupabaseObject,
+} from '../../../lib/supabase/server';
+
+export const runtime = 'nodejs';
+
+const BUCKET_NAME = 'choir-generated-images';
+
+const ChoirRequestSchema = z.object({
+  serviceType: z.string().trim().min(1).default('주일낮예배'),
+  serviceDate: z.string().trim().optional().default(''),
+  songTitle: z.string().trim().min(1, '곡명을 입력해 주세요.'),
+  composer: z.string().trim().optional().default(''),
+  arranger: z.string().trim().optional().default(''),
+  lyrics: z.string().trim().min(1, '가사를 입력해 주세요.'),
+  note: z.string().trim().optional().default(''),
+  source: z.string().trim().optional().default('unoworship-pro'),
+});
+
+interface ChoirRequestRow {
+  id: string;
+}
+
+interface GeneratedImageRow {
+  id: string;
+  storage_path: string;
+  section_index: number;
+}
+
+function formatStorageDate(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return new Date().toISOString().slice(0, 10);
+}
+
+function sanitizePathSegment(value: string) {
+  return value
+    .trim()
+    .replace(/[\\/:*?"<>|#%{}\[\]^`]/g, '')
+    .replace(/\s+/g, '-')
+    .slice(0, 80) || 'choir';
+}
+
+async function readPayload(formData: FormData) {
+  const rawPayload = formData.get('payload');
+  if (typeof rawPayload !== 'string') {
+    throw new Error('payload가 없습니다.');
+  }
+
+  return ChoirRequestSchema.parse(JSON.parse(rawPayload));
+}
+
+function getImageFiles(formData: FormData) {
+  return [...formData.entries()]
+    .filter(([key, value]) => key.startsWith('image-') && value instanceof File)
+    .sort(([left], [right]) => left.localeCompare(right, 'ko-KR', { numeric: true }))
+    .map(([, value]) => value as File);
+}
+
+function jsonError(message: string, status: number, code = 'CHOIR_REQUEST_SAVE_FAILED') {
+  return NextResponse.json({ ok: false, code, message }, { status });
+}
+
+export async function POST(request: Request) {
+  try {
+    const formData = await request.formData();
+    const payload = await readPayload(formData);
+    const imageFiles = getImageFiles(formData);
+    const sections = parseLyricSections(payload.lyrics);
+    const sectionCount = sections.length || imageFiles.length;
+
+    const [requestRow] = await supabaseRest<ChoirRequestRow[]>(
+      '/choir_requests',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          service_date: payload.serviceDate || null,
+          service_type: payload.serviceType,
+          song_title: payload.songTitle,
+          composer: payload.composer,
+          arranger: payload.arranger,
+          lyrics: payload.lyrics,
+          note: payload.note,
+          section_count: sectionCount,
+          source: payload.source,
+          status: imageFiles.length > 0 ? 'rendered' : 'text_saved',
+          metadata: {
+            appUrl: request.headers.get('origin') ?? null,
+            savedBy: 'choir-request-page',
+          },
+        }),
+      },
+      { prefer: 'return=representation' },
+    );
+
+    const dateSegment = formatStorageDate(payload.serviceDate);
+    const titleSegment = sanitizePathSegment(payload.songTitle);
+    const imageRows: GeneratedImageRow[] = [];
+    const imagePaths: string[] = [];
+
+    for (let index = 0; index < imageFiles.length; index += 1) {
+      const file = imageFiles[index];
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const checksum = createHash('sha256').update(buffer).digest('hex');
+      const sectionIndex = index + 1;
+      const storagePath = [
+        'choir',
+        dateSegment,
+        titleSegment,
+        requestRow.id,
+        `${String(sectionIndex).padStart(2, '0')}.png`,
+      ].join('/');
+
+      await uploadSupabaseObject({
+        bucket: BUCKET_NAME,
+        path: storagePath,
+        body: buffer,
+        contentType: file.type || 'image/png',
+        upsert: true,
+      });
+
+      imagePaths.push(storagePath);
+      const [imageRow] = await supabaseRest<GeneratedImageRow[]>(
+        '/choir_generated_images',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            request_id: requestRow.id,
+            section_index: sectionIndex,
+            label: `${sectionIndex}번 섹션`,
+            bucket: BUCKET_NAME,
+            storage_path: storagePath,
+            content_type: file.type || 'image/png',
+            size_bytes: buffer.byteLength,
+            width: 1920,
+            height: 1080,
+            checksum,
+            metadata: {
+              originalFileName: file.name,
+            },
+          }),
+        },
+        { prefer: 'return=representation' },
+      );
+      imageRows.push(imageRow);
+    }
+
+    const programPayload = buildChoirProgramPayload({
+      ...payload,
+      requestId: requestRow.id,
+      imagePaths,
+      source: 'unoworship-pro-supabase',
+    });
+
+    await supabaseRest(
+      '/choir_programs',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          request_id: requestRow.id,
+          program_id: programPayload.id,
+          title: payload.songTitle,
+          program_payload: programPayload,
+          status: 'ready',
+        }),
+      },
+      { prefer: 'return=representation' },
+    );
+
+    return NextResponse.json({
+      ok: true,
+      requestId: requestRow.id,
+      programId: programPayload.id,
+      sectionCount,
+      imageCount: imageRows.length,
+      imagePaths,
+    });
+  } catch (error) {
+    console.error('[choir-requests] save failed', error);
+
+    if (error instanceof SupabaseServerConfigError) {
+      return jsonError(error.message, 503, error.code);
+    }
+
+    if (error instanceof z.ZodError) {
+      return jsonError(error.issues[0]?.message ?? '입력값을 확인해 주세요.', 400, 'INVALID_CHOIR_REQUEST');
+    }
+
+    const message = error instanceof Error ? error.message : '찬양대 요청 저장 중 오류가 발생했습니다.';
+    return jsonError(message, 500);
+  }
+}

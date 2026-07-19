@@ -25,7 +25,8 @@ h1 { margin-bottom: 8px; font-size: clamp(28px, 4vw, 42px); letter-spacing: -.04
 .step-number.success { color: #149768; }
 .required-note, .section-count { color: #8a96a9; font-size: 11px; }
 .field-grid { display: grid; gap: 14px; margin-bottom: 14px; }
-.two-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.two-columns, .service-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.song-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 label { display: block; color: #526078; font-size: 12px; font-weight: 700; }
 label input, label select, label textarea { display: block; width: 100%; min-width: 0; margin-top: 7px; border: 1px solid #d7deea; border-radius: 6px; outline: 0; color: #1e293b; background: #fff; transition: border-color .15s, box-shadow .15s; }
 label input, label select { height: 42px; padding: 0 12px; }
@@ -35,6 +36,18 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .copyright-note { margin: 18px 0; padding: 14px; border: 1px solid #eee7c9; border-radius: 6px; background: #fffbed; }
 .copyright-note strong { color: #8d6f18; font-size: 12px; }
 .copyright-note p { margin: 6px 0 0; color: #887d59; font-size: 11px; line-height: 1.6; }
+.save-panel { display: grid; gap: 10px; margin: 16px 0; padding: 12px; border: 1px solid #e4e9f1; border-radius: 6px; background: #fbfcff; }
+.save-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
+.save-message { margin: 0; color: #53627a; font-size: 11px; line-height: 1.5; }
+.field-program-message { margin: 0; padding: 9px 10px; border-radius: 5px; color: #53627a; background: #f2f5fb; font-size: 11px; line-height: 1.5; }
+.field-program-message.saving { color: #6f5b0e; background: #fff7db; }
+.field-program-message.done { color: #106747; background: #e5f8ef; }
+.field-program-message.error { color: #a73545; background: #fff0f2; }
+.saved-request-list { display: grid; gap: 7px; }
+.saved-request { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; }
+.saved-request.active { border-color: #8f83e8; background: #f7f5ff; }
+.saved-request strong { display: block; overflow: hidden; color: #263247; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.saved-request span { display: block; overflow: hidden; margin-top: 3px; color: #8a96a9; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .primary-button, .secondary-button, .share-button, .text-button { border-radius: 6px; font-size: 12px; font-weight: 800; transition: .15s; }
 .primary-button { width: 100%; height: 44px; border: 0; color: #fff; background: #6754d9; }
 .primary-button:hover { background: #5745c8; }
@@ -79,6 +92,14 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
   .panel-heading { align-items: flex-start; }
   .panel-heading h2, .result-heading h2 { font-size: 16px; }
   .two-columns { grid-template-columns: 1fr; }
+  .service-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .song-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .service-fields label, .song-fields label { min-width: 0; font-size: 11px; }
+  .service-fields label input, .service-fields label select, .song-fields label input { height: 40px; padding: 0 8px; font-size: 12px; }
+  .save-panel { padding: 10px; }
+  .save-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .save-actions .secondary-button { height: 36px; padding: 0 6px; font-size: 11px; }
+  .saved-request { grid-template-columns: minmax(0, 1fr) 54px; }
   .field-hint { float: none; display: block; margin-top: 4px; }
   label textarea { min-height: 170px; }
   .image-grid { grid-template-columns: 1fr; }

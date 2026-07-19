@@ -108,3 +108,17 @@
   사용자 확인 멘트: "이 셋팅이 플러스 모드네요". 후속: 프로필 적용 시 Out2 라우팅 자동화
   (PRODUCT_PLAN §5-5 v1.1 후보), 임시 운영 커맨드는 UnoLive-필앤키+컴포즈-실행.
 - 다음: Phase 1 — 소켓 zod 스키마 + 재조인 래퍼 + 상태 리플레이 + 렌더러 이식 + /out 라우트.
+
+## 2026-07-19 — 찬양대 자막 요청 Supabase 저장 레이어
+
+- `unoworship-pro-eight.vercel.app`에서 생성한 찬양대 자막 요청을 브라우저 로컬 저장에만 두지 않고
+  Supabase에 저장하는 방향으로 확정.
+- 저장 단위는 세 가지: `choir_requests`(원본 가사/요청), `choir_generated_images`(PNG Storage 메타),
+  `choir_programs`(현장 Composer 가져오기용 프로그램 payload).
+- 실제 PNG는 Supabase Storage bucket `choir-generated-images`에 저장.
+- 2026-07-19 사용자가 새 Supabase URL `https://hwbzztfjzeismosjkmhe.supabase.co`를 제공.
+  Vercel env의 `SUPABASE_URL`은 이 값이 기준. 다만 현재 로컬 Supabase CLI 계정에는 이전 프로젝트
+  `blimpsrrphfstbbitblo`만 표시되고 새 프로젝트는 목록에 나오지 않아, DB 마이그레이션은 새 프로젝트가
+  보이는 계정으로 CLI 로그인하거나 Dashboard SQL Editor에서 직접 실행해야 한다.
+- 서버 route handler만 service role key를 사용한다. key는 Vercel env에만 저장하고 GitHub/브라우저 코드에 넣지 않는다.
+- 세부 설계 문서: `docs/features/choir-requests/SUPABASE_STORAGE_PLAN.md`.
