@@ -11,10 +11,21 @@ button:disabled { cursor: not-allowed; }
 .site-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
 .eyebrow { margin: 0 0 10px; color: #6754d9; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
 h1, h2, p { margin-top: 0; }
-h1 { margin-bottom: 8px; font-size: clamp(28px, 4vw, 42px); letter-spacing: -.04em; }
+h1 { margin-bottom: 0; font-size: clamp(19px, 2.65vw, 28px); letter-spacing: -.04em; }
 .header-copy { margin: 0; color: #68758b; font-size: 14px; }
 .status-pill { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid #d9e0ed; border-radius: 999px; color: #526078; background: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .status-pill span { width: 8px; height: 8px; border-radius: 50%; background: #19ad76; box-shadow: 0 0 0 4px #dcf7eb; }
+.search-panel { margin-bottom: 18px; padding: 18px; }
+.search-row { display: grid; grid-template-columns: minmax(0, 1fr) 86px; gap: 10px; align-items: end; }
+.search-button { width: 100%; }
+.search-message { margin: 10px 0 0; color: #64748b; font-size: 11px; line-height: 1.5; }
+.search-message.loading { color: #6f5b0e; }
+.search-message.done { color: #106747; }
+.search-message.error { color: #a73545; }
+.search-result-list { display: grid; gap: 7px; max-height: 220px; overflow: auto; margin-top: 12px; padding-right: 3px; }
+.search-result { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fbfcff; }
+.search-result strong { display: block; overflow: hidden; color: #263247; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.search-result span { display: block; overflow: hidden; margin-top: 3px; color: #8a96a9; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .content-grid { display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(0, .94fr); gap: 18px; align-items: start; }
 .panel { border: 1px solid #e1e7f0; border-radius: 8px; background: #fff; box-shadow: 0 10px 28px rgba(30, 48, 80, .06); }
 .form-panel, .preview-panel { padding: 26px; }
@@ -85,9 +96,13 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 @media (max-width: 600px) {
   .site-shell { padding: 20px 12px 24px; }
   .site-header { gap: 14px; margin-bottom: 20px; }
-  .site-header h1 { font-size: 29px; }
+  .site-header h1 { font-size: 21px; }
   .header-copy { max-width: 320px; line-height: 1.65; }
   .status-pill { align-self: stretch; justify-content: center; }
+  .search-panel { padding: 14px; }
+  .search-row { grid-template-columns: minmax(0, 1fr) 72px; gap: 8px; }
+  .search-button { height: 40px; padding: 0 8px; }
+  .search-result { grid-template-columns: minmax(0, 1fr) 54px; }
   .form-panel, .preview-panel, .result-panel { padding: 16px; }
   .panel-heading { align-items: flex-start; }
   .panel-heading h2, .result-heading h2 { font-size: 16px; }

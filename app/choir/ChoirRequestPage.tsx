@@ -29,6 +29,21 @@ interface SavedChoirRequest {
   note: string;
 }
 
+interface SearchChoirRequest {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  service_date: string | null;
+  service_type: string;
+  song_title: string;
+  composer: string;
+  arranger: string;
+  lyrics: string;
+  note: string;
+  section_count: number;
+  status: string;
+}
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -60,10 +75,12 @@ export default function ChoirRequestPage() {
   const [savedRequests, setSavedRequests] = useState<SavedChoirRequest[]>([]);
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState('');
-  const [fieldProgramStatus, setFieldProgramStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
-  const [fieldProgramMessage, setFieldProgramMessage] = useState('');
   const [cloudSaveStatus, setCloudSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const [cloudSaveMessage, setCloudSaveMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+  const [searchMessage, setSearchMessage] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchChoirRequest[]>([]);
 
   useEffect(() => {
     setServiceDate(todayISO());
@@ -95,9 +112,8 @@ export default function ChoirRequestPage() {
     note: note.trim(),
   }), [arranger, composer, lyrics, note, serviceDate, serviceType, songTitle]);
 
-  const isValid = Boolean(songTitle.trim() && composer.trim() && lyrics.trim());
+  const isValid = Boolean(songTitle.trim() && lyrics.trim());
   const hasSavableContent = Boolean(songTitle.trim() || composer.trim() || arranger.trim() || lyrics.trim() || note.trim());
-  const canSaveFieldProgram = Boolean(songTitle.trim() && lyrics.trim());
 
   useEffect(() => {
     return () => images.forEach((image) => URL.revokeObjectURL(image.url));
@@ -106,12 +122,12 @@ export default function ChoirRequestPage() {
   const saveCloudRequest = async (imagesToSave: ChoirImage[] = images) => {
     if (!currentRequest.songTitle || !currentRequest.lyrics) {
       setCloudSaveStatus('idle');
-      setCloudSaveMessage('곡명과 가사가 있어야 DB에 저장됩니다.');
+      setCloudSaveMessage('곡명과 가사가 있어야 저장됩니다.');
       return;
     }
 
     setCloudSaveStatus('saving');
-    setCloudSaveMessage(imagesToSave.length > 0 ? '가사와 생성 이미지를 DB에 저장하고 있습니다.' : '가사를 DB에 저장하고 있습니다.');
+    setCloudSaveMessage(imagesToSave.length > 0 ? '가사와 생성 이미지를 저장하고 있습니다.' : '가사를 저장하고 있습니다.');
 
     try {
       const formData = new FormData();
@@ -138,18 +154,49 @@ export default function ChoirRequestPage() {
 
       if (!response.ok || !result.ok) {
         setCloudSaveStatus('error');
-        setCloudSaveMessage(result.message ?? 'Supabase DB 저장에 실패했습니다.');
+        setCloudSaveMessage(result.message ?? '저장에 실패했습니다.');
         return;
       }
 
       setCloudSaveStatus('done');
       setCloudSaveMessage(
-        `DB 저장 완료: ${result.sectionCount ?? sections.length}개 섹션 · 이미지 ${result.imageCount ?? imagesToSave.length}장 · 요청 ${result.requestId}`,
+        `저장 완료: ${result.sectionCount ?? sections.length}개 섹션 · 이미지 ${result.imageCount ?? imagesToSave.length}장 · 요청 ${result.requestId}`,
       );
     } catch (error) {
       console.error('[choir-request] cloud save failed', error);
       setCloudSaveStatus('error');
-      setCloudSaveMessage('DB 저장 중 오류가 발생했습니다.');
+      setCloudSaveMessage('저장 중 오류가 발생했습니다.');
+    }
+  };
+
+  const saveFieldProgramFile = async () => {
+    if (!currentRequest.songTitle || !currentRequest.lyrics) return;
+
+    try {
+      const response = await fetch('/api/field-programs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentRequest),
+      });
+
+      if (response.status === 409) {
+        return;
+      }
+
+      const result = await response.json() as {
+        ok?: boolean;
+        fileName?: string;
+        sectionCount?: number;
+        message?: string;
+      };
+
+      if (response.ok && result.ok) {
+        setSaveMessage(`현장 프로그램 파일 자동 저장 완료: ${result.fileName} · ${result.sectionCount ?? 0}개 섹션`);
+      } else if (result.message) {
+        setSaveMessage(result.message);
+      }
+    } catch (error) {
+      console.warn('[choir-request] field program auto save skipped', error);
     }
   };
 
@@ -173,6 +220,7 @@ export default function ChoirRequestPage() {
       setImages(generated);
       setStatus('done');
       await saveCloudRequest(generated);
+      await saveFieldProgramFile();
     } catch (error) {
       console.error('[choir-request] image generation failed', error);
       setStatus('error');
@@ -190,47 +238,6 @@ export default function ChoirRequestPage() {
   const persistSavedRequests = (nextRequests: SavedChoirRequest[]) => {
     setSavedRequests(nextRequests);
     window.localStorage.setItem(SAVED_REQUESTS_KEY, JSON.stringify(nextRequests));
-  };
-
-  const saveFieldProgramFile = async () => {
-    if (!canSaveFieldProgram) {
-      setFieldProgramStatus('idle');
-      setFieldProgramMessage('곡명과 가사가 있어야 현장 워십 프로그램 파일로 저장됩니다.');
-      return;
-    }
-
-    setFieldProgramStatus('saving');
-    setFieldProgramMessage('현장 워십 프로그램 파일을 저장하고 있습니다.');
-
-    try {
-      const response = await fetch('/api/field-programs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(currentRequest),
-      });
-      const result = await response.json() as {
-        ok?: boolean;
-        message?: string;
-        fileName?: string;
-        sectionCount?: number;
-        updatedExisting?: boolean;
-      };
-
-      if (!response.ok || !result.ok) {
-        setFieldProgramStatus('error');
-        setFieldProgramMessage(result.message ?? '현장 워십 프로그램 파일 저장에 실패했습니다.');
-        return;
-      }
-
-      setFieldProgramStatus('done');
-      setFieldProgramMessage(
-        `${result.updatedExisting ? '기존 프로그램 업데이트' : '새 프로그램 생성'}: ${result.fileName} · ${result.sectionCount ?? 0}개 섹션`,
-      );
-    } catch (error) {
-      console.error('[choir-request] field program save failed', error);
-      setFieldProgramStatus('error');
-      setFieldProgramMessage('현장 워십 프로그램 파일 저장 중 오류가 발생했습니다.');
-    }
   };
 
   const createSavedRequest = (notice: string) => {
@@ -275,17 +282,14 @@ export default function ChoirRequestPage() {
 
   const handleSavePrimary = async () => {
     updateSavedRequest(activeRequestId ? '수정 내용을 저장했습니다.' : '요청을 저장했습니다.');
-    await saveFieldProgramFile();
   };
 
   const handleSaveUpdate = async () => {
     updateSavedRequest('저장된 요청을 업데이트했습니다.');
-    await saveFieldProgramFile();
   };
 
   const handleSaveAsNew = async () => {
     createSavedRequest('새 요청으로 저장했습니다.');
-    await saveFieldProgramFile();
   };
 
   const handleEditSavedRequest = (request: SavedChoirRequest) => {
@@ -302,6 +306,59 @@ export default function ChoirRequestPage() {
     setStatus('idle');
     setMessage('');
     setSaveMessage('저장된 요청을 수정 모드로 불러왔습니다.');
+  };
+
+  const handleSearch = async () => {
+    setSearchStatus('loading');
+    setSearchMessage('');
+
+    try {
+      const params = new URLSearchParams({
+        limit: '20',
+      });
+      const query = searchTerm.trim();
+      if (query) params.set('search', query);
+
+      const response = await fetch(`/api/choir-requests?${params.toString()}`);
+      const result = await response.json() as {
+        ok?: boolean;
+        message?: string;
+        requests?: SearchChoirRequest[];
+      };
+
+      if (!response.ok || !result.ok) {
+        setSearchStatus('error');
+        setSearchMessage(result.message ?? '지난 곡을 불러오지 못했습니다.');
+        setSearchResults([]);
+        return;
+      }
+
+      const requests = Array.isArray(result.requests) ? result.requests : [];
+      setSearchResults(requests);
+      setSearchStatus('done');
+      setSearchMessage(requests.length > 0 ? `${requests.length}곡을 찾았습니다.` : '검색 결과가 없습니다.');
+    } catch (error) {
+      console.error('[choir-request] search failed', error);
+      setSearchStatus('error');
+      setSearchMessage('지난 곡 검색 중 오류가 발생했습니다.');
+      setSearchResults([]);
+    }
+  };
+
+  const handleEditSearchResult = (request: SearchChoirRequest) => {
+    images.forEach((image) => URL.revokeObjectURL(image.url));
+    setActiveRequestId(`cloud:${request.id}`);
+    setServiceType(request.service_type || '주일낮예배');
+    setServiceDate(request.service_date || todayISO());
+    setSongTitle(request.song_title || '');
+    setComposer(request.composer || '');
+    setArranger(request.arranger || '');
+    setLyrics(request.lyrics || '');
+    setNote(request.note || '');
+    setImages([]);
+    setStatus('idle');
+    setMessage('');
+    setSaveMessage('지난 곡을 수정 모드로 불러왔습니다. 편집 후 자막 이미지를 다시 생성해 주세요.');
   };
 
   const handleDownloadAll = () => {
@@ -339,11 +396,49 @@ export default function ChoirRequestPage() {
       <header className="site-header">
         <div>
           <p className="eyebrow">UNOWORSHIP PRO</p>
-          <h1>찬양대 자막 요청</h1>
-          <p className="header-copy">가사를 입력하면 무대용 자막 이미지를 만들어 바로 공유할 수 있습니다.</p>
+          <h1>헵시바 선교단 자막 협조</h1>
         </div>
-        <div className="status-pill"><span /> 모바일 공유 준비</div>
       </header>
+
+      <section className="panel search-panel">
+        <div className="search-row">
+          <label>
+            지난 곡 검색
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void handleSearch();
+              }}
+              placeholder="곡명, 작곡, 편곡으로 검색"
+            />
+          </label>
+          <button
+            className="secondary-button search-button"
+            onClick={() => void handleSearch()}
+            disabled={searchStatus === 'loading'}
+          >
+            {searchStatus === 'loading' ? '검색 중' : '검색'}
+          </button>
+        </div>
+        {searchMessage && <p className={`search-message ${searchStatus}`}>{searchMessage}</p>}
+        {searchResults.length > 0 && (
+          <div className="search-result-list">
+            {searchResults.map((request) => (
+              <article className="search-result" key={request.id}>
+                <div>
+                  <strong>{request.song_title || '제목 없는 곡'}</strong>
+                  <span>
+                    {request.service_type} · {request.service_date || '날짜 없음'} · {request.section_count ?? 0}개 섹션
+                    {request.composer ? ` · ${request.composer}` : ''}
+                  </span>
+                </div>
+                <button className="text-button" onClick={() => handleEditSearchResult(request)}>수정</button>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="content-grid">
         <section className="panel form-panel">
@@ -363,7 +458,7 @@ export default function ChoirRequestPage() {
           </div>
           <div className="field-grid song-fields">
             <label>곡명 *<input value={songTitle} onChange={(event) => setSongTitle(event.target.value)} placeholder="예: 은혜" /></label>
-            <label>작곡 *<input value={composer} onChange={(event) => setComposer(event.target.value)} placeholder="예: 손경민" /></label>
+            <label>작곡<input value={composer} onChange={(event) => setComposer(event.target.value)} placeholder="선택 입력" /></label>
             <label>편곡<input value={arranger} onChange={(event) => setArranger(event.target.value)} placeholder="선택 입력" /></label>
           </div>
 
@@ -377,15 +472,8 @@ export default function ChoirRequestPage() {
               <button className="secondary-button" onClick={() => void handleSavePrimary()} disabled={!hasSavableContent}>저장하기</button>
               <button className="secondary-button" onClick={() => void handleSaveUpdate()} disabled={!activeRequestId || !hasSavableContent}>저장</button>
               <button className="secondary-button" onClick={() => void handleSaveAsNew()} disabled={!hasSavableContent}>새로저장</button>
-              <button className="secondary-button" onClick={() => void saveFieldProgramFile()} disabled={!canSaveFieldProgram || fieldProgramStatus === 'saving'}>
-                {fieldProgramStatus === 'saving' ? '파일 저장 중' : '워십 파일 저장'}
-              </button>
-              <button className="secondary-button" onClick={() => void saveCloudRequest()} disabled={!canSaveFieldProgram || cloudSaveStatus === 'saving'}>
-                {cloudSaveStatus === 'saving' ? 'DB 저장 중' : 'DB 저장'}
-              </button>
             </div>
             {saveMessage && <p className="save-message">{saveMessage}</p>}
-            {fieldProgramMessage && <p className={`field-program-message ${fieldProgramStatus}`}>{fieldProgramMessage}</p>}
             {cloudSaveMessage && <p className={`field-program-message ${cloudSaveStatus}`}>{cloudSaveMessage}</p>}
             {savedRequests.length > 0 && (
               <div className="saved-request-list">

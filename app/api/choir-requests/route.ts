@@ -72,6 +72,55 @@ function jsonError(message: string, status: number, code = 'CHOIR_REQUEST_SAVE_F
   return NextResponse.json({ ok: false, code, message }, { status });
 }
 
+function clampLimit(value: string | null) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 20;
+  return Math.max(1, Math.min(50, Math.floor(parsed)));
+}
+
+function normalizeSearch(value: string | null) {
+  return String(value ?? '')
+    .trim()
+    .replace(/[(),]/g, ' ')
+    .replace(/\*/g, '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 80);
+}
+
+export async function GET(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const limit = clampLimit(url.searchParams.get('limit'));
+    const search = normalizeSearch(url.searchParams.get('search'));
+    const params = new URLSearchParams({
+      select: 'id,created_at,updated_at,service_date,service_type,song_title,composer,arranger,lyrics,note,section_count,status',
+      order: 'updated_at.desc',
+      limit: String(limit),
+    });
+
+    if (search) {
+      const pattern = `*${search}*`;
+      params.set('or', `(song_title.ilike.${pattern},composer.ilike.${pattern},arranger.ilike.${pattern})`);
+    }
+
+    const rows = await supabaseRest(
+      `/choir_requests?${params.toString()}`,
+      { method: 'GET' },
+    );
+
+    return NextResponse.json({ ok: true, requests: rows });
+  } catch (error) {
+    console.error('[choir-requests] list failed', error);
+
+    if (error instanceof SupabaseServerConfigError) {
+      return jsonError(error.message, 503, error.code);
+    }
+
+    const message = error instanceof Error ? error.message : '지난 찬양대 요청을 불러오지 못했습니다.';
+    return jsonError(message, 500, 'CHOIR_REQUEST_LIST_FAILED');
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
