@@ -122,3 +122,17 @@
   보이는 계정으로 CLI 로그인하거나 Dashboard SQL Editor에서 직접 실행해야 한다.
 - 서버 route handler만 service role key를 사용한다. key는 Vercel env에만 저장하고 GitHub/브라우저 코드에 넣지 않는다.
 - 세부 설계 문서: `docs/features/choir-requests/SUPABASE_STORAGE_PLAN.md`.
+
+## 2026-07-20 — 전체저장→카카오톡 순차 활성화 + 공식 카카오 공유창
+
+- Windows PC(F:\projects\unoworship-pro)에 GitHub 저장소 클론, 개발 환경 재구성 (npm install·typecheck·vitest 통과).
+- **버튼 순서 강제** (사용자 지시) — 생성된 자막 이미지 패널에서 `① 전체 이미지 저장`이 먼저,
+  완료 후에만 `② 카카오톡으로 보내기` 활성화. `downloadAllStatus` 상태로 게이팅하고
+  생성/새 요청/지난 곡 수정 시 idle로 리셋.
+- **카카오톡 공유 = 공식 JS SDK** (사용자 지시: "통상적인 웹사이트의 카카오 공유창 그대로") —
+  SDK 2.8.1 `Kakao.Share.sendDefault`(feed) + `uploadImage`(첫 PNG 썸네일, 5MB 한도, 카카오 서버 100일 보관).
+  구현: `lib/kakaoShare.ts`. 버튼은 카카오 노랑(#FEE500) 공식 스타일.
+- **키 미설정 시 예비 경로** — `NEXT_PUBLIC_KAKAO_JS_KEY` 없으면 기존 `navigator.share` 파일 공유로 대체.
+  키 발급·도메인 등록 절차는 `docs/features/choir-requests/KAKAO_SHARE.md`.
+- 남은 사용자 작업: Kakao Developers 앱 생성 → JS 키를 Vercel env `NEXT_PUBLIC_KAKAO_JS_KEY`에 등록 +
+  사이트 도메인(`unoworship-pro-eight.vercel.app`) 등록. Supabase 새 프로젝트 마이그레이션도 여전히 미적용.
