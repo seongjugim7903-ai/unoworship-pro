@@ -400,8 +400,7 @@ export default function ChoirRequestPage() {
     try {
       await navigator.share({
         files,
-        title: `${songTitle} 찬양대 자막`,
-        text: `${songTitle} 찬양대 자막 ${files.length}장`,
+        text: `${songTitle} 이미지 ${files.length}장이 복사되었습니다.`,
       });
       setMessage(`${songTitle} 자막 ${files.length}장 전달 완료 — 오늘도 수고하셨습니다. 🎵`);
     } catch (error) {
