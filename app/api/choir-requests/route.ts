@@ -156,9 +156,6 @@ export async function POST(request: Request) {
 
     const dateSegment = formatStorageDate(payload.serviceDate);
     const titleSegment = sanitizePathSegment(payload.songTitle);
-    const imageRows: GeneratedImageRow[] = [];
-    const imagePaths: string[] = [];
-
     if (imageFiles.length > 0) {
       await ensureSupabaseBucket({
         bucket: BUCKET_NAME,
@@ -167,8 +164,7 @@ export async function POST(request: Request) {
       });
     }
 
-    for (let index = 0; index < imageFiles.length; index += 1) {
-      const file = imageFiles[index];
+    const uploadImage = async (file: File, index: number) => {
       const buffer = Buffer.from(await file.arrayBuffer());
       const checksum = createHash('sha256').update(buffer).digest('hex');
       const sectionIndex = index + 1;
@@ -190,31 +186,44 @@ export async function POST(request: Request) {
         upsert: true,
       });
 
-      imagePaths.push(storagePath);
-      const [imageRow] = await supabaseRest<GeneratedImageRow[]>(
+      return {
+        request_id: requestRow.id,
+        section_index: sectionIndex,
+        label: `${sectionIndex}번 섹션`,
+        bucket: BUCKET_NAME,
+        storage_path: storagePath,
+        content_type: contentType,
+        size_bytes: buffer.byteLength,
+        width: 1920,
+        height: 1080,
+        checksum,
+        metadata: {
+          originalFileName: file.name,
+        },
+      };
+    };
+
+    const uploadedImages: Awaited<ReturnType<typeof uploadImage>>[] = [];
+    const uploadConcurrency = 4;
+    for (let start = 0; start < imageFiles.length; start += uploadConcurrency) {
+      const batch = imageFiles.slice(start, start + uploadConcurrency);
+      const batchResults = await Promise.all(
+        batch.map((file, offset) => uploadImage(file, start + offset)),
+      );
+      uploadedImages.push(...batchResults);
+    }
+
+    const imagePaths = uploadedImages.map((image) => image.storage_path);
+    const imageRows = uploadedImages.length > 0
+      ? await supabaseRest<GeneratedImageRow[]>(
         '/choir_generated_images',
         {
           method: 'POST',
-          body: JSON.stringify({
-            request_id: requestRow.id,
-            section_index: sectionIndex,
-            label: `${sectionIndex}번 섹션`,
-            bucket: BUCKET_NAME,
-            storage_path: storagePath,
-            content_type: contentType,
-            size_bytes: buffer.byteLength,
-            width: 1920,
-            height: 1080,
-            checksum,
-            metadata: {
-              originalFileName: file.name,
-            },
-          }),
+          body: JSON.stringify(uploadedImages),
         },
         { prefer: 'return=representation' },
-      );
-      imageRows.push(imageRow);
-    }
+      )
+      : [];
 
     const programPayload = buildChoirProgramPayload({
       ...payload,
