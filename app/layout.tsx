@@ -8,19 +8,19 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'UnoWorship Pro · 찬양대 자막 요청',
   description: '찬양대 가사를 예배용 자막 이미지로 만들어 공유합니다.',
-  applicationName: 'UnoWorship Pro',
+  applicationName: 'Hephzibah Choir',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'UnoWorship',
+    title: 'Hephzibah',
   },
   icons: {
     icon: [
-      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icons/hephzibah-icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/hephzibah-icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: [{ url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+    apple: [{ url: '/icons/hephzibah-icon-192.png', sizes: '192x192', type: 'image/png' }],
   },
 };
 

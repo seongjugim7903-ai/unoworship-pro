@@ -1,7 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#f5f7fb"/>
-  <rect x="48" y="48" width="416" height="416" rx="88" fill="#172033"/>
-  <path d="M154 154v101c0 65 38 106 102 106s102-41 102-106V154" fill="none" stroke="#ffffff" stroke-width="54" stroke-linecap="round"/>
-  <rect x="134" y="116" width="40" height="40" rx="12" fill="#25c7bd"/>
-  <rect x="338" y="116" width="40" height="40" rx="12" fill="#6754d9"/>
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#8b7cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#f4f7fb"/>
+  <rect x="48" y="48" width="416" height="416" rx="88" fill="#142033"/>
+  <rect x="76" y="76" width="360" height="360" rx="64" fill="none" stroke="url(#accent)" stroke-width="8"/>
+  <path d="M142 146v192M142 242h92M234 146v192" fill="none" stroke="#fff" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M278 156h100L274 328h108" fill="none" stroke="#fff" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="256" y="401" fill="#c9d3e3" font-family="Arial, Helvetica, sans-serif" font-size="27" font-weight="700" letter-spacing="2" text-anchor="middle">Hephzibah</text>
 </svg>

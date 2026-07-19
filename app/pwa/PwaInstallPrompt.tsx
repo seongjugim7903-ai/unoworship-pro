@@ -100,9 +100,9 @@ export default function PwaInstallPrompt() {
           : ['Chrome 메뉴 열기', '앱 설치 선택', '홈 화면에서 실행'];
 
   return (
-    <aside className="pwa-install-banner" aria-label="UnoWorship 앱 설치">
+    <aside className="pwa-install-banner" aria-label="헵시바 앱 설치">
       <div className="pwa-install-copy">
-        <strong>UnoWorship 앱으로 사용</strong>
+        <strong>Hephzibah 앱으로 사용</strong>
         <span>아래 순서대로 한 번만 설치하면 다음부터 앱처럼 바로 열립니다.</span>
         <ol className="pwa-install-steps">
           {installSteps.map((step, index) => <li key={step}><b>{index + 1}</b>{step}</li>)}

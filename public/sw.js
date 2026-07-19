@@ -1,10 +1,10 @@
-const CACHE_NAME = 'unoworship-pro-shell-v1';
+const CACHE_NAME = 'unoworship-pro-shell-v2';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/icons/icon-maskable-512.png',
+  '/icons/hephzibah-icon-192.png',
+  '/icons/hephzibah-icon-512.png',
+  '/icons/hephzibah-icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (event) => {
