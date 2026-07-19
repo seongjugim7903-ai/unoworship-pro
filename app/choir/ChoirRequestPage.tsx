@@ -14,7 +14,6 @@ import {
   loadChoirImageCache,
   saveChoirImageCache,
 } from '../../lib/choirImageCache';
-import { isKakaoShareConfigured, shareChoirImagesToKakao } from '../../lib/kakaoShare';
 
 /* Blob URL 미리보기는 next/image보다 일반 img가 적합하다. */
 /* eslint-disable @next/next/no-img-element */
@@ -99,7 +98,6 @@ export default function ChoirRequestPage() {
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [searchMessage, setSearchMessage] = useState('');
   const [searchResults, setSearchResults] = useState<SearchChoirRequest[]>([]);
-  const [downloadAllStatus, setDownloadAllStatus] = useState<'idle' | 'saving' | 'done'>('idle');
   const [kakaoShareBusy, setKakaoShareBusy] = useState(false);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
 
@@ -275,7 +273,6 @@ export default function ChoirRequestPage() {
     setImages([]);
     setMessage('');
     setFieldProgramMessage('');
-    setDownloadAllStatus('idle');
     setStatus('rendering');
 
     try {
@@ -309,7 +306,6 @@ export default function ChoirRequestPage() {
     setImages([]);
     setStatus('idle');
     setMessage('');
-    setDownloadAllStatus('idle');
     setEditingRequestId(null);
     setCloudSaveStatus('idle');
     setCloudSaveMessage('');
@@ -372,7 +368,6 @@ export default function ChoirRequestPage() {
     setImages([]);
     setStatus('idle');
     setMessage('');
-    setDownloadAllStatus('idle');
     setSearchResults([]);
     setSearchStatus('idle');
     setSearchMessage('');
@@ -382,82 +377,42 @@ export default function ChoirRequestPage() {
     });
   };
 
-  const imageFiles = () => images.map((image, index) => new File(
-    [image.blob],
-    `${sanitizeFileName(songTitle)}_${String(index + 1).padStart(2, '0')}.png`,
-    { type: 'image/png' },
-  ));
+  /* 생성 이미지를 파일 그대로 공유창에 싣는다 — 다운로드 없이 카카오톡 대화방에 바로 첨부된다. */
+  const handleKakaoShare = async () => {
+    if (images.length === 0 || kakaoShareBusy) return;
 
-  const handleDownloadAll = () => {
-    if (images.length === 0 || downloadAllStatus === 'saving') return;
-
-    setDownloadAllStatus('saving');
-    setMessage(`전체 이미지 ${images.length}장을 저장하고 있습니다...`);
-    images.forEach((image, index) => {
-      window.setTimeout(() => {
-        downloadBlob(image.blob, `${sanitizeFileName(songTitle)}_${String(index + 1).padStart(2, '0')}.png`);
-      }, index * 250);
-    });
-    window.setTimeout(() => {
-      setDownloadAllStatus('done');
-      setMessage(`전체 이미지 ${images.length}장 저장 완료. 이제 카카오톡으로 보내기를 누를 수 있습니다.`);
-    }, images.length * 250 + 200);
-  };
-
-  /* 카카오 키 미설정 환경(사전 배포)용 예비 경로 — OS 공유창으로 파일 전달. */
-  const shareFilesFallback = async () => {
-    const files = imageFiles();
+    const files = images.map((image, index) => new File(
+      [image.blob],
+      `${sanitizeFileName(songTitle)}_${String(index + 1).padStart(2, '0')}.png`,
+      { type: 'image/png' },
+    ));
     const totalMegabytes = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
     const canShareFiles = typeof navigator.share === 'function'
       && (!navigator.canShare || navigator.canShare({ files }));
 
-    if (canShareFiles) {
-      try {
-        await navigator.share({
-          files,
-          title: `${songTitle} 찬양대 자막`,
-          text: `${songTitle} 찬양대 자막 ${files.length}장`,
-        });
-        setMessage(`전체 이미지 ${files.length}장을 공유창으로 전달했습니다.`);
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
-          setMessage('공유를 취소했습니다.');
-          return;
-        }
+    if (!canShareFiles) {
+      setMessage('이 브라우저는 파일 공유를 지원하지 않습니다. 각 이미지의 저장 버튼으로 내려받아 카카오톡에 첨부해 주세요.');
+      return;
+    }
+
+    setKakaoShareBusy(true);
+    setMessage(`자막 이미지 ${files.length}장이 담겼습니다. 카카오톡 대화방을 골라 보내기만 누르시면 끝!`);
+    try {
+      await navigator.share({
+        files,
+        title: `${songTitle} 찬양대 자막`,
+        text: `${songTitle} 찬양대 자막 ${files.length}장`,
+      });
+      setMessage(`${songTitle} 자막 ${files.length}장 전달 완료 — 오늘도 수고하셨습니다. 🎵`);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setMessage('보내기를 취소했습니다. 준비되면 다시 눌러 주세요.');
+      } else {
         const errorName = error instanceof DOMException ? error.name : 'UnknownError';
         setMessage(
           `공유창을 열지 못했습니다. ${files.length}장 · ${totalMegabytes.toFixed(1)}MB · 오류 ${errorName}. 모바일 Chrome 또는 Safari에서 다시 시도해 주세요.`,
         );
-        return;
       }
-    }
-
-    setMessage('이 브라우저는 이미지 파일 공유를 지원하지 않습니다. 저장된 이미지를 카카오톡에 직접 첨부해 주세요.');
-  };
-
-  const handleKakaoShare = async () => {
-    if (downloadAllStatus !== 'done' || kakaoShareBusy) return;
-
-    setKakaoShareBusy(true);
-    try {
-      if (!isKakaoShareConfigured()) {
-        await shareFilesFallback();
-        return;
-      }
-
-      await shareChoirImagesToKakao({
-        songTitle: songTitle.trim() || '제목 없는 곡',
-        serviceType,
-        serviceDate,
-        imageCount: images.length,
-        thumbnailCandidates: imageFiles(),
-        linkUrl: process.env.NEXT_PUBLIC_APP_URL || window.location.origin,
-      });
-      setMessage('카카오톡 공유창을 열었습니다.');
-    } catch (error) {
-      console.error('[choir-request] kakao share failed', error);
-      setMessage(error instanceof Error ? error.message : '카카오톡 공유창을 열지 못했습니다.');
     } finally {
       setKakaoShareBusy(false);
     }
@@ -576,25 +531,15 @@ export default function ChoirRequestPage() {
             <div className="result-actions">
               <button className="secondary-button" onClick={handleReset}>새 요청</button>
               <button
-                className="primary-button compact"
-                onClick={handleDownloadAll}
-                disabled={downloadAllStatus === 'saving'}
-              >
-                {downloadAllStatus === 'saving' ? '저장 중...' : downloadAllStatus === 'done' ? '전체 저장 완료 ✓' : '① 전체 이미지 저장'}
-              </button>
-              <button
                 className="kakao-button"
                 onClick={() => void handleKakaoShare()}
-                disabled={downloadAllStatus !== 'done' || kakaoShareBusy}
+                disabled={kakaoShareBusy}
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3C6.92 3 2.8 6.24 2.8 10.23c0 2.57 1.71 4.83 4.29 6.11l-.87 3.25c-.08.29.25.52.5.35l3.87-2.58c.46.05.93.08 1.41.08 5.08 0 9.2-3.23 9.2-7.21C21.2 6.24 17.08 3 12 3Z" /></svg>
-                {kakaoShareBusy ? '공유창 여는 중...' : '② 카카오톡으로 보내기'}
+                {kakaoShareBusy ? '보내는 중...' : '카카오톡으로 보내기'}
               </button>
             </div>
           </div>
-          {downloadAllStatus !== 'done' && (
-            <p className="share-order-hint">전체 이미지 저장을 먼저 완료하면 카카오톡으로 보내기가 활성화됩니다.</p>
-          )}
           {message && <p className="info-message">{message}</p>}
           <div className="image-grid">{images.map((image) => <article className="image-card" key={image.index}><img src={image.url} alt={`${songTitle} ${image.label}`} /><div className="image-card-footer"><span>{image.label}</span><button className="text-button" onClick={() => downloadBlob(image.blob, `${sanitizeFileName(songTitle)}_${image.index}.png`)}>저장</button></div></article>)}</div>
         </section>
