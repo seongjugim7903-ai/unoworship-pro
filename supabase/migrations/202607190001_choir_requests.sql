@@ -85,7 +85,7 @@ values (
   'choir-generated-images',
   false,
   10485760,
-  array['image/png']
+  array['image/png', 'image/webp']
 )
 on conflict (id) do update
 set public = excluded.public,

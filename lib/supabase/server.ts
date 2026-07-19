@@ -135,6 +135,29 @@ export async function uploadSupabaseObject(input: UploadObjectInput) {
   return body;
 }
 
+export async function deleteSupabaseObjects(input: { bucket: string; paths: string[] }) {
+  if (input.paths.length === 0) return;
+
+  const config = getSupabaseServerConfig();
+  const headers = createHeaders(config, { 'content-type': 'application/json' });
+  const response = await fetch(`${config.url}/storage/v1/object/${encodeURIComponent(input.bucket)}`, {
+    method: 'DELETE',
+    headers,
+    body: JSON.stringify({ prefixes: input.paths }),
+    cache: 'no-store',
+  });
+  const body = await parseSupabaseResponse(response);
+
+  if (!response.ok) {
+    const message = typeof body === 'string'
+      ? body
+      : body && typeof body === 'object' && 'message' in body
+        ? String(body.message)
+        : `Supabase Storage 객체 삭제 실패 (${response.status})`;
+    throw new Error(message);
+  }
+}
+
 export async function ensureSupabaseBucket(input: EnsureBucketInput) {
   const cacheKey = `${input.bucket}:${input.fileSizeLimit}:${input.allowedMimeTypes.join(',')}`;
   const existing = ensuredBuckets.get(cacheKey);

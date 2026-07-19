@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildChoirProgramPayload, parseLyricSections } from '../../../lib/choirProgramPayload';
 import {
+  deleteSupabaseObjects,
   ensureSupabaseBucket,
   SupabaseServerConfigError,
   supabaseRest,
@@ -22,6 +23,8 @@ const ChoirRequestSchema = z.object({
   lyrics: z.string().trim().min(1, '가사를 입력해 주세요.'),
   note: z.string().trim().optional().default(''),
   source: z.string().trim().optional().default('unoworship-pro'),
+  /* 지난 곡 수정·재생성 시 기존 행을 업데이트하기 위한 대상 id */
+  requestId: z.string().uuid().optional(),
 });
 
 interface ChoirRequestRow {
@@ -130,29 +133,62 @@ export async function POST(request: Request) {
     const sections = parseLyricSections(payload.lyrics);
     const sectionCount = sections.length || imageFiles.length;
 
-    const [requestRow] = await supabaseRest<ChoirRequestRow[]>(
-      '/choir_requests',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          service_date: payload.serviceDate || null,
-          service_type: payload.serviceType,
-          song_title: payload.songTitle,
-          composer: payload.composer,
-          arranger: payload.arranger,
-          lyrics: payload.lyrics,
-          note: payload.note,
-          section_count: sectionCount,
-          source: payload.source,
-          status: imageFiles.length > 0 ? 'rendered' : 'text_saved',
-          metadata: {
-            appUrl: request.headers.get('origin') ?? null,
-            savedBy: 'choir-request-page',
-          },
-        }),
+    const requestFields = {
+      service_date: payload.serviceDate || null,
+      service_type: payload.serviceType,
+      song_title: payload.songTitle,
+      composer: payload.composer,
+      arranger: payload.arranger,
+      lyrics: payload.lyrics,
+      note: payload.note,
+      section_count: sectionCount,
+      source: payload.source,
+      status: imageFiles.length > 0 ? 'rendered' : 'text_saved',
+      metadata: {
+        appUrl: request.headers.get('origin') ?? null,
+        savedBy: 'choir-request-page',
       },
-      { prefer: 'return=representation' },
-    );
+    };
+
+    /* requestId가 오면 기존 행 업데이트(재생성 중복 방지), 없거나 사라진 행이면 새로 만든다. */
+    let requestRow: ChoirRequestRow | undefined;
+    let updatedExisting = false;
+    if (payload.requestId) {
+      const updatedRows = await supabaseRest<ChoirRequestRow[]>(
+        `/choir_requests?id=eq.${payload.requestId}`,
+        { method: 'PATCH', body: JSON.stringify(requestFields) },
+        { prefer: 'return=representation' },
+      );
+      requestRow = updatedRows[0];
+      updatedExisting = Boolean(requestRow);
+    }
+    if (!requestRow) {
+      [requestRow] = await supabaseRest<ChoirRequestRow[]>(
+        '/choir_requests',
+        { method: 'POST', body: JSON.stringify(requestFields) },
+        { prefer: 'return=representation' },
+      );
+    }
+
+    if (updatedExisting) {
+      const previousImages = await supabaseRest<Array<{ storage_path: string }>>(
+        `/choir_generated_images?request_id=eq.${requestRow.id}&select=storage_path`,
+        { method: 'GET' },
+      );
+      if (previousImages.length > 0) {
+        await deleteSupabaseObjects({
+          bucket: BUCKET_NAME,
+          paths: previousImages.map((image) => image.storage_path),
+        }).catch((error) => {
+          /* 스토리지 정리 실패가 저장 자체를 막으면 안 된다 — 메타 행은 아래에서 지워진다. */
+          console.warn('[choir-requests] previous image cleanup failed', error);
+        });
+        await supabaseRest(
+          `/choir_generated_images?request_id=eq.${requestRow.id}`,
+          { method: 'DELETE' },
+        );
+      }
+    }
 
     const dateSegment = formatStorageDate(payload.serviceDate);
     const titleSegment = sanitizePathSegment(payload.songTitle);
@@ -232,8 +268,9 @@ export async function POST(request: Request) {
       source: 'unoworship-pro-supabase',
     });
 
+    /* choir_programs는 request_id unique — 재생성 시 merge-duplicates로 기존 행을 갱신한다. */
     await supabaseRest(
-      '/choir_programs',
+      '/choir_programs?on_conflict=request_id',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -244,7 +281,7 @@ export async function POST(request: Request) {
           status: 'ready',
         }),
       },
-      { prefer: 'return=representation' },
+      { prefer: 'resolution=merge-duplicates,return=representation' },
     );
 
     return NextResponse.json({
@@ -254,6 +291,7 @@ export async function POST(request: Request) {
       sectionCount,
       imageCount: imageRows.length,
       imagePaths,
+      updatedExisting,
     });
   } catch (error) {
     console.error('[choir-requests] save failed', error);

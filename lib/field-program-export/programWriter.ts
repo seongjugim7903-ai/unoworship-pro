@@ -76,9 +76,9 @@ async function findExistingProgramByTitle(programsDir: string, title: string): P
       const item = getNestedRecord(data, 'item');
       const itemTitle = item?.title;
       const topTitle = data.title;
-      const id = data.id;
-      const haystacks = [itemTitle, topTitle, id, fileName].map(normalizeText);
-      if (haystacks.some((value) => value === target || value.includes(target))) {
+      /* 완전일치만 인정 — 부분일치(includes)는 "은혜"가 "주님의은혜" 프로그램을 덮어쓰는 사고를 만든다. */
+      const haystacks = [itemTitle, topTitle].map(normalizeText);
+      if (haystacks.some((value) => value && value === target)) {
         return { fileName, filePath, data };
       }
     } catch {

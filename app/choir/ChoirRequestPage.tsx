@@ -30,6 +30,8 @@ interface ChoirRequestDraft {
   arranger: string;
   lyrics: string;
   note: string;
+  /* 저장된 요청을 이어서 수정 중일 때 대상 id — 재생성이 중복 행을 만들지 않게 한다. */
+  editingRequestId?: string | null;
 }
 
 interface SearchChoirRequest {
@@ -55,6 +57,7 @@ interface ApiResult {
   imageCount?: number;
   sectionCount?: number;
   storagePath?: string;
+  updatedExisting?: boolean;
 }
 
 function todayISO() {
@@ -98,6 +101,7 @@ export default function ChoirRequestPage() {
   const [searchResults, setSearchResults] = useState<SearchChoirRequest[]>([]);
   const [downloadAllStatus, setDownloadAllStatus] = useState<'idle' | 'saving' | 'done'>('idle');
   const [kakaoShareBusy, setKakaoShareBusy] = useState(false);
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -111,6 +115,7 @@ export default function ChoirRequestPage() {
         setArranger(draft.arranger || '');
         setLyrics(draft.lyrics || '');
         setNote(draft.note || '');
+        setEditingRequestId(draft.editingRequestId || null);
       } else {
         setServiceDate(todayISO());
       }
@@ -133,9 +138,10 @@ export default function ChoirRequestPage() {
       arranger,
       lyrics,
       note,
+      editingRequestId,
     };
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-  }, [arranger, composer, draftReady, lyrics, note, serviceDate, serviceType, songTitle]);
+  }, [arranger, composer, draftReady, editingRequestId, lyrics, note, serviceDate, serviceType, songTitle]);
 
   useEffect(() => {
     let cancelled = false;
@@ -197,6 +203,7 @@ export default function ChoirRequestPage() {
       formData.append('payload', JSON.stringify({
         ...currentRequest,
         source: 'unoworship-pro',
+        requestId: editingRequestId ?? undefined,
       }));
       imagesToSave.forEach((image) => {
         const isWebp = image.uploadBlob.type === 'image/webp';
@@ -218,9 +225,11 @@ export default function ChoirRequestPage() {
         throw new Error(result.message ?? `저장에 실패했습니다. (HTTP ${response.status})`);
       }
 
+      /* 이후 재생성은 방금 저장한 행을 업데이트하게 만든다 — 중복 행 방지 */
+      if (result.requestId) setEditingRequestId(result.requestId);
       setCloudSaveStatus('done');
       setCloudSaveMessage(
-        `저장 완료: ${result.sectionCount ?? sections.length}개 섹션 · 이미지 ${result.imageCount ?? imagesToSave.length}장 · 요청 ${result.requestId}`,
+        `${result.updatedExisting ? '기존 요청 업데이트' : '저장'} 완료: ${result.sectionCount ?? sections.length}개 섹션 · 이미지 ${result.imageCount ?? imagesToSave.length}장 · 요청 ${result.requestId}`,
       );
     } catch (error) {
       console.error('[choir-request] cloud save failed', error);
@@ -265,6 +274,7 @@ export default function ChoirRequestPage() {
     images.forEach((image) => URL.revokeObjectURL(image.url));
     setImages([]);
     setMessage('');
+    setFieldProgramMessage('');
     setDownloadAllStatus('idle');
     setStatus('rendering');
 
@@ -300,6 +310,10 @@ export default function ChoirRequestPage() {
     setStatus('idle');
     setMessage('');
     setDownloadAllStatus('idle');
+    setEditingRequestId(null);
+    setCloudSaveStatus('idle');
+    setCloudSaveMessage('');
+    setFieldProgramMessage('');
     void clearChoirImageCache().catch((error) => {
       console.warn('[choir-request] image cache clear failed', error);
     });
@@ -344,6 +358,10 @@ export default function ChoirRequestPage() {
 
   const handleEditSearchResult = (request: SearchChoirRequest) => {
     images.forEach((image) => URL.revokeObjectURL(image.url));
+    setEditingRequestId(request.id);
+    setCloudSaveStatus('idle');
+    setCloudSaveMessage('');
+    setFieldProgramMessage('');
     setServiceType(request.service_type || '주일낮예배');
     setServiceDate(request.service_date || todayISO());
     setSongTitle(request.song_title || '');
@@ -521,6 +539,12 @@ export default function ChoirRequestPage() {
           </label>
           <label>방송실 메모<input value={note} onChange={(event) => setNote(event.target.value)} placeholder="선택 입력" /></label>
 
+          {editingRequestId && (
+            <p className="editing-badge">
+              저장된 요청을 수정 중입니다 — 재생성하면 기존 요청이 업데이트됩니다.
+              <button className="text-button" onClick={() => setEditingRequestId(null)}>새 곡으로 저장</button>
+            </p>
+          )}
           <button className="primary-button" onClick={handleGenerate} disabled={!isValid || status === 'rendering'}>
             {status === 'rendering' ? '이미지 생성 중...' : '자막 이미지 생성'}
           </button>

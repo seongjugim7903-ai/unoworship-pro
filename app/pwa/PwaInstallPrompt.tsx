@@ -35,7 +35,8 @@ export default function PwaInstallPrompt() {
     setEnvironment(detectEnvironment());
     setInstallRequested(new URLSearchParams(window.location.search).get('install') === '1');
 
-    if ('serviceWorker' in navigator) {
+    /* dev에서는 SW 캐시가 stale 번들을 서빙하므로 프로덕션에서만 등록한다. */
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       void navigator.serviceWorker.register('/sw.js').catch((error) => {
         console.warn('[pwa] service worker registration failed', error);
       });

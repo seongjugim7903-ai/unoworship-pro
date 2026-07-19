@@ -95,6 +95,8 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .kakao-button:hover { background: #f6dc00; }
 .kakao-button:disabled { opacity: .42; }
 .share-order-hint { margin: 10px 0 0; color: #8a96a9; font-size: 11px; }
+.editing-badge { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; padding: 8px 10px; border: 1px solid #e3dfff; border-radius: 5px; color: #5543c0; background: #f6f4ff; font-size: 11px; line-height: 1.5; }
+.editing-badge .text-button { flex: 0 0 auto; }
 .image-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .image-card { overflow: hidden; border: 1px solid #e0e6ef; border-radius: 6px; background: #050608; }
 .image-card img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }

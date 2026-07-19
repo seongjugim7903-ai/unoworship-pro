@@ -8,3 +8,4 @@ out/
 tsconfig.tsbuildinfo
 .vercel
 supabase/.temp/
+.claude/settings.local.json

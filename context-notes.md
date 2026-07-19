@@ -136,3 +136,22 @@
   키 발급·도메인 등록 절차는 `docs/features/choir-requests/KAKAO_SHARE.md`.
 - 남은 사용자 작업: Kakao Developers 앱 생성 → JS 키를 Vercel env `NEXT_PUBLIC_KAKAO_JS_KEY`에 등록 +
   사이트 도메인(`unoworship-pro-eight.vercel.app`) 등록. Supabase 새 프로젝트 마이그레이션도 여전히 미적용.
+
+## 2026-07-20 — 개선점 리뷰·수정 (중복 저장 방지 외)
+
+- **재생성 중복 행 방지** — 생성 때마다 `choir_requests`에 새 행이 쌓이던 문제.
+  페이지가 `editingRequestId`를 추적(드래프트 localStorage에도 보존, 지난 곡 "수정" 시 설정,
+  저장 성공 시 응답 id 채택) → API에 `requestId` 전달 시 PATCH 업데이트 + 이전 Storage
+  객체/이미지 행 정리 + `choir_programs`는 `on_conflict=request_id` merge-duplicates upsert.
+  폼에 "수정 중" 배지 + "새 곡으로 저장" 해제 버튼.
+- **현장 프로그램 부분일치 덮어쓰기 수정** — programWriter의 `includes` 매칭이
+  "은혜"→"주님의은혜.json"을 덮어쓸 수 있었음. 정규화 완전일치로 변경 (id·fileName 매칭 제거).
+- **dev에서 SW 미등록** — sw.js의 `/_next/static` cache-first가 dev에서 stale 번들을 서빙
+  (실제로 이번 세션 검증 중 재현). PwaInstallPrompt가 production에서만 SW 등록하도록 수정.
+- **Windows start 스크립트** — `NODE_ENV=production` 인라인 env가 Windows에서 실패 → cross-env 도입.
+- **마이그레이션 버킷 MIME에 webp 추가** (코드와 일치, 새 프로젝트에 아직 미적용이라 안전).
+- 수정 모드 진입·새 요청 시 이전 저장 메시지(cloudSave/fieldProgram) 초기화.
+- **보류(사용자 결정 필요)** — `/api/choir-requests`가 무인증 공개 쓰기 엔드포인트 (service role 사용).
+  접근 코드 게이트 등 보호를 넣을지 결정 대기.
+- **푸시 차단** — 이 PC의 git 자격증명이 `tbakorea` 계정이라 `seongjugim7903-ai/unoworship-pro`에
+  push 403. GitHub MCP 토큰도 만료(Bad credentials). 해결 전까지 커밋은 로컬 보관.
