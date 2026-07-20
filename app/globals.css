@@ -18,12 +18,15 @@ button:disabled { cursor: not-allowed; }
 .pwa-install-actions button { height: 34px; padding: 0 12px; border: 0; border-radius: 6px; color: #fff; background: #6754d9; font-size: 11px; font-weight: 800; }
 .pwa-install-actions .pwa-install-close { width: 34px; padding: 0; border: 1px solid #dfe4ee; color: #6f7b8f; background: #fff; font-size: 18px; }
 /* 랜딩 */
-.landing { height: 100vh; height: 100dvh; overflow: hidden; background: linear-gradient(170deg, #0e1020 0%, #1a1b3a 30%, #2b2455 58%, #45327a 82%, #5a3f92 100%); color: #fff; }
-.landing-inner { display: flex; flex-direction: column; height: 100vh; height: 100dvh; max-width: 480px; margin: 0 auto; padding: max(44px, env(safe-area-inset-top)) 28px calc(36px + env(safe-area-inset-bottom)); }
-.landing-brand { margin: 0; color: #c3bcf0; font-size: 12px; font-weight: 800; letter-spacing: .22em; }
-.landing-copy { margin-top: auto; padding: 40px 0 34px; }
-.landing-copy h1 { margin: 0 0 18px; font-size: clamp(40px, 12vw, 56px); font-weight: 800; letter-spacing: -.035em; line-height: 1.18; }
-.landing-copy p { margin: 0; color: rgba(255, 255, 255, .68); font-size: 15px; line-height: 1.75; }
+.landing { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; background: linear-gradient(170deg, #0e1020 0%, #1a1b3a 30%, #2b2455 58%, #45327a 82%, #5a3f92 100%); color: #fff; }
+.landing-head { flex: 0 0 auto; padding: max(16px, env(safe-area-inset-top)) 24px 15px; border-bottom: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .03); }
+.landing-head-brand { color: #c9c2f2; font-size: 13px; font-weight: 800; letter-spacing: .24em; }
+.landing-inner { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden; width: 100%; max-width: 480px; margin: 0 auto; padding: 0 28px calc(36px + env(safe-area-inset-bottom)); }
+.landing-copy { margin-top: auto; padding: 32px 0 26px; }
+.landing-copy h1 { margin: 0; font-size: clamp(34px, 9.6vw, 48px); font-weight: 800; letter-spacing: -.035em; line-height: 1.24; }
+.landing-verse { margin: 22px 0 0; padding: 15px 17px; border-left: 3px solid rgba(255, 255, 255, .34); border-radius: 0 10px 10px 0; background: rgba(255, 255, 255, .05); }
+.landing-verse p { margin: 0; color: rgba(255, 255, 255, .84); font-size: 14px; line-height: 1.72; }
+.landing-verse cite { display: block; margin-top: 9px; color: rgba(255, 255, 255, .55); font-size: 12px; font-style: normal; letter-spacing: .01em; }
 .landing-menu { display: grid; gap: 12px; }
 .landing-btn { display: grid; gap: 3px; text-align: left; padding: 16px 18px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 14px; color: #fff; background: rgba(255, 255, 255, .06); transition: .15s; }
 .landing-btn:hover { border-color: rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .12); }

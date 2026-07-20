@@ -21,11 +21,16 @@ export default function WorkspaceTabs() {
   if (view === 'home') {
     return (
       <main className="landing">
+        <header className="landing-head">
+          <span className="landing-head-brand">ULJU COMMUNITY</span>
+        </header>
         <div className="landing-inner">
-          <p className="landing-brand">ULJU COMMUNITY</p>
           <div className="landing-copy">
-            <h1>예배 뒤에서 섬기는<br />당신을 위해</h1>
-            <p>찬양은 곡조로 드리는 기도, 예배를 여는 첫 고백입니다.<br />보이지 않아도 가장 귀한 그 사역을 응원합니다.</p>
+            <h1>온전한 예배를 여는<br />섬김이들을 환영합니다</h1>
+            <blockquote className="landing-verse">
+              <p>“각각 은사를 받은 대로 하나님의 여러 가지 은혜를 맡은 선한 청지기 같이 서로 봉사하라”</p>
+              <cite>베드로전서 4장 10절</cite>
+            </blockquote>
           </div>
           <nav className="landing-menu" aria-label="기능 선택">
             {MENU.map((item) => (
