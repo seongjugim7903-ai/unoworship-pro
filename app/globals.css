@@ -126,16 +126,25 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .bulletin-save { width: 100%; }
 .hymn-input { min-height: 76px; max-height: 168px; overflow-y: auto; line-height: 1.5; resize: vertical; }
 .song-list { display: grid; gap: 12px; margin: 16px 0; }
-.song-row { display: grid; gap: 12px; padding: 14px; border: 1px solid #e4e9f1; border-radius: 8px; background: #fbfcfe; }
+.song-card { display: grid; gap: 12px; padding: 14px; border: 1px solid #e4e9f1; border-radius: 8px; background: #fbfcfe; }
+.song-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .song-row-head { display: flex; align-items: center; justify-content: space-between; }
 .song-row-no { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 50%; color: #fff; background: #6754d9; font-size: 12px; font-weight: 800; }
+.song-tabs { display: flex; gap: 6px; overflow-x: auto; margin: 16px 0 10px; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.song-tabs::-webkit-scrollbar { display: none; }
+.song-tab { flex: 0 0 auto; max-width: 150px; height: 34px; padding: 0 14px; border: 1px solid #dfe4ee; border-radius: 999px; color: #6b7891; background: #eef1f7; font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.song-tab.active { color: #5543c0; background: #fff; border-color: #c4bdf2; }
+.song-tab.add { color: #5543c0; background: #f6f4ff; border-color: #e3dfff; }
+.song-track { position: relative; min-width: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 100%; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; margin-bottom: 16px; padding-bottom: 4px; scrollbar-width: none; }
+.song-track::-webkit-scrollbar { display: none; }
+.song-track > .song-card { scroll-snap-align: start; }
 .sheet-field input[type=file] { margin-top: 8px; font-size: 12px; }
 .sheet-field input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .sheet-name { display: block; margin-top: 6px; color: #5a6b8c; font-size: 11px; }
 .bulletin-ocr-row input[type=file] { margin-top: 8px; font-size: 12px; }
 .bulletin-ocr-row input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .page-footer { padding: 24px 0 0; color: #9ca7b8; font-size: 11px; text-align: center; }
-@media (max-width: 880px) { .workspace-topbar { padding: 12px 16px 0; } .site-shell { padding: 24px 16px; } .site-header { align-items: flex-start; flex-direction: column; } .content-grid { grid-template-columns: 1fr; } .empty-state { min-height: 230px; } .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 880px) { .workspace-topbar { padding: 12px 16px 0; } .site-shell { padding: 24px 16px; } .site-header { align-items: flex-start; flex-direction: column; } .content-grid { grid-template-columns: minmax(0, 1fr); } .empty-state { min-height: 230px; } .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .pwa-install-banner { align-items: flex-start; gap: 10px; padding-top: max(10px, env(safe-area-inset-top)); }
   .pwa-install-copy span { max-width: 220px; }

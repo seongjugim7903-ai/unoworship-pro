@@ -2,8 +2,20 @@
 
 // 준비찬양 — 정기예배·일자·찬양팀별로 준비 곡(제목·악보·조·구성)을 저장한다.
 
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { nextServiceDate } from '../../lib/nextServiceDate';
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 600px)');
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return mobile;
+}
 
 const SERVICE_TYPES = ['주일낮예배', '주일오후예배', '수요예배', '금요기도회', '월삭감사예배'];
 const TEAMS = ['주일1부', '주일2부', '수요예배', '금요기도회'];
@@ -134,10 +146,46 @@ export default function WorshipPrepPage() {
     updateSong(key, { sheet: file, sheetName: file?.name ?? '' });
   };
 
+  const isMobile = useIsMobile();
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [activeSong, setActiveSong] = useState(0);
+  const prevLenRef = useRef(songs.length);
+
+  const scrollToSong = useCallback((index: number) => {
+    const track = trackRef.current;
+    const child = track?.children[index] as HTMLElement | undefined;
+    if (track && child) track.scrollTo({ left: child.offsetLeft, behavior: 'smooth' });
+    setActiveSong(index);
+  }, []);
+
+  const handleTrackScroll = () => {
+    const track = trackRef.current;
+    if (!track) return;
+    const children = Array.from(track.children) as HTMLElement[];
+    let nearest = 0;
+    let min = Infinity;
+    children.forEach((child, index) => {
+      const distance = Math.abs(child.offsetLeft - track.scrollLeft);
+      if (distance < min) { min = distance; nearest = index; }
+    });
+    setActiveSong(nearest);
+  };
+
   const addSong = () => setSongs((previous) => [...previous, newRow()]);
-  const removeSong = (key: string) => setSongs((previous) => (
-    previous.length <= 1 ? previous : previous.filter((song) => song.key !== key)
-  ));
+  const removeSong = (key: string) => setSongs((previous) => {
+    if (previous.length <= 1) return previous;
+    const next = previous.filter((song) => song.key !== key);
+    setActiveSong((current) => Math.max(0, Math.min(current, next.length - 1)));
+    return next;
+  });
+
+  /* 곡 추가 시 새 카드로 부드럽게 슬라이드(오른쪽에서 진입). */
+  useEffect(() => {
+    if (isMobile && songs.length > prevLenRef.current) {
+      requestAnimationFrame(() => scrollToSong(songs.length - 1));
+    }
+    prevLenRef.current = songs.length;
+  }, [songs.length, isMobile, scrollToSong]);
 
   const handleSave = async () => {
     if (!isValid || saveStatus === 'saving') return;
@@ -179,6 +227,29 @@ export default function WorshipPrepPage() {
     }
   };
 
+  const renderSongCard = (song: SongRow, index: number) => (
+    <article className="song-card" key={song.key}>
+      <div className="song-row-head">
+        <span className="song-row-no">{index + 1}</span>
+        {songs.length > 1 && (
+          <button className="text-button danger" type="button" onClick={() => removeSong(song.key)}>삭제</button>
+        )}
+      </div>
+      <label>찬양 제목<input value={song.title} onChange={(event) => updateSong(song.key, { title: event.target.value })} placeholder="예: 나의 하나님" /></label>
+      <div className="song-inline">
+        <label>조 (Key)<input value={song.songKey} onChange={(event) => updateSong(song.key, { songKey: event.target.value })} placeholder="예: G, Am" /></label>
+        <label>찬양 구성<select value={song.arrangement} onChange={(event) => updateSong(song.key, { arrangement: event.target.value as Arrangement })}>{ARRANGEMENTS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+      </div>
+      {song.arrangement === 'custom' && (
+        <label>구성 직접 기입<input value={song.arrangementCustom} onChange={(event) => updateSong(song.key, { arrangementCustom: event.target.value })} placeholder="예: 1절 → 후렴 → 2절 → 후렴 반복" /></label>
+      )}
+      <label className="sheet-field">찬양 악보<span className="field-hint">이미지 또는 PDF. 팀별로 저장됩니다.</span>
+        <input type="file" accept="image/*,application/pdf" onChange={(event) => handleSheetChange(song.key, event)} />
+        {song.sheetName && <small className="sheet-name">{song.sheetName}</small>}
+      </label>
+    </article>
+  );
+
   return (
     <main className="site-shell">
       <div className="content-grid">
@@ -194,32 +265,35 @@ export default function WorshipPrepPage() {
           </div>
           <label>찬양팀<select value={team} onChange={(event) => setTeam(event.target.value)}>{TEAMS.map((name) => <option key={name}>{name}</option>)}</select></label>
 
-          <div className="song-list">
-            {songs.map((song, index) => (
-              <article className="song-row" key={song.key}>
-                <div className="song-row-head">
-                  <span className="song-row-no">{index + 1}</span>
-                  {songs.length > 1 && (
-                    <button className="text-button danger" type="button" onClick={() => removeSong(song.key)}>삭제</button>
-                  )}
-                </div>
-                <label>찬양 제목<input value={song.title} onChange={(event) => updateSong(song.key, { title: event.target.value })} placeholder="예: 나의 하나님" /></label>
-                <div className="field-grid two-columns">
-                  <label>조 (Key)<input value={song.songKey} onChange={(event) => updateSong(song.key, { songKey: event.target.value })} placeholder="예: G, Am" /></label>
-                  <label>찬양 구성<select value={song.arrangement} onChange={(event) => updateSong(song.key, { arrangement: event.target.value as Arrangement })}>{ARRANGEMENTS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-                </div>
-                {song.arrangement === 'custom' && (
-                  <label>구성 직접 기입<input value={song.arrangementCustom} onChange={(event) => updateSong(song.key, { arrangementCustom: event.target.value })} placeholder="예: 1절 → 후렴 → 2절 → 후렴 반복" /></label>
-                )}
-                <label className="sheet-field">찬양 악보<span className="field-hint">이미지 또는 PDF. 팀별로 저장됩니다.</span>
-                  <input type="file" accept="image/*,application/pdf" onChange={(event) => handleSheetChange(song.key, event)} />
-                  {song.sheetName && <small className="sheet-name">{song.sheetName}</small>}
-                </label>
-              </article>
-            ))}
-          </div>
+          {isMobile ? (
+            <>
+              {/* 기본 필드 아래 찬양제목 탭 — 손으로 좌우 드래그·탭 이동 */}
+              <div className="song-tabs" role="tablist">
+                {songs.map((song, index) => (
+                  <button
+                    key={song.key}
+                    type="button"
+                    className={`song-tab ${activeSong === index ? 'active' : ''}`}
+                    onClick={() => scrollToSong(index)}
+                  >
+                    {song.title.trim() || `${index + 1}번 곡`}
+                  </button>
+                ))}
+                <button type="button" className="song-tab add" onClick={addSong}>+ 곡 추가</button>
+              </div>
+              <div className="song-track" ref={trackRef} onScroll={handleTrackScroll}>
+                {songs.map((song, index) => renderSongCard(song, index))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="song-list">
+                {songs.map((song, index) => renderSongCard(song, index))}
+              </div>
+              <button className="secondary-button" type="button" onClick={addSong}>+ 곡 추가</button>
+            </>
+          )}
 
-          <button className="secondary-button" type="button" onClick={addSong}>+ 곡 추가</button>
           <button className="primary-button" onClick={() => void handleSave()} disabled={!isValid || saveStatus === 'saving'}>
             {saveStatus === 'saving' ? '저장 중...' : '준비찬양 저장'}
           </button>
