@@ -18,7 +18,7 @@ button:disabled { cursor: not-allowed; }
 .pwa-install-actions button { height: 34px; padding: 0 12px; border: 0; border-radius: 6px; color: #fff; background: #6754d9; font-size: 11px; font-weight: 800; }
 .pwa-install-actions .pwa-install-close { width: 34px; padding: 0; border: 1px solid #dfe4ee; color: #6f7b8f; background: #fff; font-size: 18px; }
 /* 랜딩 */
-.landing { position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; background: linear-gradient(170deg, #0e1020 0%, #1a1b3a 30%, #2b2455 58%, #45327a 82%, #5a3f92 100%); color: #fff; }
+.landing { position: fixed; inset: 0; display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(170deg, #0e1020 0%, #1a1b3a 30%, #2b2455 58%, #45327a 82%, #5a3f92 100%); color: #fff; }
 /* 사용자 사진을 우리 톤에 믹스하는 배경 레이어.
    - 사진 위에 보라 그라데이션을 soft-light로 블렌드해 톤 통일
    - 하단은 어둡게 눌러 카피 가독성 확보 + mask로 그라데이션에 페이드 */
