@@ -21,6 +21,7 @@ export default function WorkspaceTabs() {
   if (view === 'home') {
     return (
       <main className="landing">
+        <div className="landing-bg" aria-hidden="true" />
         <header className="landing-head">
           <span className="landing-head-brand">ULJU COMMUNITY</span>
         </header>
