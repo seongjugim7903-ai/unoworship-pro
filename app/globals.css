@@ -18,13 +18,15 @@ button:disabled { cursor: not-allowed; }
 .pwa-install-actions button { height: 34px; padding: 0 12px; border: 0; border-radius: 6px; color: #fff; background: #6754d9; font-size: 11px; font-weight: 800; }
 .pwa-install-actions .pwa-install-close { width: 34px; padding: 0; border: 1px solid #dfe4ee; color: #6f7b8f; background: #fff; font-size: 18px; }
 /* 랜딩 */
-.landing { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; background: linear-gradient(170deg, #0e1020 0%, #1a1b3a 30%, #2b2455 58%, #45327a 82%, #5a3f92 100%); color: #fff; }
-.landing-head { flex: 0 0 auto; padding: max(16px, env(safe-area-inset-top)) 24px 15px; border-bottom: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .03); }
-.landing-head-brand { color: #c9c2f2; font-size: 13px; font-weight: 800; letter-spacing: .24em; }
+.landing { position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; background: linear-gradient(170deg, #0e1020 0%, #1a1b3a 30%, #2b2455 58%, #45327a 82%, #5a3f92 100%); color: #fff; }
+.landing::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 82%; z-index: 0; pointer-events: none; background: url('/landing-worship.svg') top center / cover no-repeat; -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%); }
+.landing-head, .landing-inner { position: relative; z-index: 1; }
+.landing-head { flex: 0 0 auto; padding: max(16px, env(safe-area-inset-top)) 24px 15px; border-bottom: 1px solid rgba(255, 255, 255, .12); background: rgba(10, 11, 22, .38); }
+.landing-head-brand { color: #d4cef7; font-size: 13px; font-weight: 800; letter-spacing: .24em; }
 .landing-inner { flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden; width: 100%; max-width: 480px; margin: 0 auto; padding: 0 28px calc(36px + env(safe-area-inset-bottom)); }
 .landing-copy { margin-top: auto; padding: 32px 0 26px; }
-.landing-copy h1 { margin: 0; font-size: clamp(34px, 9.6vw, 48px); font-weight: 800; letter-spacing: -.035em; line-height: 1.24; }
-.landing-verse { margin: 22px 0 0; padding: 15px 17px; border-left: 3px solid rgba(255, 255, 255, .34); border-radius: 0 10px 10px 0; background: rgba(255, 255, 255, .05); }
+.landing-copy h1 { margin: 0; font-size: clamp(34px, 9.6vw, 48px); font-weight: 800; letter-spacing: -.035em; line-height: 1.24; text-shadow: 0 2px 22px rgba(0, 0, 0, .55); }
+.landing-verse { margin: 22px 0 0; padding: 15px 17px; border-left: 3px solid rgba(255, 255, 255, .34); border-radius: 0 10px 10px 0; background: rgba(10, 11, 22, .32); backdrop-filter: blur(2px); }
 .landing-verse p { margin: 0; color: rgba(255, 255, 255, .84); font-size: 14px; line-height: 1.72; }
 .landing-verse cite { display: block; margin-top: 9px; color: rgba(255, 255, 255, .55); font-size: 12px; font-style: normal; letter-spacing: .01em; }
 .landing-menu { display: grid; gap: 12px; }
