@@ -25,7 +25,7 @@ export default function WorkspaceTabs() {
           <p className="landing-brand">ULJU COMMUNITY</p>
           <div className="landing-copy">
             <h1>예배 뒤에서 섬기는<br />당신을 위해</h1>
-            <p>보이지 않는 자리에서 오늘도 예배를 준비하는<br />모든 손길을 하나님이 기억하십니다.</p>
+            <p>찬양은 곡조로 드리는 기도, 예배를 여는 첫 고백입니다.<br />보이지 않아도 가장 귀한 그 사역을 응원합니다.</p>
           </div>
           <nav className="landing-menu" aria-label="기능 선택">
             {MENU.map((item) => (
