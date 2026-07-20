@@ -124,6 +124,7 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .bulletin-block .panel-heading { padding-bottom: 12px; margin-bottom: 14px; }
 .bulletin-block .step-number { color: #b98a2a; }
 .bulletin-save { width: 100%; }
+.hymn-input { min-height: 76px; max-height: 168px; overflow-y: auto; line-height: 1.5; resize: vertical; }
 .bulletin-ocr-row input[type=file] { margin-top: 8px; font-size: 12px; }
 .bulletin-ocr-row input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .page-footer { padding: 24px 0 0; color: #9ca7b8; font-size: 11px; text-align: center; }

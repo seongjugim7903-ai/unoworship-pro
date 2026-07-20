@@ -37,6 +37,12 @@ function outlineTitle(content: string) {
   return content.slice(0, 20).trim() || '내용 없음';
 }
 
+function summarizeHymn(hymn: string) {
+  const songs = hymn.split('\n').map((line) => line.trim()).filter(Boolean);
+  if (songs.length <= 1) return songs[0] ?? hymn;
+  return `${songs[0]} 외 ${songs.length - 1}곡`;
+}
+
 export default function SermonOutlinePage() {
   const [serviceType, setServiceType] = useState('주일낮예배');
   const [serviceDate, setServiceDate] = useState('');
@@ -231,7 +237,9 @@ export default function SermonOutlinePage() {
           <label>내용 *<span className="field-hint">설교대지 원문을 붙여넣으세요.</span>
             <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder={'성경: 사65:17-25\n제목: 새 하늘과 새 땅의 축복\n1. ...'} rows={12} />
           </label>
-          <label>찬양<input value={hymn} onChange={(event) => setHymn(event.target.value)} placeholder="예: 236장" /></label>
+          <label>찬양<span className="field-hint">여러 곡은 줄바꿈으로 나눠 적으세요.</span>
+            <textarea className="hymn-input" value={hymn} onChange={(event) => setHymn(event.target.value)} placeholder={'예: 236장\n나의 하나님\n오직 예수'} rows={3} />
+          </label>
 
           <button className="primary-button" onClick={() => void handleSaveOutline()} disabled={!isOutlineValid || saveStatus === 'saving'}>
             {saveStatus === 'saving' ? '저장 중...' : '설교대지 저장'}
@@ -274,7 +282,7 @@ export default function SermonOutlinePage() {
                     <strong>{outlineTitle(item.content)}</strong>
                     <span>
                       {item.service_type} · {item.service_date || '날짜 없음'}
-                      {item.hymn ? ` · 찬양 ${item.hymn}` : ''}
+                      {item.hymn ? ` · 찬양 ${summarizeHymn(item.hymn)}` : ''}
                     </span>
                   </div>
                 </article>
