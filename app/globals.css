@@ -19,7 +19,9 @@ button:disabled { cursor: not-allowed; }
 .pwa-install-actions .pwa-install-close { width: 34px; padding: 0; border: 1px solid #dfe4ee; color: #6f7b8f; background: #fff; font-size: 18px; }
 /* 랜딩 */
 .landing { position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; background: linear-gradient(170deg, #0e1020 0%, #1a1b3a 30%, #2b2455 58%, #45327a 82%, #5a3f92 100%); color: #fff; }
-.landing::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 82%; z-index: 0; pointer-events: none; background: url('/landing-worship.svg') top center / cover no-repeat; -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%); }
+/* 사용자 제공 이미지를 넣을 배경 레이어 (현재는 비어 있음).
+   .landing-bg 요소로 이미지를 넣거나 아래 background:url(...)을 지정하면 된다. */
+.landing-bg { position: absolute; top: 0; left: 0; right: 0; height: 82%; z-index: 0; pointer-events: none; background-position: top center; background-size: cover; background-repeat: no-repeat; -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, #000 52%, transparent 100%); }
 .landing-head, .landing-inner { position: relative; z-index: 1; }
 .landing-head { flex: 0 0 auto; padding: max(16px, env(safe-area-inset-top)) 24px 15px; border-bottom: 1px solid rgba(255, 255, 255, .12); background: rgba(10, 11, 22, .38); }
 .landing-head-brand { color: #d4cef7; font-size: 13px; font-weight: 800; letter-spacing: .24em; }
