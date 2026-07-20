@@ -47,6 +47,7 @@ interface SavedSong {
   song_key: string;
   arrangement: string;
   arrangement_custom: string;
+  sheet_path: string | null;
 }
 
 let rowSeq = 0;
@@ -73,6 +74,10 @@ export default function WorshipPrepPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState('');
   const [recent, setRecent] = useState<SavedSong[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<SavedSong[]>([]);
+  const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  const searchSeqRef = useRef(0);
 
   useEffect(() => {
     try {
@@ -124,6 +129,33 @@ export default function WorshipPrepPage() {
       console.warn('[worship-prep] recent load failed', error);
     }
   }, []);
+
+  /* 제목 검색 — 입력하면 디바운스 후 전체 라이브러리에서 제목 매칭. */
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (!term) {
+      setSearchResults([]);
+      setSearchStatus('idle');
+      return;
+    }
+    setSearchStatus('loading');
+    const timer = window.setTimeout(async () => {
+      const seq = ++searchSeqRef.current;
+      try {
+        const response = await fetch(`/api/worship-prep?limit=30&search=${encodeURIComponent(term)}`);
+        const result = await response.json() as { ok?: boolean; songs?: SavedSong[] };
+        if (seq !== searchSeqRef.current) return;
+        setSearchResults(result.ok && Array.isArray(result.songs) ? result.songs : []);
+        setSearchStatus('done');
+      } catch (error) {
+        if (seq !== searchSeqRef.current) return;
+        console.warn('[worship-prep] search failed', error);
+        setSearchResults([]);
+        setSearchStatus('done');
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     void loadRecent(team);
@@ -227,6 +259,31 @@ export default function WorshipPrepPage() {
     }
   };
 
+  const renderSongList = (items: SavedSong[], emptyText: string) => (
+    items.length === 0 ? (
+      <div className="empty-state"><div className="empty-icon">♪</div><p>{emptyText}</p></div>
+    ) : (
+      <div className="search-result-list">
+        {items.map((item) => (
+          <article className="search-result" key={item.id}>
+            <div>
+              <strong>{item.title}</strong>
+              <span>
+                {item.team} · {item.service_date || '날짜 없음'}
+                {item.song_key ? ` · ${item.song_key}` : ''} · {arrangementLabel(item.arrangement, item.arrangement_custom)}
+              </span>
+            </div>
+            {item.sheet_path ? (
+              <a className="text-button" href={`/api/worship-sheet?path=${encodeURIComponent(item.sheet_path)}`} target="_blank" rel="noreferrer">악보</a>
+            ) : (
+              <span className="no-sheet">악보 없음</span>
+            )}
+          </article>
+        ))}
+      </div>
+    )
+  );
+
   const renderSongCard = (song: SongRow, index: number) => (
     <article className="song-card" key={song.key}>
       <div className="song-row-head">
@@ -319,25 +376,23 @@ export default function WorshipPrepPage() {
 
         <section className="panel preview-panel">
           <div className="panel-heading">
-            <div><span className="step-number success">02</span><h2>{team} 저장 곡</h2></div>
-            <span className="section-count">{recent.length}곡</span>
+            <div><span className="step-number success">02</span><h2>찬양곡 검색</h2></div>
+            {!searchTerm.trim() && <span className="section-count">{team} {recent.length}곡</span>}
           </div>
-          {recent.length === 0 ? (
-            <div className="empty-state"><div className="empty-icon">♪</div><p>이 팀에 저장된 곡이<br />여기에 표시됩니다.</p></div>
+
+          <label className="song-search-label">
+            제목으로 검색
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="찬양 제목 입력 (전체 곡에서 검색)"
+            />
+          </label>
+
+          {searchTerm.trim() ? (
+            renderSongList(searchResults, searchStatus === 'loading' ? '검색 중...' : '검색 결과가 없습니다.')
           ) : (
-            <div className="search-result-list">
-              {recent.map((item) => (
-                <article className="search-result" key={item.id}>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <span>
-                      {item.service_date || '날짜 없음'} · {item.service_type}
-                      {item.song_key ? ` · ${item.song_key}` : ''} · {arrangementLabel(item.arrangement, item.arrangement_custom)}
-                    </span>
-                  </div>
-                </article>
-              ))}
-            </div>
+            renderSongList(recent, '이 팀에 저장된 곡이 없습니다.')
           )}
         </section>
       </div>

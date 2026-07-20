@@ -135,6 +135,35 @@ export async function uploadSupabaseObject(input: UploadObjectInput) {
   return body;
 }
 
+export async function createSignedUrl(input: { bucket: string; path: string; expiresIn?: number }) {
+  const config = getSupabaseServerConfig();
+  const headers = createHeaders(config, { 'content-type': 'application/json' });
+  const objectPath = `${encodeURIComponent(input.bucket)}/${encodeObjectPath(input.path)}`;
+
+  const response = await fetch(`${config.url}/storage/v1/object/sign/${objectPath}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ expiresIn: input.expiresIn ?? 3600 }),
+    cache: 'no-store',
+  });
+  const body = await parseSupabaseResponse(response);
+
+  if (!response.ok) {
+    const message = typeof body === 'string'
+      ? body
+      : body && typeof body === 'object' && 'message' in body
+        ? String(body.message)
+        : `Supabase signed URL 발급 실패 (${response.status})`;
+    throw new Error(message);
+  }
+
+  const signed = body && typeof body === 'object' && 'signedURL' in body
+    ? String((body as { signedURL: unknown }).signedURL)
+    : '';
+  if (!signed) throw new Error('signed URL을 받지 못했습니다.');
+  return `${config.url}/storage/v1${signed}`;
+}
+
 export async function deleteSupabaseObjects(input: { bucket: string; paths: string[] }) {
   if (input.paths.length === 0) return;
 

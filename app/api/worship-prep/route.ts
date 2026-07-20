@@ -64,20 +64,44 @@ function sanitizeSegment(value: string) {
   return `s-${createHash('sha1').update(value).digest('hex').slice(0, 10)}`;
 }
 
+const SELECT_COLUMNS = 'id,created_at,service_date,service_type,team,song_order,title,song_key,arrangement,arrangement_custom,sheet_bucket,sheet_path,sheet_content_type';
+
+function normalizeSearch(value: string | null) {
+  return String(value ?? '').trim().replace(/[(),*]/g, ' ').replace(/\s+/g, ' ').slice(0, 60);
+}
+
+/* 검색 결과는 제목 라이브러리로 쓰이므로 제목 중복은 최신 1건만 남긴다. */
+function dedupeByTitle(rows: Array<Record<string, unknown>>) {
+  const seen = new Set<string>();
+  const result: Array<Record<string, unknown>> = [];
+  for (const row of rows) {
+    const key = String(row.title ?? '').trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(row);
+  }
+  return result;
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const limit = clampLimit(url.searchParams.get('limit'));
     const team = url.searchParams.get('team')?.trim();
-    const params = new URLSearchParams({
-      select: 'id,created_at,service_date,service_type,team,song_order,title,song_key,arrangement,arrangement_custom,sheet_bucket,sheet_path,sheet_content_type',
-      order: 'service_date.desc.nullslast,team.asc,song_order.asc',
-      limit: String(limit),
-    });
-    if (team) params.set('team', `eq.${team}`);
+    const search = normalizeSearch(url.searchParams.get('search'));
+    const params = new URLSearchParams({ select: SELECT_COLUMNS, limit: String(limit) });
 
-    const rows = await supabaseRest(`/worship_prep_songs?${params.toString()}`, { method: 'GET' });
-    return NextResponse.json({ ok: true, songs: rows });
+    if (search) {
+      // 제목 검색 — 팀 무관 전체 라이브러리에서, 최신순.
+      params.set('title', `ilike.*${search}*`);
+      params.set('order', 'created_at.desc');
+    } else {
+      params.set('order', 'service_date.desc.nullslast,team.asc,song_order.asc');
+      if (team) params.set('team', `eq.${team}`);
+    }
+
+    const rows = await supabaseRest<Array<Record<string, unknown>>>(`/worship_prep_songs?${params.toString()}`, { method: 'GET' });
+    return NextResponse.json({ ok: true, songs: search ? dedupeByTitle(rows) : rows });
   } catch (error) {
     console.error('[worship-prep] list failed', error);
     if (error instanceof SupabaseServerConfigError) {
