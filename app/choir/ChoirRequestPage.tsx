@@ -14,6 +14,7 @@ import {
   loadChoirImageCache,
   saveChoirImageCache,
 } from '../../lib/choirImageCache';
+import { nextServiceDate } from '../../lib/nextServiceDate';
 
 /* Blob URL 미리보기는 next/image보다 일반 img가 적합하다. */
 /* eslint-disable @next/next/no-img-element */
@@ -268,6 +269,12 @@ export default function ChoirRequestPage() {
     }
   };
 
+  const handleServiceTypeChange = (next: string) => {
+    setServiceType(next);
+    const auto = nextServiceDate(next);
+    if (auto) setServiceDate(auto);
+  };
+
   const handleGenerate = async () => {
     if (!isValid || status === 'rendering') return;
     images.forEach((image) => URL.revokeObjectURL(image.url));
@@ -461,8 +468,7 @@ export default function ChoirRequestPage() {
     <main className="site-shell">
       <header className="site-header">
         <div>
-          <p className="eyebrow">UNOWORSHIP PRO</p>
-          <h1>헵시바 선교단 자막 협조</h1>
+          <h1>헵시바 선교단</h1>
         </div>
       </header>
 
@@ -529,7 +535,7 @@ export default function ChoirRequestPage() {
           */}
           <div className="field-grid service-fields">
             <label>예배일<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
-            <label>예배 종류<select value={serviceType} onChange={(event) => setServiceType(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
+            <label>예배 종류<select value={serviceType} onChange={(event) => handleServiceTypeChange(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
           </div>
           <div className="field-grid song-fields">
             <label>곡명 *<input value={songTitle} onChange={(event) => setSongTitle(event.target.value)} placeholder="예: 은혜" /></label>

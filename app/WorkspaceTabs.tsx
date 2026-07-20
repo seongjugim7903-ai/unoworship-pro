@@ -18,19 +18,22 @@ export default function WorkspaceTabs() {
 
   return (
     <>
-      <nav className="workspace-tabs" aria-label="작업 메뉴">
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={tab === item.id ? 'active' : ''}
-            aria-current={tab === item.id ? 'page' : undefined}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <header className="workspace-topbar">
+        <p className="workspace-brand">UNOWORSHIP PRO</p>
+        <nav className="workspace-tabs" aria-label="작업 메뉴">
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={tab === item.id ? 'active' : ''}
+              aria-current={tab === item.id ? 'page' : undefined}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+      </header>
       {tab === 'choir' ? <ChoirRequestPage /> : <SermonOutlinePage />}
     </>
   );

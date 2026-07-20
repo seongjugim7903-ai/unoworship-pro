@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { formatWeekLabel, toWeekStart } from '../../lib/weekStart';
+import { nextServiceDate } from '../../lib/nextServiceDate';
 
 // 정기예배: 주일낮예배(일 09/11시), 주일오후예배(일 14:30), 수요예배(수 19:30),
 // 금요기도회(금 20:30), 월삭감사예배(매월 1일 20:30)
@@ -152,6 +153,12 @@ export default function SermonOutlinePage() {
     }
   };
 
+  const handleServiceTypeChange = (next: string) => {
+    setServiceType(next);
+    const auto = nextServiceDate(next);
+    if (auto) setServiceDate(auto);
+  };
+
   const handleBulletinImage = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = ''; // 같은 파일 재선택 허용
@@ -205,7 +212,6 @@ export default function SermonOutlinePage() {
     <main className="site-shell">
       <header className="site-header">
         <div>
-          <p className="eyebrow">UNOWORSHIP PRO</p>
           <h1>헵시바 선교단 설교대지</h1>
         </div>
       </header>
@@ -219,7 +225,7 @@ export default function SermonOutlinePage() {
 
           <div className="field-grid service-fields">
             <label>일자<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
-            <label>예배 종류<select value={serviceType} onChange={(event) => setServiceType(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
+            <label>예배 종류<select value={serviceType} onChange={(event) => handleServiceTypeChange(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
           </div>
 
           <label>내용 *<span className="field-hint">설교대지 원문을 붙여넣으세요.</span>

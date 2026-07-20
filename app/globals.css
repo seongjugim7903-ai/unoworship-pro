@@ -17,10 +17,12 @@ button:disabled { cursor: not-allowed; }
 .pwa-install-actions { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
 .pwa-install-actions button { height: 34px; padding: 0 12px; border: 0; border-radius: 6px; color: #fff; background: #6754d9; font-size: 11px; font-weight: 800; }
 .pwa-install-actions .pwa-install-close { width: 34px; padding: 0; border: 1px solid #dfe4ee; color: #6f7b8f; background: #fff; font-size: 18px; }
-.workspace-tabs { position: sticky; z-index: 90; top: 0; display: flex; gap: 6px; max-width: 1260px; margin: 0 auto; padding: 14px 28px 0; background: #f5f7fb; }
+.workspace-topbar { position: sticky; z-index: 90; top: 0; max-width: 1260px; margin: 0 auto; padding: 12px 28px 0; background: #f5f7fb; }
+.workspace-brand { margin: 0 0 8px; color: #6754d9; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
+.workspace-tabs { display: flex; gap: 6px; }
 .workspace-tabs button { flex: 0 0 auto; height: 42px; padding: 0 22px; border: 1px solid #dfe4ee; border-bottom: 0; border-radius: 10px 10px 0 0; color: #6b7891; background: #eef1f7; font-size: 13px; font-weight: 800; }
 .workspace-tabs button.active { color: #5543c0; background: #fff; box-shadow: 0 -3px 12px rgba(30, 48, 80, .05); }
-.workspace-tabs + .site-shell { padding-top: 20px; }
+.workspace-topbar + .site-shell { padding-top: 20px; }
 .site-shell { min-height: 100vh; max-width: 1260px; margin: 0 auto; padding: 36px 28px 28px; }
 .site-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
 .eyebrow { margin: 0 0 10px; color: #6754d9; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
@@ -125,7 +127,7 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .bulletin-ocr-row input[type=file] { margin-top: 8px; font-size: 12px; }
 .bulletin-ocr-row input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .page-footer { padding: 24px 0 0; color: #9ca7b8; font-size: 11px; text-align: center; }
-@media (max-width: 880px) { .workspace-tabs { padding: 12px 16px 0; } .site-shell { padding: 24px 16px; } .site-header { align-items: flex-start; flex-direction: column; } .content-grid { grid-template-columns: 1fr; } .empty-state { min-height: 230px; } .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 880px) { .workspace-topbar { padding: 12px 16px 0; } .site-shell { padding: 24px 16px; } .site-header { align-items: flex-start; flex-direction: column; } .content-grid { grid-template-columns: 1fr; } .empty-state { min-height: 230px; } .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .pwa-install-banner { align-items: flex-start; gap: 10px; padding-top: max(10px, env(safe-area-inset-top)); }
   .pwa-install-copy span { max-width: 220px; }
