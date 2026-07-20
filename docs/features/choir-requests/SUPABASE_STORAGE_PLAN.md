@@ -48,35 +48,23 @@ NEXT_PUBLIC_APP_URL=https://unoworship-pro-eight.vercel.app
 
 주의: `SUPABASE_SERVICE_ROLE_KEY`는 서버 전용이다. 브라우저 코드나 GitHub에 절대 노출하지 않는다.
 
-## 현재 차단 사항
+## 적용 상태 (2026-07-20 확인)
 
-2026-07-19 사용자가 새 Supabase 프로젝트 URL을 제공했다.
+**마이그레이션 적용 완료, 전 기능 프로덕션 동작 확인.**
 
-```text
-https://hwbzztfjzeismosjkmhe.supabase.co
-```
+- `GET /api/choir-requests` — 저장된 곡 목록 정상 반환
+- `GET /api/choir-programs` — 프로그램 payload `ready` 상태로 정상 반환
+- 이미지 업로드·수정 모드 업데이트(upsert)까지 실사용 확인
+- Vercel 환경변수(`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) 설정 완료
 
-이 프로젝트 기준으로 Vercel 환경변수 `SUPABASE_URL`을 맞춘다. 단, 2026-07-19 CLI 확인 시 현재 로컬 Supabase CLI 계정에는 이전 프로젝트 `blimpsrrphfstbbitblo`만 표시되고 새 프로젝트 `hwbzztfjzeismosjkmhe`는 목록에 나오지 않았다. 따라서 DB 마이그레이션은 아래 둘 중 하나로 진행한다.
+대시보드: `https://supabase.com/dashboard/project/hwbzztfjzeismosjkmhe`
 
-1. 새 프로젝트가 보이는 Supabase 계정으로 CLI 로그인 후 `supabase link/db push`
-2. Supabase Dashboard의 SQL Editor에서 마이그레이션 SQL 직접 실행
+참고: 로컬 dev(:3100)는 `.env`가 없어 저장 API가 503을 반환한다(의도된 동작).
+로컬에서도 DB 저장을 테스트하려면 프로젝트 루트에 `.env` 파일을 만들고
+`.env.example` 항목을 채우면 된다 — service role key는 절대 커밋하지 말 것.
 
-대시보드:
-
-```text
-https://supabase.com/dashboard/project/hwbzztfjzeismosjkmhe
-```
-
-## Supabase 적용 순서
-
-프로젝트가 unpause 된 뒤:
-
-```bash
-supabase link --project-ref hwbzztfjzeismosjkmhe
-supabase db push
-```
-
-또는 SQL Editor에 `supabase/migrations/202607190001_choir_requests.sql` 내용을 직접 실행한다.
+이후 스키마 변경이 생기면: 새 마이그레이션 파일 추가 후 Dashboard SQL Editor에서 실행하거나,
+`npx supabase login && npx supabase link --project-ref hwbzztfjzeismosjkmhe && npx supabase db push`.
 
 ## Composer 가져오기 방향
 

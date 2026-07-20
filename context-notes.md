@@ -168,3 +168,12 @@
   안 맞음(사용자와 합의). `lib/kakaoShare.ts`는 향후 "링크로 알리기" 용도로 보존, 미연결.
   따라서 `NEXT_PUBLIC_KAKAO_JS_KEY` 등록도 당장은 불필요.
 - 파일 공유 미지원 브라우저(PC 일부·카톡 인앱)는 안내 문구 + 이미지 카드 개별 저장 버튼으로 우회.
+
+## 2026-07-20 — Supabase 상태 확인: 마이그레이션 적용 완료(문서가 낡았었음)
+
+- 프로덕션 API 점검 결과 requests/images/programs 세 테이블 모두 실동작 중
+  (곡 목록 조회, 이미지 업로드, 수정 모드 upsert까지 확인). Vercel env도 설정 완료 상태.
+- "마이그레이션 미적용" 차단 기록은 해소 — SUPABASE_STORAGE_PLAN.md 현행화.
+- 이 PC에 Supabase CLI 미설치, `npx supabase`(v2.109)로 대체 가능. 스키마 변경 시에만 login/link 필요.
+- 로컬 dev는 `.env` 없음 → 저장 API 503 (의도된 동작). 로컬 DB 테스트가 필요하면 사용자가
+  `.env`를 직접 만들어 service role key를 채운다 (커밋 금지).
