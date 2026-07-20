@@ -309,6 +309,24 @@ export default function WorshipPrepPage() {
 
   return (
     <main className="site-shell">
+      <section className="panel search-panel">
+        <div className="search-row">
+          <label>
+            찬양곡 검색
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="제목으로 검색 (전체 곡에서)"
+            />
+          </label>
+        </div>
+        {searchTerm.trim() && (
+          <div className="search-body">
+            {renderSongList(searchResults, searchStatus === 'loading' ? '검색 중...' : '검색 결과가 없습니다.')}
+          </div>
+        )}
+      </section>
+
       <div className="content-grid">
         <section className="panel form-panel">
           <div className="panel-heading">
@@ -376,24 +394,10 @@ export default function WorshipPrepPage() {
 
         <section className="panel preview-panel">
           <div className="panel-heading">
-            <div><span className="step-number success">02</span><h2>찬양곡 검색</h2></div>
-            {!searchTerm.trim() && <span className="section-count">{team} {recent.length}곡</span>}
+            <div><span className="step-number success">02</span><h2>{team} 저장 곡</h2></div>
+            <span className="section-count">{recent.length}곡</span>
           </div>
-
-          <label className="song-search-label">
-            제목으로 검색
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="찬양 제목 입력 (전체 곡에서 검색)"
-            />
-          </label>
-
-          {searchTerm.trim() ? (
-            renderSongList(searchResults, searchStatus === 'loading' ? '검색 중...' : '검색 결과가 없습니다.')
-          ) : (
-            renderSongList(recent, '이 팀에 저장된 곡이 없습니다.')
-          )}
+          {renderSongList(recent, '이 팀에 저장된 곡이 없습니다.')}
         </section>
       </div>
 

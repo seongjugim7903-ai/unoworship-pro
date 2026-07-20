@@ -149,7 +149,7 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .setlist-preview li > p { margin: 0; color: #2c3852; font-size: 13px; font-weight: 700; }
 .setlist-preview li em { color: #8591a4; font-style: normal; font-weight: 600; }
 @media (max-width: 600px) { .setlist-preview li { cursor: pointer; } }
-.song-search-label { margin-bottom: 14px; }
+.search-panel .search-body { margin-top: 12px; }
 .no-sheet { flex: 0 0 auto; color: #b0b8c6; font-size: 11px; }
 .bulletin-ocr-row input[type=file] { margin-top: 8px; font-size: 12px; }
 .bulletin-ocr-row input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
