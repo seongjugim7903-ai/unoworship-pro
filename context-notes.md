@@ -169,6 +169,23 @@
   따라서 `NEXT_PUBLIC_KAKAO_JS_KEY` 등록도 당장은 불필요.
 - 파일 공유 미지원 브라우저(PC 일부·카톡 인앱)는 안내 문구 + 이미지 카드 개별 저장 버튼으로 우회.
 
+## 2026-07-20 — 설교대지 탭 + DB + 주보 사진 텍스트 추출
+
+- 상단 탭 신설: `자막 협조`(기존) / `설교대지`. `app/WorkspaceTabs.tsx`, 각 페이지는 자체 site-shell.
+- **설교대지 데이터 모델** (사용자 확정): 일자·내용·찬양은 정기예배마다, 주보는 주 1회.
+  → 두 테이블 분리: `sermon_outlines`(예배별) + `weekly_bulletins`(week_start unique, 그 주 일요일).
+  마이그레이션 `202607200002_sermon_outlines.sql`. 저장 API `/api/sermon-outlines`, `/api/weekly-bulletins`.
+  정기예배 5종: 주일낮/주일오후/수요/금요기도회/월삭감사예배.
+- **주보 사진 → 텍스트 추출** (사용자 요청): 주보 이미지 업로드 → Claude Opus 4.8 비전 + 구조화 출력으로
+  다섯 섹션만 추출 = 교회소식 / 주일낮예배 / 주일오후예배 / 수요예배 / 금요기도회.
+  구현: `lib/bulletin/extractBulletin.ts`(server-only, @anthropic-ai/sdk), `/api/bulletin-ocr`.
+  결과를 주보 textarea에 `[섹션]\n내용` 형식으로 채움. 단순 OCR 대신 비전 LLM 선택 이유:
+  다단 레이아웃(교회소식/예배순서/지도/사진)이라 순서·표가 깨짐. 지도·차량표·헌금 안내는 제외.
+- **남은 사용자 작업**:
+  1. Supabase에 `202607200002_sermon_outlines.sql` 적용 (Dashboard SQL Editor 또는 npx supabase db push).
+  2. Vercel env `ANTHROPIC_API_KEY` 등록 (서버 전용, 주보 추출용). 없으면 추출 API가 503 안내 반환.
+  로컬 dev는 .env 없어 저장/추출 모두 503(의도된 동작).
+
 ## 2026-07-20 — Supabase 상태 확인: 마이그레이션 적용 완료(문서가 낡았었음)
 
 - 프로덕션 API 점검 결과 requests/images/programs 세 테이블 모두 실동작 중
