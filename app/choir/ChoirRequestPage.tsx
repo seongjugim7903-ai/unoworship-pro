@@ -408,7 +408,7 @@ export default function ChoirRequestPage() {
     try {
       await navigator.share({
         files,
-        text: `《${songTitle}》 이미지 ${files.length}장이 복사되었습니다.`,
+        text: `《${songTitle}》\n이미지 ${files.length}장이 복사되었습니다.`,
       });
       setMessage(`${songTitle} 자막 ${files.length}장 전달 완료 — 오늘도 수고하셨습니다. 🎵`);
     } catch (error) {
@@ -504,12 +504,13 @@ export default function ChoirRequestPage() {
           {editingRequestId && (
             <p className="editing-badge">
               저장된 요청을 수정 중입니다 — 재생성하면 기존 요청이 업데이트됩니다.
-              <button className="text-button" onClick={() => setEditingRequestId(null)}>새 곡으로 저장</button>
             </p>
           )}
           <button className="primary-button" onClick={handleGenerate} disabled={!isValid || status === 'rendering'}>
             {status === 'rendering' ? '이미지 생성 중...' : '자막 이미지 생성'}
           </button>
+          {status === 'rendering' && <p className="generation-status rendering">이미지 생성 중 ...</p>}
+          {status === 'done' && <p className="generation-status done">이미지 생성 완료!</p>}
           {cloudSaveMessage && <p className={`field-program-message ${cloudSaveStatus}`}>{cloudSaveMessage}</p>}
           {fieldProgramMessage && <p className="field-program-message">{fieldProgramMessage}</p>}
           {status === 'error' && <p className="error-message">{message}</p>}
