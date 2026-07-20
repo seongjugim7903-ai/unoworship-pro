@@ -5,12 +5,14 @@
 import { useState } from 'react';
 import ChoirRequestPage from './choir/ChoirRequestPage';
 import SermonOutlinePage from './sermon/SermonOutlinePage';
+import WorshipPrepPage from './worship/WorshipPrepPage';
 
-type WorkspaceTab = 'choir' | 'sermon';
+type WorkspaceTab = 'choir' | 'sermon' | 'worship';
 
 const TABS: Array<{ id: WorkspaceTab; label: string }> = [
   { id: 'choir', label: '헵시바 선교단' },
   { id: 'sermon', label: '설교대지' },
+  { id: 'worship', label: '준비찬양' },
 ];
 
 export default function WorkspaceTabs() {
@@ -34,7 +36,9 @@ export default function WorkspaceTabs() {
           ))}
         </nav>
       </header>
-      {tab === 'choir' ? <ChoirRequestPage /> : <SermonOutlinePage />}
+      {tab === 'choir' && <ChoirRequestPage />}
+      {tab === 'sermon' && <SermonOutlinePage />}
+      {tab === 'worship' && <WorshipPrepPage />}
     </>
   );
 }
