@@ -100,6 +100,7 @@ export default function ChoirRequestPage() {
   const [searchResults, setSearchResults] = useState<SearchChoirRequest[]>([]);
   const [kakaoShareBusy, setKakaoShareBusy] = useState(false);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -385,6 +386,37 @@ export default function ChoirRequestPage() {
     });
   };
 
+  const handleDeleteSearchResult = async (request: SearchChoirRequest) => {
+    if (deletingRequestId) return;
+
+    const label = request.song_title || '제목 없는 곡';
+    if (!window.confirm(`《${label}》 요청과 저장된 이미지가 모두 삭제됩니다. 삭제할까요?`)) return;
+
+    setDeletingRequestId(request.id);
+    try {
+      const response = await fetch(`/api/choir-requests?id=${encodeURIComponent(request.id)}`, {
+        method: 'DELETE',
+      });
+      const result = await readApiResult(response);
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message ?? `삭제에 실패했습니다. (HTTP ${response.status})`);
+      }
+
+      setSearchResults((previous) => previous.filter((row) => row.id !== request.id));
+      setSearchStatus('done');
+      setSearchMessage(`《${label}》 요청을 삭제했습니다.`);
+      /* 방금 지운 요청을 수정 중이었다면 연결을 끊어 재생성이 새 요청으로 저장되게 한다. */
+      if (editingRequestId === request.id) setEditingRequestId(null);
+    } catch (error) {
+      console.error('[choir-request] delete failed', error);
+      setSearchStatus('error');
+      setSearchMessage(error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.');
+    } finally {
+      setDeletingRequestId(null);
+    }
+  };
+
   /* 생성 이미지를 파일 그대로 공유창에 싣는다 — 다운로드 없이 카카오톡 대화방에 바로 첨부된다. */
   const handleKakaoShare = async () => {
     if (images.length === 0 || kakaoShareBusy) return;
@@ -467,7 +499,16 @@ export default function ChoirRequestPage() {
                     {request.composer ? ` · ${request.composer}` : ''}
                   </span>
                 </div>
-                <button className="text-button" onClick={() => handleEditSearchResult(request)}>수정</button>
+                <div className="search-result-actions">
+                  <button className="text-button" onClick={() => handleEditSearchResult(request)}>수정</button>
+                  <button
+                    className="text-button danger"
+                    onClick={() => void handleDeleteSearchResult(request)}
+                    disabled={deletingRequestId === request.id}
+                  >
+                    {deletingRequestId === request.id ? '삭제 중' : '삭제'}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

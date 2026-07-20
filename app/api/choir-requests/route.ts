@@ -125,6 +125,52 @@ export async function GET(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const id = z.string().uuid('삭제할 요청 id가 올바르지 않습니다.').parse(url.searchParams.get('id'));
+
+    /* FK cascade가 이미지·프로그램 행은 지우지만 Storage 객체는 직접 정리해야 한다. */
+    const imageRows = await supabaseRest<Array<{ storage_path: string }>>(
+      `/choir_generated_images?request_id=eq.${id}&select=storage_path`,
+      { method: 'GET' },
+    );
+    if (imageRows.length > 0) {
+      await deleteSupabaseObjects({
+        bucket: BUCKET_NAME,
+        paths: imageRows.map((row) => row.storage_path),
+      }).catch((error) => {
+        console.warn('[choir-requests] storage cleanup failed during delete', error);
+      });
+    }
+
+    const deletedRows = await supabaseRest<ChoirRequestRow[]>(
+      `/choir_requests?id=eq.${id}`,
+      { method: 'DELETE' },
+      { prefer: 'return=representation' },
+    );
+
+    if (deletedRows.length === 0) {
+      return jsonError('이미 삭제되었거나 존재하지 않는 요청입니다.', 404, 'CHOIR_REQUEST_NOT_FOUND');
+    }
+
+    return NextResponse.json({ ok: true, deletedId: id, imageCount: imageRows.length });
+  } catch (error) {
+    console.error('[choir-requests] delete failed', error);
+
+    if (error instanceof SupabaseServerConfigError) {
+      return jsonError(error.message, 503, error.code);
+    }
+
+    if (error instanceof z.ZodError) {
+      return jsonError(error.issues[0]?.message ?? '삭제 요청이 올바르지 않습니다.', 400, 'INVALID_DELETE_REQUEST');
+    }
+
+    const message = error instanceof Error ? error.message : '요청 삭제 중 오류가 발생했습니다.';
+    return jsonError(message, 500, 'CHOIR_REQUEST_DELETE_FAILED');
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();

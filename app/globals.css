@@ -106,6 +106,10 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .image-card-footer > span { color: #58657a; font-size: 11px; font-weight: 800; }
 .image-card-footer > div { display: flex; gap: 5px; }
 .text-button, .share-button { height: 28px; padding: 0 8px; border: 1px solid #d7deea; color: #5f6d84; background: #fff; }
+.search-result-actions { display: flex; gap: 5px; }
+.text-button.danger { border-color: #f2cfd6; color: #c24455; }
+.text-button.danger:hover { border-color: #d98a97; background: #fff5f6; }
+.text-button:disabled { opacity: .5; }
 .share-button { border-color: #e3dfff; color: #6551cb; background: #f6f4ff; }
 .text-button:hover, .share-button:hover { border-color: #8778e1; }
 .error-message, .info-message { margin: 12px 0 0; color: #c24455; font-size: 12px; line-height: 1.5; }
@@ -125,7 +129,7 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
   .search-panel { padding: 14px; }
   .search-row { grid-template-columns: minmax(0, 1fr) 72px; gap: 8px; }
   .search-button { height: 40px; padding: 0 8px; }
-  .search-result { grid-template-columns: minmax(0, 1fr) 54px; }
+  .search-result { grid-template-columns: minmax(0, 1fr) auto; }
   .form-panel, .preview-panel, .result-panel { padding: 16px; }
   .panel-heading { align-items: flex-start; }
   .panel-heading h2, .result-heading h2 { font-size: 16px; }
