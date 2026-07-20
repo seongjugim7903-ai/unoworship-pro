@@ -141,6 +141,14 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .sheet-field input[type=file] { margin-top: 8px; font-size: 12px; }
 .sheet-field input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .sheet-name { display: block; margin-top: 6px; color: #5a6b8c; font-size: 11px; }
+.setlist-preview { margin-top: 16px; padding-top: 16px; border-top: 1px dashed #dfe4ee; }
+.setlist-preview-label { margin: 0 0 8px; color: #8a96a9; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+.setlist-preview ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.setlist-preview li { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid #e4e9f1; border-radius: 6px; background: #fbfcfe; }
+.setlist-preview li > span { display: grid; width: 22px; height: 22px; place-items: center; border-radius: 50%; color: #fff; background: #6754d9; font-size: 11px; font-weight: 800; }
+.setlist-preview li > p { margin: 0; color: #2c3852; font-size: 13px; font-weight: 700; }
+.setlist-preview li em { color: #8591a4; font-style: normal; font-weight: 600; }
+@media (max-width: 600px) { .setlist-preview li { cursor: pointer; } }
 .bulletin-ocr-row input[type=file] { margin-top: 8px; font-size: 12px; }
 .bulletin-ocr-row input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .page-footer { padding: 24px 0 0; color: #9ca7b8; font-size: 11px; text-align: center; }

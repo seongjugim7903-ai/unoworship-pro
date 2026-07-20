@@ -298,6 +298,23 @@ export default function WorshipPrepPage() {
             {saveStatus === 'saving' ? '저장 중...' : '준비찬양 저장'}
           </button>
           {saveMessage && <p className={`field-program-message ${saveStatus}`}>{saveMessage}</p>}
+
+          {songs.some((song) => song.title.trim()) && (
+            <div className="setlist-preview">
+              <p className="setlist-preview-label">준비 곡 순서</p>
+              <ol>
+                {songs.filter((song) => song.title.trim()).map((song, index) => (
+                  <li key={song.key} onClick={() => (isMobile ? scrollToSong(songs.indexOf(song)) : undefined)}>
+                    <span>{index + 1}</span>
+                    <p>
+                      {song.title.trim()}
+                      {song.songKey.trim() && <em> · {song.songKey.trim()}</em>}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </section>
 
         <section className="panel preview-panel">
