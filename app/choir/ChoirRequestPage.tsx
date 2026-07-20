@@ -466,12 +466,6 @@ export default function ChoirRequestPage() {
 
   return (
     <main className="site-shell">
-      <header className="site-header">
-        <div>
-          <h1>헵시바 선교단</h1>
-        </div>
-      </header>
-
       <section className="panel search-panel">
         <div className="search-row">
           <label>
@@ -534,8 +528,8 @@ export default function ChoirRequestPage() {
           </div>
           */}
           <div className="field-grid service-fields">
-            <label>예배일<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
             <label>예배 종류<select value={serviceType} onChange={(event) => handleServiceTypeChange(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
+            <label>예배일<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
           </div>
           <div className="field-grid song-fields">
             <label>곡명 *<input value={songTitle} onChange={(event) => setSongTitle(event.target.value)} placeholder="예: 은혜" /></label>

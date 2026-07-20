@@ -224,8 +224,8 @@ export default function SermonOutlinePage() {
           </div>
 
           <div className="field-grid service-fields">
-            <label>일자<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
             <label>예배 종류<select value={serviceType} onChange={(event) => handleServiceTypeChange(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
+            <label>일자<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
           </div>
 
           <label>내용 *<span className="field-hint">설교대지 원문을 붙여넣으세요.</span>

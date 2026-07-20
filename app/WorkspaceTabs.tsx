@@ -9,7 +9,7 @@ import SermonOutlinePage from './sermon/SermonOutlinePage';
 type WorkspaceTab = 'choir' | 'sermon';
 
 const TABS: Array<{ id: WorkspaceTab; label: string }> = [
-  { id: 'choir', label: '자막 협조' },
+  { id: 'choir', label: '헵시바 선교단' },
   { id: 'sermon', label: '설교대지' },
 ];
 
@@ -19,7 +19,7 @@ export default function WorkspaceTabs() {
   return (
     <>
       <header className="workspace-topbar">
-        <p className="workspace-brand">UNOWORSHIP PRO</p>
+        <p className="workspace-brand">ULJU COMMUNITY</p>
         <nav className="workspace-tabs" aria-label="작업 메뉴">
           {TABS.map((item) => (
             <button
