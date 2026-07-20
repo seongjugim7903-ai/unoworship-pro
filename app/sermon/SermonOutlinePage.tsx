@@ -216,12 +216,6 @@ export default function SermonOutlinePage() {
 
   return (
     <main className="site-shell">
-      <header className="site-header">
-        <div>
-          <h1>헵시바 선교단 설교대지</h1>
-        </div>
-      </header>
-
       <div className="content-grid">
         <section className="panel form-panel">
           <div className="panel-heading">

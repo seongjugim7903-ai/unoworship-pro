@@ -2,7 +2,7 @@
 
 // 찬양대 자막 요청 — 가사 입력, PNG 생성, 모바일 저장·카카오톡 공유를 한 화면에서 처리한다.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   downloadBlob,
   renderChoirImages,
@@ -331,15 +331,17 @@ export default function ChoirRequestPage() {
     });
   };
 
-  const handleSearch = async () => {
+  /* 최신 요청만 반영하기 위한 시퀀스 가드 — 자동완성 응답 경합 방지. */
+  const searchSeqRef = useRef(0);
+
+  const fetchMatches = useCallback(async (term: string) => {
+    const seq = ++searchSeqRef.current;
     setSearchStatus('loading');
     setSearchMessage('');
 
     try {
-      const params = new URLSearchParams({
-        limit: '20',
-      });
-      const query = searchTerm.trim();
+      const params = new URLSearchParams({ limit: '20' });
+      const query = term.trim();
       if (query) params.set('search', query);
 
       const response = await fetch(`/api/choir-requests?${params.toString()}`);
@@ -348,6 +350,7 @@ export default function ChoirRequestPage() {
         message?: string;
         requests?: SearchChoirRequest[];
       };
+      if (seq !== searchSeqRef.current) return; // 더 최신 검색이 진행 중이면 버린다
 
       if (!response.ok || !result.ok) {
         setSearchStatus('error');
@@ -359,14 +362,24 @@ export default function ChoirRequestPage() {
       const requests = Array.isArray(result.requests) ? result.requests : [];
       setSearchResults(requests);
       setSearchStatus('done');
-      setSearchMessage(requests.length > 0 ? `${requests.length}곡을 찾았습니다.` : '검색 결과가 없습니다.');
+      setSearchMessage(requests.length > 0 ? `${requests.length}곡` : '검색 결과가 없습니다.');
     } catch (error) {
+      if (seq !== searchSeqRef.current) return;
       console.error('[choir-request] search failed', error);
       setSearchStatus('error');
       setSearchMessage('지난 곡 검색 중 오류가 발생했습니다.');
       setSearchResults([]);
     }
-  };
+  }, []);
+
+  const handleSearch = () => void fetchMatches(searchTerm);
+
+  /* 자동완성 — 입력이 있으면 짧게 디바운스 후 매칭 목록을 보여준다. */
+  useEffect(() => {
+    if (!searchTerm.trim()) return;
+    const timer = window.setTimeout(() => void fetchMatches(searchTerm), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm, fetchMatches]);
 
   const handleEditSearchResult = (request: SearchChoirRequest) => {
     images.forEach((image) => URL.revokeObjectURL(image.url));
@@ -476,7 +489,7 @@ export default function ChoirRequestPage() {
               onKeyDown={(event) => {
                 if (event.key === 'Enter') void handleSearch();
               }}
-              placeholder="곡명, 작곡, 편곡으로 검색"
+              placeholder="곡명·작곡·편곡 입력 (입력하면 자동으로 목록 표시)"
             />
           </label>
           <button
@@ -484,7 +497,7 @@ export default function ChoirRequestPage() {
             onClick={() => void handleSearch()}
             disabled={searchStatus === 'loading'}
           >
-            {searchStatus === 'loading' ? '검색 중' : '검색'}
+            {searchStatus === 'loading' ? '검색 중' : '전체'}
           </button>
         </div>
         {searchMessage && <p className={`search-message ${searchStatus}`}>{searchMessage}</p>}
