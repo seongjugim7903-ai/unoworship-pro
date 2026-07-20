@@ -17,12 +17,25 @@ button:disabled { cursor: not-allowed; }
 .pwa-install-actions { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
 .pwa-install-actions button { height: 34px; padding: 0 12px; border: 0; border-radius: 6px; color: #fff; background: #6754d9; font-size: 11px; font-weight: 800; }
 .pwa-install-actions .pwa-install-close { width: 34px; padding: 0; border: 1px solid #dfe4ee; color: #6f7b8f; background: #fff; font-size: 18px; }
-.workspace-topbar { position: sticky; z-index: 90; top: 0; max-width: 1260px; margin: 0 auto; padding: 12px 28px 0; background: #f5f7fb; }
-.workspace-brand { margin: 0 0 8px; color: #6754d9; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
-.workspace-tabs { display: flex; gap: 6px; }
-.workspace-tabs button { flex: 0 0 auto; height: 42px; padding: 0 22px; border: 1px solid #dfe4ee; border-bottom: 0; border-radius: 10px 10px 0 0; color: #6b7891; background: #eef1f7; font-size: 13px; font-weight: 800; }
-.workspace-tabs button.active { color: #5543c0; background: #fff; box-shadow: 0 -3px 12px rgba(30, 48, 80, .05); }
-.workspace-topbar + .site-shell { padding-top: 20px; }
+/* 랜딩 */
+.landing { min-height: 100vh; min-height: 100dvh; background: linear-gradient(180deg, #14172a 0%, #232048 46%, #362c5e 100%); color: #fff; }
+.landing-inner { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; max-width: 480px; margin: 0 auto; padding: max(44px, env(safe-area-inset-top)) 28px calc(40px + env(safe-area-inset-bottom)); }
+.landing-brand { margin: 0; color: #b7afe6; font-size: 12px; font-weight: 800; letter-spacing: .22em; }
+.landing-copy { margin-top: auto; padding: 44px 0 32px; }
+.landing-copy h1 { margin: 0 0 14px; font-size: clamp(23px, 6.4vw, 31px); font-weight: 800; letter-spacing: -.03em; line-height: 1.34; }
+.landing-copy p { margin: 0; color: rgba(255, 255, 255, .68); font-size: 14px; line-height: 1.75; }
+.landing-menu { display: grid; gap: 12px; }
+.landing-btn { display: grid; gap: 3px; text-align: left; padding: 16px 18px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 14px; color: #fff; background: rgba(255, 255, 255, .06); transition: .15s; }
+.landing-btn:hover { border-color: rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .12); }
+.landing-btn strong { font-size: 16px; font-weight: 800; }
+.landing-btn span { color: rgba(255, 255, 255, .58); font-size: 12px; }
+
+/* 기능 화면 상단 바 */
+.feature-topbar { position: sticky; z-index: 90; top: 0; display: flex; align-items: center; gap: 12px; max-width: 1260px; margin: 0 auto; padding: 12px 28px; background: #f5f7fb; }
+.feature-back { height: 34px; padding: 0 14px; border: 1px solid #dfe4ee; border-radius: 8px; color: #5543c0; background: #fff; font-size: 13px; font-weight: 800; }
+.feature-back:hover { border-color: #a69be8; }
+.feature-title { color: #46506a; font-size: 13px; font-weight: 800; }
+.feature-topbar + .site-shell { padding-top: 12px; }
 .site-shell { min-height: 100vh; max-width: 1260px; margin: 0 auto; padding: 36px 28px 28px; }
 .site-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
 .eyebrow { margin: 0 0 10px; color: #6754d9; font-size: 11px; font-weight: 800; letter-spacing: .18em; }
@@ -154,7 +167,7 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .bulletin-ocr-row input[type=file] { margin-top: 8px; font-size: 12px; }
 .bulletin-ocr-row input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .page-footer { padding: 24px 0 0; color: #9ca7b8; font-size: 11px; text-align: center; }
-@media (max-width: 880px) { .workspace-topbar { padding: 12px 16px 0; } .site-shell { padding: 24px 16px; } .site-header { align-items: flex-start; flex-direction: column; } .content-grid { grid-template-columns: minmax(0, 1fr); } .empty-state { min-height: 230px; } .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 880px) { .feature-topbar { padding: 10px 16px; } .site-shell { padding: 24px 16px; } .site-header { align-items: flex-start; flex-direction: column; } .content-grid { grid-template-columns: minmax(0, 1fr); } .empty-state { min-height: 230px; } .image-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .pwa-install-banner { align-items: flex-start; gap: 10px; padding-top: max(10px, env(safe-area-inset-top)); }
   .pwa-install-copy span { max-width: 220px; }
