@@ -495,7 +495,7 @@ export default function ChoirRequestPage() {
                 <div>
                   <strong>{request.song_title || '제목 없는 곡'}</strong>
                   <span>
-                    {request.service_type} · {request.service_date || '날짜 없음'} · {request.section_count ?? 0}개 섹션
+                    최근 연주 {request.service_date || '날짜 없음'} · {request.section_count ?? 0}개 섹션
                     {request.composer ? ` · ${request.composer}` : ''}
                   </span>
                 </div>
