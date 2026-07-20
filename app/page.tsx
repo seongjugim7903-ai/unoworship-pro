@@ -1,7 +1,7 @@
-// UnoWorship Pro 초기 진입점 — 찬양대 자막 요청 전용 화면
+// UnoWorship Pro 초기 진입점 — 자막 협조 / 설교대지 탭
 
-import ChoirRequestPage from './choir/ChoirRequestPage';
+import WorkspaceTabs from './WorkspaceTabs';
 
 export default function Home() {
-  return <ChoirRequestPage />;
+  return <WorkspaceTabs />;
 }
