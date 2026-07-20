@@ -77,6 +77,7 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .primary-button.compact { width: auto; padding: 0 15px; }
 .secondary-button { height: 38px; padding: 0 14px; border: 1px solid #d7deea; color: #58657a; background: #fff; }
 .secondary-button:hover { border-color: #a69be8; color: #5543c0; }
+.reset-button { padding: 0 9px; }
 .preview-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 .preview-meta span { padding: 6px 9px; border-radius: 4px; color: #637189; background: #f3f5f9; font-size: 11px; }
 .empty-state { display: grid; min-height: 475px; place-items: center; align-content: center; border: 1px dashed #dbe2ed; border-radius: 6px; color: #98a5b7; text-align: center; }
@@ -142,6 +143,7 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
   .result-heading p { margin-left: 21px; line-height: 1.5; }
   .result-actions { width: 100%; }
   .result-actions button { flex: 1; }
+  .result-actions .reset-button { flex: .66; }
   .image-card-footer { align-items: flex-start; flex-direction: column; }
   .image-card-footer > div { width: 100%; }
   .image-card-footer button { flex: 1; }

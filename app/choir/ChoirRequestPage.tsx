@@ -301,6 +301,7 @@ export default function ChoirRequestPage() {
     }
   };
 
+  /* 새 요청 — 생성 이미지와 폼 입력을 전부 비운다 (드래프트도 빈 값으로 덮여 새로고침 후에도 깨끗). */
   const handleReset = () => {
     images.forEach((image) => URL.revokeObjectURL(image.url));
     setImages([]);
@@ -310,6 +311,13 @@ export default function ChoirRequestPage() {
     setCloudSaveStatus('idle');
     setCloudSaveMessage('');
     setFieldProgramMessage('');
+    setServiceType('주일낮예배');
+    setServiceDate(todayISO());
+    setSongTitle('');
+    setComposer('');
+    setArranger('');
+    setLyrics('');
+    setNote('');
     void clearChoirImageCache().catch((error) => {
       console.warn('[choir-request] image cache clear failed', error);
     });
@@ -528,7 +536,7 @@ export default function ChoirRequestPage() {
           <div className="result-heading">
             <div><span className="step-number success">03</span><h2>생성된 자막 이미지</h2><p>{images.length}장의 PNG 파일이 준비되었습니다.</p></div>
             <div className="result-actions">
-              <button className="secondary-button" onClick={handleReset}>새 요청</button>
+              <button className="secondary-button reset-button" onClick={handleReset}>새 요청</button>
               <button
                 className="kakao-button"
                 onClick={() => void handleKakaoShare()}
