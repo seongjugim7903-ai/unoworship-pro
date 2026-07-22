@@ -17,7 +17,7 @@
 
 const { app, BrowserWindow, dialog, ipcMain, screen, session, shell, utilityProcess } = require('electron');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const os = require('os');
 const http = require('http');
@@ -154,29 +154,128 @@ function spawnNextServer() {
   });
 }
 
-// ─── 모니터 자동 매핑 ──────────────────────────────────────────
-function resolveMonitors() {
-  const displays = screen.getAllDisplays();
-  const sorted = [...displays].sort((a, b) => a.bounds.x - b.bounds.x);
-  return {
-    control: sorted[0],
-    prompt:  sorted[1],
-    output:  sorted[2],
-  };
+// ─── 창 역할 정의 (현장 검증 구조: docs/field/setup-and-output-control.md) ───
+//   composer  제어 화면
+//   fill      ATEM Input 4 = Fill Source (원본 색상)
+//   key       ATEM Input 5 = Key Source (흑백 매트) — 반드시 ?mode=key
+//   sub       ATEM Input 6 = 무대 출력
+//   relay     ATEM USB 클린피드 릴레이 — 모니터 불필요, 숨김 창으로 상주
+const WINDOW_ROLES = [
+  { role: 'composer', urlPath: '/composer', kiosk: false, title: 'UnoWorship Composer' },
+  { role: 'fill', urlPath: '/atemsignal/fill?mode=fill', kiosk: true, title: 'UnoWorship FILL — ATEM Input 4' },
+  { role: 'key', urlPath: '/atemsignal/key?mode=key', kiosk: true, title: 'UnoWorship KEY — ATEM Input 5' },
+  { role: 'sub', urlPath: '/atem-sub', kiosk: true, title: 'UnoWorship SUB — 무대' },
+];
+const RELAY_ROLE = { role: 'relay', urlPath: '/atem-usb-relay-v2', title: 'UnoWorship Camera Relay (백그라운드)' };
+
+// ─── 디스플레이 프로필 ─────────────────────────────────────────
+//   Blackmagic 어댑터 2개는 동일 EDID 라 재부팅 시 순서가 뒤바뀔 수 있다.
+//   userData/display-profile.json 에 역할→디스플레이 id 를 저장해 고정하고,
+//   지정이 없거나 해당 디스플레이가 없으면 x좌표 순서 휴리스틱으로 배치한다.
+//   부팅 때마다 감지된 디스플레이 목록과 실제 배치를 같은 파일에 기록해
+//   사용자가 파일을 열어 id 만 바꾸면 다음 부팅부터 반영된다.
+function displayProfilePath() {
+  return path.join(app.getPath('userData'), 'display-profile.json');
+}
+
+function loadDisplayProfile() {
+  try {
+    return JSON.parse(fs.readFileSync(displayProfilePath(), 'utf-8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveDisplayProfile(profile) {
+  try {
+    fs.mkdirSync(path.dirname(displayProfilePath()), { recursive: true });
+    fs.writeFileSync(displayProfilePath(), JSON.stringify(profile, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[electron] display-profile 저장 실패:', err);
+  }
+}
+
+// 역할별 디스플레이 결정. 반환: Map<role, Display|null>
+function resolveRoleDisplays() {
+  const displays = [...screen.getAllDisplays()].sort((a, b) => a.bounds.x - b.bounds.x);
+  const profile = loadDisplayProfile();
+  const saved = profile.assignments || {};
+  const assigned = new Map();
+  const used = new Set();
+
+  // 1차: 프로필에 저장된 id 가 실제 연결되어 있으면 그대로 사용
+  for (const { role } of WINDOW_ROLES) {
+    const id = saved[role];
+    const match = id != null ? displays.find((d) => d.id === id) : null;
+    if (match && !used.has(match.id)) {
+      assigned.set(role, match);
+      used.add(match.id);
+    }
+  }
+
+  // 2차: 남은 역할을 x좌표 순서로 배치 (composer → fill → key → sub)
+  const remaining = displays.filter((d) => !used.has(d.id));
+  for (const { role } of WINDOW_ROLES) {
+    if (assigned.has(role)) continue;
+    const next = remaining.shift();
+    if (next) {
+      assigned.set(role, next);
+      used.add(next.id);
+    } else {
+      assigned.set(role, null); // 모니터 부족 — 이 역할 창은 열지 않음 (composer 는 예외 처리)
+    }
+  }
+
+  // composer 는 모니터가 하나뿐이어도 반드시 primary 에 연다
+  if (!assigned.get('composer')) {
+    assigned.set('composer', screen.getPrimaryDisplay());
+  }
+
+  // 감지 결과와 실제 배치를 프로필 파일에 기록 (사용자 편집용)
+  saveDisplayProfile({
+    note: 'assignments 의 역할별 값에 lastDetectedDisplays 의 id 를 넣으면 다음 실행부터 그 모니터에 고정됩니다.',
+    assignments: Object.fromEntries(
+      WINDOW_ROLES.map(({ role }) => [role, assigned.get(role)?.id ?? saved[role] ?? null])
+    ),
+    lastDetectedDisplays: displays.map((d) => ({
+      id: d.id,
+      bounds: d.bounds,
+      internal: d.internal,
+      label: d.label || '',
+    })),
+    lastResolvedAt: new Date().toISOString(),
+  });
+
+  const summary = WINDOW_ROLES
+    .map(({ role }) => `${role}=${assigned.get(role) ? assigned.get(role).id : '없음'}`)
+    .join(', ');
+  console.log(`[electron] 디스플레이 배치: ${summary}`);
+
+  return assigned;
 }
 
 // ─── BrowserWindow 생성 헬퍼 ───────────────────────────────────
 function createWindow(display, urlPath, opts = {}) {
-  const { kiosk = false, title, deviceToken, deviceType, deviceName, desktopShell = false } = opts;
-  const { x, y, width, height } = display.bounds;
+  const {
+    kiosk = false,
+    title,
+    deviceToken,
+    deviceType,
+    deviceName,
+    desktopShell = false,
+    hidden = false,
+    noThrottle = false,
+  } = opts;
+  const bounds = display ? display.bounds : { x: 0, y: 0, width: 1280, height: 800 };
   const inset = desktopShell && !kiosk ? 12 : 0;
 
   const win = new BrowserWindow({
-    x: x + inset,
-    y: y + inset,
-    width: width - inset * 2,
-    height: height - inset * 2,
+    x: bounds.x + inset,
+    y: bounds.y + inset,
+    width: bounds.width - inset * 2,
+    height: bounds.height - inset * 2,
     kiosk,
+    show: !hidden,
     frame: !kiosk,
     titleBarStyle: 'default',
     resizable: !kiosk,
@@ -189,6 +288,8 @@ function createWindow(display, urlPath, opts = {}) {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // 출력·릴레이 창은 가려지거나 숨겨져도 렌더링/캡처가 멈추면 안 된다
+      backgroundThrottling: !noThrottle,
       additionalArguments: [
         `--unolive-device-type=${deviceType ?? DEVICE_TYPE}`,
         `--unolive-device-name=${encodeURIComponent(deviceName ?? '')}`,
@@ -207,12 +308,12 @@ function createWindow(display, urlPath, opts = {}) {
   return win;
 }
 
-// ─── 3 모니터 창 배치 ──────────────────────────────────────────
-//   제어 창(control) 을 "메인" 으로 취급: 이 창이 닫히면 앱 전체 종료.
-//   강대상/중층 은 kiosk 창이라 UI 에서 닫을 수 없으므로, 제어 창의
-//   close 이벤트를 따라 같이 닫히게 만든다.
+// ─── 5창 배치: Composer / Fill / Key / Sub + 숨김 카메라 릴레이 ────
+//   제어 창(composer) 이 "메인": 닫히면 앱 전체 종료.
+//   Fill/Key/Sub 는 kiosk 라 UI 에서 닫을 수 없고, 모니터가 부족하면 열지 않는다.
+//   릴레이는 모니터가 필요 없는 숨김 창으로 항상 상주한다.
 function createAllWindows(stored) {
-  const { control, prompt, output } = resolveMonitors();
+  const assigned = resolveRoleDisplays();
 
   const opts = {
     deviceToken: stored.token,
@@ -221,34 +322,41 @@ function createAllWindows(stored) {
   };
 
   let controlWin = null;
-  if (control) {
-    controlWin = createWindow(control, '/', {
-      ...opts, kiosk: false, desktopShell: true, title: 'UnoWorship Composer',
+  for (const { role, urlPath, kiosk, title } of WINDOW_ROLES) {
+    const display = assigned.get(role);
+    if (!display) {
+      console.log(`[electron] 모니터 부족 — ${role} 창 생략`);
+      continue;
+    }
+    const win = createWindow(display, urlPath, {
+      ...opts,
+      kiosk,
+      title,
+      desktopShell: role === 'composer',
+      // 출력 창은 다른 창에 가려져도 렌더링이 멈추면 안 됨
+      noThrottle: role !== 'composer',
     });
-    windows.push(controlWin);
-  }
-  if (prompt) {
-    windows.push(createWindow(prompt, '/prompt', {
-      ...opts, kiosk: true, title: 'UnoLive — Prompt',
-    }));
-  }
-  if (output) {
-    windows.push(createWindow(output, '/output', {
-      ...opts, kiosk: true, title: 'UnoLive — Output',
-    }));
+    windows.push(win);
+    if (role === 'composer') controlWin = win;
   }
 
-  // 제어 창 닫기 → 앱 전체 종료 (kiosk 창 포함 전부)
+  // 카메라 릴레이 — 항상 숨김 창으로 상주 (ATEM USB 클린피드 → WebRTC)
+  const relayWin = createWindow(null, RELAY_ROLE.urlPath, {
+    ...opts,
+    title: RELAY_ROLE.title,
+    hidden: true,
+    noThrottle: true,
+  });
+  windows.push(relayWin);
+  console.log('[electron] 카메라 릴레이 숨김 창 기동');
+
+  // 제어 창 닫기 → 앱 전체 종료 (kiosk·숨김 창 포함 전부)
   if (controlWin) {
     controlWin.on('close', () => {
       console.log('[electron] 제어 창 닫힘 → 앱 종료');
       app.isQuiting = true;
       app.quit();
     });
-  }
-
-  if (!prompt && !output) {
-    console.log('[electron] 단일 모니터 감지 — 창 하나만 배치');
   }
 }
 
@@ -285,7 +393,7 @@ function configureSession(token) {
   //   (localhost:3000 뿐 아니라 LAN IP 로 접근해도 동일하게 적용)
   session.defaultSession.webRequest.onBeforeSendHeaders((details, cb) => {
     const headers = { ...details.requestHeaders };
-    if (!headers['X-Device-Token'] && !headers['x-device-token']) {
+    if (token && !headers['X-Device-Token'] && !headers['x-device-token']) {
       headers['X-Device-Token'] = token;
     }
     cb({ requestHeaders: headers });
@@ -340,6 +448,18 @@ async function boot() {
   }
 
   // 2. 디바이스 토큰 인증 체크
+  //   [DEV BYPASS] 맥미니가 아닌 개발 머신에는 디바이스 토큰·클라우드 인증이
+  //   없어 로그인 창에서 막힌다. 개발 모드 + UNOLIVE_SKIP_DEVICE_AUTH=1 일 때만
+  //   인증을 건너뛰고 창 배치/기능 개발을 허용한다. 프로덕션에서는 동작하지 않는다.
+  const skipDeviceAuth = isDev && process.env.UNOLIVE_SKIP_DEVICE_AUTH === '1';
+  if (skipDeviceAuth) {
+    console.log('[electron] DEV: 디바이스 인증 우회 (UNOLIVE_SKIP_DEVICE_AUTH=1)');
+    configureSession('');
+    createAllWindows({ token: '', deviceName: 'dev-bypass' });
+    registerGlobalShortcuts();
+    return;
+  }
+
   let stored = loadToken();
   let authResult = stored ? await checkAuth(SERVER_URL) : { status: 'no_token' };
 
@@ -415,12 +535,26 @@ app.whenReady().then(() => {
   boot();
 });
 
+// 서버 프로세스 종료.
+//   dev 모드는 shell:true 로 npm 을 띄우므로 kill() 이 쉘만 죽이고 tsx/node 가
+//   고아로 남는다(포트 3000 점유 → 다음 실행 lock 충돌). Windows 는 taskkill /T
+//   로 트리 전체를 정리한다. 패키지 앱(utilityProcess)은 kill() 로 충분하다.
+function killServerProcess() {
+  if (!nextProcess) return;
+  const proc = nextProcess;
+  nextProcess = null;
+  try {
+    if (!app.isPackaged && process.platform === 'win32' && proc.pid) {
+      spawnSync('taskkill', ['/pid', String(proc.pid), '/T', '/F']);
+    } else {
+      proc.kill();
+    }
+  } catch { /* ignore */ }
+}
+
 app.on('window-all-closed', () => {
   app.isQuiting = true;
-  if (nextProcess) {
-    try { nextProcess.kill(); } catch { /* ignore */ }
-    nextProcess = null;
-  }
+  killServerProcess();
   app.quit();
 });
 
