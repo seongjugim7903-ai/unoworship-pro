@@ -38,6 +38,13 @@ const SERVER_PORT = process.env.PORT || 3000;
 const SERVER_URL = `http://localhost:${SERVER_PORT}`;
 const DEVICE_TYPE = process.env.UNOLIVE_DEVICE_TYPE || 'server';
 
+// 디바이스 인증(로그인·토큰 발급·검증)은 내부 서버가 아니라 클라우드 웹에서 수행한다.
+//   설치된 앱에는 Supabase service role 키가 없기 때문 (RUNBOOK §5).
+//   교회 등록·구독도 이 웹에서 미리 끝내는 온보딩 구조
+//   (docs/UNOWORSHIP_ONBOARDING_DEVICE_AUTH_PLAN_2026-07-23.md).
+const CLOUD_BASE = (process.env.UNOLIVE_CLOUD_BASE || 'https://unoworship-pro-eight.vercel.app')
+  .replace(/\/+$/, '');
+
 function getLanIPv4s() {
   return Object.values(os.networkInterfaces())
     .flat()
@@ -461,7 +468,7 @@ async function boot() {
   }
 
   let stored = loadToken();
-  let authResult = stored ? await checkAuth(SERVER_URL) : { status: 'no_token' };
+  let authResult = stored ? await checkAuth(CLOUD_BASE) : { status: 'no_token' };
 
   // 최초 기동 또는 토큰 무효 → 로그인 창
   if (authResult.status === 'no_token' || authResult.status === 'invalid_token' ||
@@ -476,7 +483,7 @@ async function boot() {
       dialog.showMessageBoxSync({ type: 'warning', message: reason, buttons: ['로그인'] });
     }
 
-    const result = await openLoginWindow(SERVER_URL, DEVICE_TYPE);
+    const result = await openLoginWindow(CLOUD_BASE, DEVICE_TYPE);
     if (!result.success) {
       console.log('[electron] 로그인 취소됨 — 종료');
       app.quit();
@@ -499,7 +506,7 @@ async function boot() {
     });
     if (clicked === 0) {
       const { shell } = require('electron');
-      shell.openExternal(`${SERVER_URL}/media/pricing`);
+      shell.openExternal(CLOUD_BASE);
     }
     app.quit();
     return;
