@@ -1,0 +1,65 @@
+# macOS DMG 자동 빌드 (Apple Silicon, 미서명)
+#
+# 트리거:
+#   - v* 태그 푸시 → 해당 태그의 Release에 DMG 첨부 (없으면 생성)
+#   - 수동 실행(workflow_dispatch) → 지정한 기존 태그의 Release에 첨부
+#
+# 서명·공증은 외부 교회 배포 단계에서 추가한다
+# (docs/UNOWORSHIP_PRO_ELECTRON_RELEASE_RUNBOOK.md, ASSESSMENT 문서 §4-1).
+
+name: electron-mac
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'DMG를 첨부할 Release 태그'
+        required: true
+        default: 'v0.1.0-win-preview'
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: apps/atem-field
+
+jobs:
+  build-mac-dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/atem-field/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Next.js standalone build
+        run: npm run build
+
+      - name: Bundle custom server (Socket.io)
+        run: npm run build:server
+
+      - name: Build DMG (unsigned, arm64)
+        run: npx electron-builder --mac dmg --arm64 --publish never
+        env:
+          # Apple Developer 인증서 없이 미서명(adhoc) 빌드
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Upload DMG to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.release_tag || github.ref_name }}
+        run: |
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" --notes "자동 빌드 (electron-mac workflow)"
+          fi
+          gh release upload "$TAG" dist/*.dmg --clobber --repo "$GITHUB_REPOSITORY"
