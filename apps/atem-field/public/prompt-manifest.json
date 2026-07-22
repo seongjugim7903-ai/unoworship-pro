@@ -1,0 +1,21 @@
+{
+  "name": "UnoLive 프롬프트",
+  "short_name": "UnoLive Prompt",
+  "description": "교회 예배 프롬프트 모니터 — 무대 찬양팀이 보는 최종 PGM 미러 (PC1 확장 모니터)",
+  "start_url": "/prompt",
+  "scope": "/prompt",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"]
+}

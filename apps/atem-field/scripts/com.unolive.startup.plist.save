@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.unolive.startup.plist
+  Mac Mini 로그인 시 UnoLive 서버 + Kiosk 자동 실행 LaunchAgent
+
+  ── 설치 방법 ──────────────────────────────────────────────
+  1. 이 파일을 LaunchAgents 폴더로 복사:
+     cp scripts/com.unolive.startup.plist ~/Library/LaunchAgents/
+
+  2. 스크립트 실행 권한 부여:
+     chmod +x scripts/mac-server-start.sh
+     chmod +x scripts/mac-output-kiosk.sh
+
+  3. 아래 /Users/kimseongju/... 경로를 실제 경로로 수정:
+     예) /Users/sjkim/UnoLive/scripts/...
+
+  4. LaunchAgent 등록:
+     launchctl load ~/Library/LaunchAgents/com.unolive.startup.plist
+
+  5. 재부팅 또는 수동 실행 테스트:
+     launchctl start com.unolive.startup
+
+  ── 제거 방법 ──────────────────────────────────────────────
+     launchctl unload ~/Library/LaunchAgents/com.unolive.startup.plist
+     rm ~/Library/LaunchAgents/com.unolive.startup.plist
+  ────────────────────────────────────────────────────────────
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.unolive.startup</string>
+
+  <!-- 로그인 시 자동 실행 -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- 실행할 스크립트 (서버 + kiosk를 순서대로 실행) -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <!--
+      ▼▼▼ 아래 경로를 실제 Mac Mini 경로로 변경하세요 ▼▼▼
+      예) /Users/sjkim/Documents/UnoLive/scripts/
+    -->
+    <string>/Users/YOUR_USERNAME/UnoLive/scripts/mac-server-start.sh &amp; sleep 5 &amp;&amp; /Users/YOUR_USERNAME/UnoLive/scripts/mac-output-kiosk.sh</string>
+  </array>
+
+  <!-- 비정상 종료 시 재시작 -->
+  <key>KeepAlive</key>
+  <false/>
+
+  <!-- 환경변수: Node.js 경로 포함 (nvm 사용 시 필요) -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    <key>NODE_ENV</key>
+    <string>production</string>
+  </dict>
+
+  <!-- 로그 파일 -->
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USERNAME/Library/Logs/unolive-launch.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USERNAME/Library/Logs/unolive-launch-error.log</string>
+</dict>
+</plist>

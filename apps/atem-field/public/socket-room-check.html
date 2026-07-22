@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UnoLive Socket Room Check</title>
+  <style>
+    :root {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      background: #f8fafc;
+      color: #111827;
+    }
+    body { margin: 0; padding: 28px; }
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { color: #475569; line-height: 1.6; }
+    button {
+      height: 38px;
+      border: 0;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #fff;
+      font-weight: 800;
+      padding: 0 14px;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f8fafc; color: #334155; }
+    .ok { color: #047857; font-weight: 800; }
+    .warn { color: #b45309; font-weight: 800; }
+    .bad { color: #be123c; font-weight: 800; }
+    code { background: #f1f5f9; border-radius: 6px; padding: 2px 5px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>UnoLive Socket Room Check</h1>
+    <p>
+      실제 Socket.io 클라이언트로 서버에 연결해 인증, viewer 룸, composer 룸,
+      Mac output 과의 PING/PONG 왕복까지 확인합니다.
+    </p>
+    <button type="button" id="retry">다시 테스트</button>
+    <table>
+      <thead>
+        <tr><th>항목</th><th>상태</th><th>세부 내용</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const rows = document.getElementById('rows');
+    const retry = document.getElementById('retry');
+
+    function clearRows() {
+      rows.innerHTML = '';
+    }
+
+    function addRow(name, status, detail, tone = 'ok') {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${name}</td><td class="${tone}">${status}</td><td>${detail}</td>`;
+      rows.appendChild(tr);
+    }
+
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/health', { cache: 'no-store' });
+        const text = await res.text();
+        if (!res.ok) {
+          addRow('서버 상태 API', `${res.status}`, text.slice(0, 180), res.status === 403 ? 'warn' : 'bad');
+          return;
+        }
+        const data = JSON.parse(text);
+        addRow(
+          '서버 룸 상태',
+          '확인',
+          `composer=${data.socket.roomCounts.composer}, output=${data.socket.roomCounts.output}, viewer=${data.socket.roomCounts.viewer}`
+        );
+      } catch (error) {
+        addRow('서버 상태 API', '실패', String(error), 'warn');
+      }
+    }
+
+    function waitForJoinResult(socket, room) {
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          socket.off('join-room-result', handler);
+          resolve({ room, ok: false, reason: 'timeout' });
+        }, 2000);
+
+        function handler(result) {
+          if (!result || result.room !== room) return;
+          clearTimeout(timer);
+          socket.off('join-room-result', handler);
+          resolve(result);
+        }
+
+        socket.on('join-room-result', handler);
+        socket.emit('join-room', room);
+      });
+    }
+
+    function waitForPong(socket) {
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          socket.off('pong', handler);
+          resolve(false);
+        }, 4000);
+
+        function handler() {
+          clearTimeout(timer);
+          socket.off('pong', handler);
+          resolve(true);
+        }
+
+        socket.on('pong', handler);
+        socket.emit('broadcast', { type: 'PING' });
+      });
+    }
+
+    async function run() {
+      clearRows();
+      addRow('현재 주소', '확인', location.href);
+      addRow('브라우저', '확인', navigator.userAgent);
+      await checkHealth();
+
+      if (!window.io) {
+        addRow('Socket.io Client', '실패', '<code>/socket.io/socket.io.js</code> 로드 실패', 'bad');
+        return;
+      }
+
+      addRow('Socket.io Client', '로드됨', '클라이언트 스크립트 로드 성공');
+
+      const socket = window.io(location.origin, {
+        transports: ['websocket'],
+        upgrade: false,
+        reconnection: false,
+        timeout: 5000,
+      });
+
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        socket.close();
+        addRow('연결', '시간초과', '5초 안에 connect/connect_error가 오지 않음', 'bad');
+      }, 5000);
+
+      socket.on('connect', async () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        addRow('연결', '정상', `socket id: <code>${socket.id}</code>`);
+
+        const viewer = await waitForJoinResult(socket, 'viewer');
+        addRow(
+          'viewer 룸',
+          viewer.ok ? '참가 성공' : '참가 실패',
+          viewer.ok ? 'PGM 보기 권한 확인' : `reason=${viewer.reason}`,
+          viewer.ok ? 'ok' : 'bad'
+        );
+
+        const composer = await waitForJoinResult(socket, 'composer');
+        addRow(
+          'composer 룸',
+          composer.ok ? '참가 성공' : '참가 실패',
+          composer.ok ? 'Windows PC가 컴포즈 송출자 역할 가능' : `reason=${composer.reason}`,
+          composer.ok ? 'ok' : 'bad'
+        );
+
+        if (composer.ok) {
+          const gotPong = await waitForPong(socket);
+          addRow(
+            'Output 왕복',
+            gotPong ? '성공' : '실패',
+            gotPong
+              ? 'Windows composer → Mac output PING/PONG 왕복 성공'
+              : 'Mac /output 창이 꺼져 있거나 output 룸 참가/권한이 막혔습니다.',
+            gotPong ? 'ok' : 'bad'
+          );
+        }
+
+        setTimeout(() => {
+          socket.close();
+          addRow('종료', '완료', '테스트 연결 종료');
+        }, 1000);
+      });
+
+      socket.on('connect_error', (error) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        addRow('연결', '실패', error && error.message ? error.message : String(error), 'bad');
+        addRow('판단', '인증 문제 가능', '로그인 세션 또는 device token 없이 Socket.io 서버가 거부한 상태입니다.', 'warn');
+        socket.close();
+      });
+    }
+
+    retry.addEventListener('click', run);
+    run();
+  </script>
+</body>
+</html>

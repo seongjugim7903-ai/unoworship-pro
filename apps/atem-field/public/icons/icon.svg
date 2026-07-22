@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#0a0a0a"/>
+  <rect x="32" y="32" width="448" height="448" rx="60" fill="none" stroke="#3b82f6" stroke-width="16"/>
+  <!-- 카메라 아이콘 -->
+  <rect x="96" y="160" width="320" height="220" rx="24" fill="none" stroke="white" stroke-width="20"/>
+  <circle cx="256" cy="270" r="64" fill="none" stroke="white" stroke-width="18"/>
+  <circle cx="256" cy="270" r="32" fill="white"/>
+  <rect x="200" y="128" width="112" height="44" rx="14" fill="white"/>
+  <!-- U 텍스트 -->
+  <text x="256" y="460" font-size="40" text-anchor="middle" fill="#3b82f6" font-family="sans-serif" font-weight="bold" letter-spacing="8">UnoLive</text>
+</svg>

@@ -1,0 +1,35 @@
+node_modules/
+.next/
+.next.*/
+dist/
+out/
+*.tsbuildinfo
+*.log
+.DS_Store
+.env*
+!.env.example
+.dev-tests/
+.vercel/
+.claude/worktrees/
+
+# Local church content and generated runtime data
+FILES/
+data/bibles/
+data/hymns/
+data/media/
+data/programs/*
+!data/programs/.gitkeep
+data/designs/*
+!data/designs/.gitkeep
+data/templates/*
+!data/templates/.gitkeep
+data/fixed-programs/*
+!data/fixed-programs/.gitkeep
+public/generated/
+
+# PPT and score analysis working files
+generator/ppt-slides/generated/
+generator/ppt-slides/inbox/*
+!generator/ppt-slides/inbox/.gitkeep
+score-lab/.venv/
+score-lab/output/

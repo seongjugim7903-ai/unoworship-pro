@@ -6,6 +6,21 @@
 
 `https://unoworship-pro-eight.vercel.app`에서 총무/찬양대 담당자가 가사를 입력하고 PNG 이미지를 생성하면, 브라우저 다운로드에만 의존하지 않고 Supabase에 원본 가사와 생성 이미지를 함께 저장한다. 이후 현장 Composer가 이 데이터를 조회해 예배 프로그램으로 가져오는 기반으로 사용한다.
 
+이 페이지는 공개 생성 도구가 아니라 **구독이 활성화된 개별 교회가 사용하는 입력페이지 서비스**다. 정식 운영에서는 로그인 사용자, 소속 교회, 구독 상태를 서버에서 검증하고 모든 요청·이미지·프로그램 payload를 교회별로 격리해야 한다.
+
+전체 제품 및 Electron 연계 기준은 `docs/UNOWORSHIP_SAAS_ELECTRON_DATA_ARCHITECTURE_PLAN.md`를 따른다.
+
+## 현재 멀티테넌트 제한
+
+현재 `choir_requests`, `choir_generated_images`, `choir_programs`에는 `church_id`가 없으므로 단일 교회 시험 운영 구조다. 정식 구독 서비스 전에는 반드시 다음 작업을 완료한다.
+
+- 교회 및 교회 회원 테이블 연결
+- 세 테이블에 `church_id`와 작성자 컬럼 추가
+- 기존 데이터의 소유 교회 이관
+- Storage 경로를 `churches/{church_id}/...` 형식으로 분리
+- 교회 소속과 역할을 검사하는 RLS 적용
+- 목록·검색·저장 API에서 교회 범위 강제
+
 ## 저장 대상
 
 - `choir_requests`: 사용자가 입력한 원본 요청
@@ -40,10 +55,10 @@
 
 Vercel 프로젝트 `unoworship-pro`에 아래 값을 등록해야 한다.
 
-```bash
-SUPABASE_URL=https://hwbzztfjzeismosjkmhe.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=Supabase service_role key
-NEXT_PUBLIC_APP_URL=https://unoworship-pro-eight.vercel.app
+```text
+SUPABASE_URL: https://hwbzztfjzeismosjkmhe.supabase.co
+SUPABASE_SERVICE_ROLE_KEY: Vercel 서버 비밀값으로만 등록
+NEXT_PUBLIC_APP_URL: https://unoworship-pro-eight.vercel.app
 ```
 
 주의: `SUPABASE_SERVICE_ROLE_KEY`는 서버 전용이다. 브라우저 코드나 GitHub에 절대 노출하지 않는다.

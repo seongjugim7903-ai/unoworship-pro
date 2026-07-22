@@ -8,7 +8,7 @@ const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta
 const eslintConfig = [
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
-    ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts'],
+    ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'apps/atem-field/**'],
   },
   {
     // 렌더러(출력 라우트)는 에디터를 import하지 않는다 — 소켓 수신이 유일한 입력

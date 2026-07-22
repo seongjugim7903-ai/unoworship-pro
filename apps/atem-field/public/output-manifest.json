@@ -1,0 +1,21 @@
+{
+  "name": "UnoLive 아웃풋",
+  "short_name": "UnoLive Out",
+  "description": "교회 예배 실시간 자막 송출 시스템 — 송출 화면 (PC1 전용)",
+  "start_url": "/output",
+  "scope": "/output",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "UnoLive 컴포우즈",
+  "short_name": "UnoLive",
+  "description": "교회 예배 실시간 자막 송출 시스템 — 운영 패널",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["productivity", "utilities"]
+}
