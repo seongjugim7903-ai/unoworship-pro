@@ -120,6 +120,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  // Supabase env 미설정(오프라인/현장 단독 설치) — 인증 미들웨어 없이 통과.
+  // 클라우드 의존 라우트는 각 API 핸들러 단계에서 실패하며, 페이지 부팅은 막지 않는다.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

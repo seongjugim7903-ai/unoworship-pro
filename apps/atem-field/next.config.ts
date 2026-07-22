@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  // Electron 패키징: npm/tsx 없이 번들 서버로 직접 기동하기 위한 standalone 출력.
+  // (docs/UNOWORSHIP_PRO_GITHUB_ELECTRON_RELEASE_RUNBOOK.md §8-1,2)
+  output: 'standalone',
   // Keep Turbopack scoped to this app inside the parent Git repository.
   turbopack: {
     root: projectRoot,

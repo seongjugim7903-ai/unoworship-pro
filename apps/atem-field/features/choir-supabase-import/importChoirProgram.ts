@@ -4,10 +4,12 @@ import path from 'path';
 import type { ImageElement, ShapeElement, TextElement } from '@/lib/canvasTypes';
 import type { SavedProgram } from '@/lib/generators/programTypes';
 
+import { dataPath, generatedPath, generatedUrlBase } from '@/lib/localLibraryPath';
+
 const BUCKET_FALLBACK = 'choir-generated-images';
-const DATA_PROGRAMS_DIR = path.join(process.cwd(), 'data', 'programs');
-const PUBLIC_ASSET_ROOT = path.join(process.cwd(), 'public', 'generated', 'choir-supabase');
-const PUBLIC_ASSET_BASE = '/generated/choir-supabase';
+const DATA_PROGRAMS_DIR = dataPath('programs');
+const PUBLIC_ASSET_ROOT = generatedPath('choir-supabase');
+const PUBLIC_ASSET_BASE = `${generatedUrlBase()}/choir-supabase`;
 const DEFAULT_CLOUD_API_BASE = 'https://unoworship-pro-eight.vercel.app/api';
 
 export interface ChoirProgramCandidate {

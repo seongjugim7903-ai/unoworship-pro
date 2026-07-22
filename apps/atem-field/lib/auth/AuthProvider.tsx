@@ -111,6 +111,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const supabase = createClient();
 
+    // Supabase 미설정(오프라인/현장 단독 설치) — 게스트 모드로 즉시 부팅
+    if (!supabase) {
+      setUser(null);
+      setProfile(DEFAULT_PROFILE);
+      setIsLoading(false);
+      setAuthMode('guest');
+      syncMediaSession(null);
+      return () => {
+        mounted = false;
+      };
+    }
+
     // 초기 로드
     supabase.auth.getUser().then(({ data: { user: u } }) => {
       if (!mounted) return;

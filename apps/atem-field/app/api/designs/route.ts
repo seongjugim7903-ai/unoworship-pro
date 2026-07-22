@@ -9,8 +9,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { rejectLargeRequest, requireRequestRole, requireTrustedWriteRequest } from '@/lib/auth/serverAuth';
+import { dataPath } from '@/lib/localLibraryPath';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'designs');
+const DATA_DIR = dataPath('designs');
 const MAX_DESIGN_REQUEST_BYTES = 5 * 1024 * 1024;
 
 async function ensureDir() {

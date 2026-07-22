@@ -8,9 +8,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { NextRequest, NextResponse } from 'next/server';
+import { dataPath } from '@/lib/localLibraryPath';
 
-const ROOT = process.cwd();
-const LOCAL_HYMN_PACK_PATH = path.join(ROOT, 'data/hymns/local-new-hymn-lyrics.json');
+const LOCAL_HYMN_PACK_PATH = dataPath('hymns', 'local-new-hymn-lyrics.json');
 
 interface LocalHymn {
   num: number;

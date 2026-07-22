@@ -17,6 +17,14 @@ export function useAuthSync() {
     let mounted = true;
     const supabase = createClient();
 
+    // Supabase 미설정 — 게스트로 두고 구독하지 않음
+    if (!supabase) {
+      setAuthMode('guest');
+      return () => {
+        mounted = false;
+      };
+    }
+
     // 초기 상태 동기화
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!mounted) return;

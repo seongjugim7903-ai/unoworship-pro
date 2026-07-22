@@ -15,12 +15,12 @@
  *   5. 카메라·마이크 권한 자동 허용
  */
 
-const { app, BrowserWindow, dialog, ipcMain, screen, session, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, screen, session, shell, utilityProcess } = require('electron');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
-const waitOn = require('wait-on');
+const http = require('http');
 
 const { checkAuth } = require('./auth/verify');
 const { openLoginWindow } = require('./auth/loginWindow');
@@ -69,28 +69,84 @@ function resolveRecordingRevealTarget(targetPath, channel = 'recording') {
   return normalizedTarget;
 }
 
+// ─── 로컬 라이브러리 (교회 데이터는 앱 번들 밖에 저장) ─────────────
+//   docs/UNOWORSHIP_SAAS_ELECTRON_DATA_ARCHITECTURE_PLAN.md §5
+function getLibraryDir() {
+  return process.env.UNOLIVE_LIBRARY_DIR
+    || path.join(app.getPath('documents'), 'UnoWorship Library');
+}
+
+function ensureLibraryDirs(libraryDir) {
+  const subdirs = ['data', 'generated', 'archive', 'files', 'manifests'];
+  for (const sub of subdirs) {
+    try { fs.mkdirSync(path.join(libraryDir, sub), { recursive: true }); } catch { /* ignore */ }
+  }
+}
+
+function buildServerEnv(libraryDir) {
+  return {
+    ...process.env,
+    PORT: String(SERVER_PORT),
+    UNOLIVE_BIND_HOST: process.env.UNOLIVE_BIND_HOST || '0.0.0.0',
+    UNOLIVE_STRICT_HOSTS: process.env.UNOLIVE_STRICT_HOSTS || '1',
+    UNOLIVE_SERVER_LAN_IP: process.env.UNOLIVE_SERVER_LAN_IP || LAN_IPV4S[0] || '',
+    UNOLIVE_ALLOWED_LAN_HOSTS: process.env.UNOLIVE_ALLOWED_LAN_HOSTS || DEFAULT_ALLOWED_LAN_HOSTS,
+    UNOLIVE_ALLOWED_WRITE_ORIGINS: process.env.UNOLIVE_ALLOWED_WRITE_ORIGINS || process.env.UNOLIVE_ALLOWED_LAN_HOSTS || DEFAULT_ALLOWED_LAN_HOSTS,
+    ...(libraryDir ? { UNOLIVE_LIBRARY_DIR: libraryDir } : {}),
+  };
+}
+
 // ─── Next.js 서버 기동 ─────────────────────────────────────────
+//   dev: 기존처럼 npm run dev:watch (개발 머신에는 npm/tsx 존재)
+//   패키지 앱: .resources/app-server/unoworship-server.js 를 Electron 내장
+//   Node(utilityProcess)로 직접 기동 — 사용자 컴퓨터에 Node/npm 불필요.
 function spawnNextServer() {
   if (nextProcess) return;
 
-  const projectRoot = path.join(__dirname, '..');
-  const cmd = isDev ? 'dev:watch' : 'start';
+  if (app.isPackaged) {
+    const serverRoot = path.join(process.resourcesPath, 'app-server');
+    const serverEntry = path.join(serverRoot, 'unoworship-server.js');
+    const libraryDir = getLibraryDir();
+    ensureLibraryDirs(libraryDir);
 
-  console.log(`[electron] Next.js 기동: npm run ${cmd}`);
-  nextProcess = spawn('npm', ['run', cmd], {
-    cwd: projectRoot,
-    stdio: 'inherit',
-    shell: true,
-    env: {
-      ...process.env,
-      PORT: String(SERVER_PORT),
-      UNOLIVE_BIND_HOST: process.env.UNOLIVE_BIND_HOST || '0.0.0.0',
-      UNOLIVE_STRICT_HOSTS: process.env.UNOLIVE_STRICT_HOSTS || '1',
-      UNOLIVE_SERVER_LAN_IP: process.env.UNOLIVE_SERVER_LAN_IP || LAN_IPV4S[0] || '',
-      UNOLIVE_ALLOWED_LAN_HOSTS: process.env.UNOLIVE_ALLOWED_LAN_HOSTS || DEFAULT_ALLOWED_LAN_HOSTS,
-      UNOLIVE_ALLOWED_WRITE_ORIGINS: process.env.UNOLIVE_ALLOWED_WRITE_ORIGINS || process.env.UNOLIVE_ALLOWED_LAN_HOSTS || DEFAULT_ALLOWED_LAN_HOSTS,
-    },
-  });
+    console.log(`[electron] 번들 서버 기동: ${serverEntry}`);
+    console.log(`[electron] 로컬 라이브러리: ${libraryDir}`);
+
+    // 서버 stdout/stderr → userData/logs/server.log
+    //   GUI 앱은 콘솔이 없어 현장 장애 진단이 불가능하므로 파일로 남긴다.
+    let logStream = null;
+    try {
+      const logDir = path.join(app.getPath('userData'), 'logs');
+      fs.mkdirSync(logDir, { recursive: true });
+      logStream = fs.createWriteStream(path.join(logDir, 'server.log'), { flags: 'a' });
+      logStream.write(`\n──── ${new Date().toISOString()} 서버 기동 ────\n`);
+    } catch { /* 로그 실패가 기동을 막지 않게 */ }
+
+    nextProcess = utilityProcess.fork(serverEntry, [], {
+      cwd: serverRoot,
+      stdio: 'pipe',
+      serviceName: 'unoworship-server',
+      env: {
+        ...buildServerEnv(libraryDir),
+        NODE_ENV: 'production',
+      },
+    });
+    if (logStream) {
+      nextProcess.stdout?.on('data', (chunk) => logStream.write(chunk));
+      nextProcess.stderr?.on('data', (chunk) => logStream.write(chunk));
+    }
+  } else {
+    const projectRoot = path.join(__dirname, '..');
+    const cmd = isDev ? 'dev:watch' : 'start';
+
+    console.log(`[electron] Next.js 기동: npm run ${cmd}`);
+    nextProcess = spawn('npm', ['run', cmd], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+      shell: true,
+      env: buildServerEnv(null),
+    });
+  }
 
   nextProcess.on('exit', (code) => {
     console.log(`[electron] Next.js exit (${code}) — quit app`);
@@ -247,12 +303,34 @@ function showBlockingError(title, message, detail) {
   });
 }
 
+// ─── 서버 ready 대기 (외부 의존성 없는 자체 폴링) ────────────────
+//   패키지 앱에는 devDependency(wait-on)가 없으므로 http 폴링으로 대체.
+function waitForServer(url, { timeout = 60_000, interval = 500 } = {}) {
+  const deadline = Date.now() + timeout;
+  return new Promise((resolve, reject) => {
+    const probe = () => {
+      const req = http.get(url, (res) => {
+        res.resume();
+        if (res.statusCode && res.statusCode < 500) return resolve();
+        retry();
+      });
+      req.on('error', retry);
+      req.setTimeout(3_000, () => { req.destroy(); retry(); });
+    };
+    const retry = () => {
+      if (Date.now() > deadline) return reject(new Error(`server not ready within ${timeout}ms: ${url}`));
+      setTimeout(probe, interval);
+    };
+    probe();
+  });
+}
+
 // ─── 메인 기동 루틴 ────────────────────────────────────────────
 async function boot() {
   // 1. Next.js 서버 기동 + ready 대기
   spawnNextServer();
   try {
-    await waitOn({ resources: [SERVER_URL], timeout: 60_000, interval: 500 });
+    await waitForServer(SERVER_URL, { timeout: 60_000, interval: 500 });
     console.log('[electron] Next.js ready');
   } catch (err) {
     console.error('[electron] Next.js 기동 실패:', err);

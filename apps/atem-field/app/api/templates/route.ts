@@ -13,8 +13,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { rejectLargeRequest, requireRequestRole, requireTrustedWriteRequest } from '@/lib/auth/serverAuth';
+import { dataPath } from '@/lib/localLibraryPath';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'templates');
+const DATA_DIR = dataPath('templates');
 const MAX_TEMPLATE_REQUEST_BYTES = 5 * 1024 * 1024;
 
 async function ensureDir() {

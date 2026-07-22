@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3100
+    },
+    {
+      "name": "atem-field-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "apps/atem-field", "run", "dev"],
+      "port": 3000
     }
   ]
 }

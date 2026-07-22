@@ -15,6 +15,10 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const supabase = createClient();
+    if (!supabase) {
+      setError('클라우드 인증이 설정되지 않은 설치입니다.');
+      return;
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
@@ -46,6 +50,10 @@ export default function ResetPasswordPage() {
 
     try {
       const supabase = createClient();
+      if (!supabase) {
+        setError('클라우드 인증이 설정되지 않은 설치입니다.');
+        return;
+      }
       const { error: updateError } = await supabase.auth.updateUser({ password });
 
       if (updateError) {

@@ -12,9 +12,10 @@ import path from 'path';
 import { CHOIR_DESIGN } from '@/lib/generators/designs/choirDesign';
 import type { SavedProgram } from '@/lib/generators/programTypes';
 import type { Section, SetlistItem } from '@/lib/types';
+import { dataPath } from '@/lib/localLibraryPath';
 
-const FIXED_DIR = path.join(process.cwd(), 'data', 'fixed-programs');
-const PROGRAM_DIR = path.join(process.cwd(), 'data', 'programs');
+const FIXED_DIR = dataPath('fixed-programs');
+const PROGRAM_DIR = dataPath('programs');
 
 interface FixedProgramFile {
   id: string;

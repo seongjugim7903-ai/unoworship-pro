@@ -11,8 +11,9 @@ import path from 'node:path';
 import { NextRequest, NextResponse } from 'next/server';
 import { formatReference, parseReference } from '@/lib/bible/referenceParser';
 import type { BibleBook, BibleBookMeta, BibleData, BibleReference, BibleVerse } from '@/lib/bible/types';
+import { dataPath } from '@/lib/localLibraryPath';
 
-const LOCAL_BIBLE_PATH = path.join(process.cwd(), 'data', 'bibles', 'local-bible.json');
+const LOCAL_BIBLE_PATH = dataPath('bibles', 'local-bible.json');
 
 let cache: { mtimeMs: number; data: BibleData } | null = null;
 

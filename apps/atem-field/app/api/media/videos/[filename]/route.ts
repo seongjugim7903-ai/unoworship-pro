@@ -6,7 +6,9 @@ import { Readable } from 'stream';
 
 export const runtime = 'nodejs';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'media', 'videos');
+import { dataPath } from '@/lib/localLibraryPath';
+
+const DATA_DIR = dataPath('media', 'videos');
 
 function sanitizeFilename(filename: string): string | null {
   const decoded = decodeURIComponent(filename);

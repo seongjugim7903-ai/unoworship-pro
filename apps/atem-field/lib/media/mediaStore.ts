@@ -709,7 +709,7 @@ export const useMediaStore = create<MediaStoreState>()(
         // Supabase 로그아웃 (브라우저 환경에서만)
         if (typeof window !== 'undefined') {
           import('@/lib/supabase/browser').then(({ createClient }) => {
-            createClient().auth.signOut();
+            createClient()?.auth.signOut();
           });
         }
         set({ authMode: 'guest', currentMemberId: null });

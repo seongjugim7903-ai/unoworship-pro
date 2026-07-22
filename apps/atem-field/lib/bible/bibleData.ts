@@ -6,14 +6,14 @@
  */
 
 import fs from 'node:fs';
-import path from 'node:path';
+import { dataPath } from '@/lib/localLibraryPath';
 import type { BibleData, BibleBook, BibleVerse, BibleChapter } from './types';
 
 let cache: BibleData | null = null;
 
 function load(): BibleData {
   if (cache) return cache;
-  const file = path.join(process.cwd(), 'data', 'bibles', 'local-bible.json');
+  const file = dataPath('bibles', 'local-bible.json');
   const raw  = fs.readFileSync(file, 'utf-8');
   cache = JSON.parse(raw) as BibleData;
   return cache;

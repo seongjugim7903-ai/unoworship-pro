@@ -12,8 +12,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import type { SavedProgram } from '@/lib/generators/programTypes';
 import { rejectLargeRequest, requireRequestRole, requireTrustedWriteRequest } from '@/lib/auth/serverAuth';
+import { dataPath } from '@/lib/localLibraryPath';
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'programs');
+const DATA_DIR = dataPath('programs');
 const MAX_PROGRAM_REQUEST_BYTES = 2 * 1024 * 1024;
 
 function sanitizeId(id: string): string {

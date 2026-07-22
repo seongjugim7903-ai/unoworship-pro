@@ -7,7 +7,9 @@ export const runtime = 'nodejs';
 // 큰 영상 저장에 대비한 타임아웃 여유값(자체 호스팅 커스텀 서버에선 사실상 무제한).
 export const maxDuration = 60;
 
-const DATA_DIR = path.join(process.cwd(), 'data', 'media', 'videos');
+import { dataPath } from '@/lib/localLibraryPath';
+
+const DATA_DIR = dataPath('media', 'videos');
 const MAX_VIDEO_UPLOAD_BYTES = 1024 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'mov', 'm4v', 'webm']);
 

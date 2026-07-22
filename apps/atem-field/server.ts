@@ -12,6 +12,8 @@
  */
 
 import { createServer } from 'http';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { AsyncLocalStorage } from 'async_hooks';
 import {
   describeDeploymentConfig,
@@ -37,13 +39,38 @@ process.on('uncaughtException', (err) => {
 });
 
 async function startServer() {
+  // [STANDALONE] 패키지 앱(Electron)에서는 next.config.ts 파서(webpack 의존)가
+  // pruned node_modules 에 없다. Next 가 생성한 standalone server.js 와 같은
+  // 방식으로 required-server-files.json 의 config 를 미리 주입해 파서를 건너뛴다.
+  // dev 에서는 파일이 없으므로 기존 동작 그대로다.
+  let standaloneConf: Record<string, unknown> | undefined;
+  if (!dev && !process.env.__NEXT_PRIVATE_STANDALONE_CONFIG) {
+    try {
+      const requiredFiles = JSON.parse(
+        readFileSync(join(process.cwd(), '.next', 'required-server-files.json'), 'utf-8')
+      ) as { config?: Record<string, unknown> };
+      if (requiredFiles.config) {
+        standaloneConf = requiredFiles.config;
+        process.env.__NEXT_PRIVATE_STANDALONE_CONFIG = JSON.stringify(requiredFiles.config);
+      }
+    } catch {
+      // required-server-files.json 없음 = standalone 빌드가 아님 → 기존 경로 사용
+    }
+  }
+
   const [{ default: next }, { Server: SocketIOServer }, { setupSocketServer }] = await Promise.all([
     import('next'),
     import('socket.io'),
     import('./lib/server/socketServer'),
   ]);
 
-  const app    = next({ dev, hostname, port, dir: process.cwd() });
+  const app    = next({
+    dev,
+    hostname,
+    port,
+    dir: process.cwd(),
+    ...(standaloneConf ? { conf: standaloneConf } : {}),
+  });
   const handle = app.getRequestHandler();
 
   await app.prepare();

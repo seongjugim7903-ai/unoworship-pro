@@ -5,22 +5,28 @@ import os from 'os';
 import path from 'path';
 import { promisify } from 'util';
 import type { SavedProgram } from '@/lib/generators/programTypes';
+import {
+  archivePath,
+  dataPath,
+  filesPath,
+  generatedPath,
+  generatedUrlBase,
+  manifestsPath,
+} from '@/lib/localLibraryPath';
 
 export const runtime = 'nodejs';
 
 const execFileAsync = promisify(execFile);
-const PROJECT_ROOT = process.cwd();
-// 소스 스캔 폴더: 사용자 다운로드 폴더(요청). 아카이브·출력 경로는 기존 그대로 유지한다.
+// 소스 스캔 폴더: 사용자 다운로드 폴더(요청). 아카이브·출력 경로는 로컬 라이브러리 모듈을 따른다.
 const INBOX_DIR = path.join(os.homedir(), 'Downloads');
-const INBOX_ARCHIVE_DIR = path.join(PROJECT_ROOT, 'generator', 'ppt-slides', 'inbox', 'archive');
-const GENERATED_DIR = path.join(PROJECT_ROOT, 'generator', 'ppt-slides', 'generated');
-const DATA_PROGRAMS_DIR = path.join(PROJECT_ROOT, 'data', 'programs');
-const PUBLIC_SLIDES_DIR = path.join(PROJECT_ROOT, 'public', 'generated', 'ppt-slides');
-const PUBLIC_SLIDES_BASE = '/generated/ppt-slides';
-const FILES_DIR = path.join(PROJECT_ROOT, 'FILES');
+const INBOX_ARCHIVE_DIR = archivePath();
+const GENERATED_DIR = manifestsPath();
+const DATA_PROGRAMS_DIR = dataPath('programs');
+const PUBLIC_SLIDES_DIR = generatedPath('ppt-slides');
+const PUBLIC_SLIDES_BASE = `${generatedUrlBase()}/ppt-slides`;
 const FILE_LIBRARY_DIRS = {
-  hymns: path.join(FILES_DIR, '01_HYMNS'),
-  praise: path.join(FILES_DIR, '02_PRAISE'),
+  hymns: filesPath('01_HYMNS'),
+  praise: filesPath('02_PRAISE'),
 } as const;
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const PRESENTATION_EXTENSIONS = new Set(['.ppt', '.pptx']);
