@@ -4,6 +4,7 @@ import {
   SupabaseServerConfigError,
   supabaseRest,
 } from '../../../lib/supabase/server';
+import { getActiveChurchId } from '../../../lib/churchScope';
 
 export const runtime = 'nodejs';
 
@@ -41,6 +42,8 @@ export async function GET(request: Request) {
       limit: String(limit),
     });
 
+    params.set('church_id', `eq.${await getActiveChurchId()}`);
+
     const rows = await supabaseRest(
       `/sermon_outlines?${params.toString()}`,
       { method: 'GET' },
@@ -62,8 +65,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const payload = SermonOutlineSchema.parse(await request.json());
+    const churchId = await getActiveChurchId();
 
     const fields = {
+      church_id: churchId,
       service_date: payload.serviceDate || null,
       service_type: payload.serviceType,
       content: payload.content,
@@ -80,7 +85,7 @@ export async function POST(request: Request) {
     let updatedExisting = false;
     if (payload.id) {
       const updatedRows = await supabaseRest<SermonOutlineRow[]>(
-        `/sermon_outlines?id=eq.${payload.id}`,
+        `/sermon_outlines?id=eq.${payload.id}&church_id=eq.${churchId}`,
         { method: 'PATCH', body: JSON.stringify(fields) },
         { prefer: 'return=representation' },
       );

@@ -8,6 +8,7 @@ import {
   supabaseRest,
   uploadSupabaseObject,
 } from '../../../lib/supabase/server';
+import { getActiveChurchId } from '../../../lib/churchScope';
 
 export const runtime = 'nodejs';
 
@@ -100,6 +101,7 @@ export async function GET(request: Request) {
       if (team) params.set('team', `eq.${team}`);
     }
 
+    params.set('church_id', `eq.${await getActiveChurchId()}`);
     const rows = await supabaseRest<Array<Record<string, unknown>>>(`/worship_prep_songs?${params.toString()}`, { method: 'GET' });
     return NextResponse.json({ ok: true, songs: search ? dedupeByTitle(rows) : rows });
   } catch (error) {
@@ -132,8 +134,10 @@ export async function POST(request: Request) {
       });
     }
 
-    /* 같은 (예배·일자·팀) 셋리스트를 재저장하면 기존 행/악보를 정리하고 새로 넣는다. */
-    let deleteFilter = `service_type=eq.${encodeURIComponent(payload.serviceType)}&team=eq.${encodeURIComponent(payload.team)}`;
+    const churchId = await getActiveChurchId();
+
+    /* 같은 (교회·예배·일자·팀) 셋리스트를 재저장하면 기존 행/악보를 정리하고 새로 넣는다. */
+    let deleteFilter = `church_id=eq.${churchId}&service_type=eq.${encodeURIComponent(payload.serviceType)}&team=eq.${encodeURIComponent(payload.team)}`;
     deleteFilter += payload.serviceDate
       ? `&service_date=eq.${payload.serviceDate}`
       : '&service_date=is.null';
@@ -175,6 +179,7 @@ export async function POST(request: Request) {
       }
 
       return {
+        church_id: churchId,
         service_type: payload.serviceType,
         service_date: payload.serviceDate || null,
         team: payload.team,

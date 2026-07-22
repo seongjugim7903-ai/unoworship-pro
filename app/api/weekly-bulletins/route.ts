@@ -4,6 +4,7 @@ import {
   SupabaseServerConfigError,
   supabaseRest,
 } from '../../../lib/supabase/server';
+import { getActiveChurchId } from '../../../lib/churchScope';
 import { toWeekStart } from '../../../lib/weekStart';
 
 export const runtime = 'nodejs';
@@ -40,6 +41,8 @@ export async function GET(request: Request) {
       limit: String(limit),
     });
 
+    params.set('church_id', `eq.${await getActiveChurchId()}`);
+
     const rows = await supabaseRest(
       `/weekly_bulletins?${params.toString()}`,
       { method: 'GET' },
@@ -62,13 +65,15 @@ export async function POST(request: Request) {
   try {
     const payload = BulletinSchema.parse(await request.json());
     const weekStart = toWeekStart(payload.date);
+    const churchId = await getActiveChurchId();
 
-    /* week_start unique — 같은 주 재저장은 merge-duplicates로 덮어쓴다. */
+    /* (church_id, week_start) unique — 같은 교회·같은 주 재저장은 merge-duplicates로 덮어쓴다. */
     const [row] = await supabaseRest<BulletinRow[]>(
-      '/weekly_bulletins?on_conflict=week_start',
+      '/weekly_bulletins?on_conflict=church_id,week_start',
       {
         method: 'POST',
         body: JSON.stringify({
+          church_id: churchId,
           week_start: weekStart,
           content: payload.content,
           source: payload.source,

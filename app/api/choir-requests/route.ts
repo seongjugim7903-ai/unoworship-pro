@@ -9,6 +9,7 @@ import {
   supabaseRest,
   uploadSupabaseObject,
 } from '../../../lib/supabase/server';
+import { getActiveChurchId } from '../../../lib/churchScope';
 
 export const runtime = 'nodejs';
 
@@ -107,6 +108,8 @@ export async function GET(request: Request) {
       params.set('or', `(song_title.ilike.${pattern},composer.ilike.${pattern},arranger.ilike.${pattern})`);
     }
 
+    params.set('church_id', `eq.${await getActiveChurchId()}`);
+
     const rows = await supabaseRest(
       `/choir_requests?${params.toString()}`,
       { method: 'GET' },
@@ -129,10 +132,12 @@ export async function DELETE(request: Request) {
   try {
     const url = new URL(request.url);
     const id = z.string().uuid('삭제할 요청 id가 올바르지 않습니다.').parse(url.searchParams.get('id'));
+    const churchId = await getActiveChurchId();
 
-    /* FK cascade가 이미지·프로그램 행은 지우지만 Storage 객체는 직접 정리해야 한다. */
+    /* FK cascade가 이미지·프로그램 행은 지우지만 Storage 객체는 직접 정리해야 한다.
+       교회 범위를 함께 걸어 다른 교회 자료는 조회·삭제되지 않게 한다. */
     const imageRows = await supabaseRest<Array<{ storage_path: string }>>(
-      `/choir_generated_images?request_id=eq.${id}&select=storage_path`,
+      `/choir_generated_images?request_id=eq.${id}&church_id=eq.${churchId}&select=storage_path`,
       { method: 'GET' },
     );
     if (imageRows.length > 0) {
@@ -145,7 +150,7 @@ export async function DELETE(request: Request) {
     }
 
     const deletedRows = await supabaseRest<ChoirRequestRow[]>(
-      `/choir_requests?id=eq.${id}`,
+      `/choir_requests?id=eq.${id}&church_id=eq.${churchId}`,
       { method: 'DELETE' },
       { prefer: 'return=representation' },
     );
@@ -178,8 +183,10 @@ export async function POST(request: Request) {
     const imageFiles = getImageFiles(formData);
     const sections = parseLyricSections(payload.lyrics);
     const sectionCount = sections.length || imageFiles.length;
+    const churchId = await getActiveChurchId();
 
     const requestFields = {
+      church_id: churchId,
       service_date: payload.serviceDate || null,
       service_type: payload.serviceType,
       song_title: payload.songTitle,
@@ -201,7 +208,7 @@ export async function POST(request: Request) {
     let updatedExisting = false;
     if (payload.requestId) {
       const updatedRows = await supabaseRest<ChoirRequestRow[]>(
-        `/choir_requests?id=eq.${payload.requestId}`,
+        `/choir_requests?id=eq.${payload.requestId}&church_id=eq.${churchId}`,
         { method: 'PATCH', body: JSON.stringify(requestFields) },
         { prefer: 'return=representation' },
       );
@@ -270,6 +277,7 @@ export async function POST(request: Request) {
 
       return {
         request_id: requestRow.id,
+        church_id: churchId,
         section_index: sectionIndex,
         label: `${sectionIndex}번 섹션`,
         bucket: BUCKET_NAME,
@@ -321,6 +329,7 @@ export async function POST(request: Request) {
         method: 'POST',
         body: JSON.stringify({
           request_id: requestRow.id,
+          church_id: churchId,
           program_id: programPayload.id,
           title: payload.songTitle,
           program_payload: programPayload,

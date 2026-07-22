@@ -3,6 +3,7 @@ import {
   SupabaseServerConfigError,
   supabaseRest,
 } from '../../../lib/supabase/server';
+import { getActiveChurchId } from '../../../lib/churchScope';
 
 export const runtime = 'nodejs';
 
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const limit = clampLimit(url.searchParams.get('limit'));
     const rows = await supabaseRest(
-      `/choir_programs?select=id,request_id,created_at,updated_at,program_id,title,status,program_payload&order=created_at.desc&limit=${limit}`,
+      `/choir_programs?select=id,request_id,created_at,updated_at,program_id,title,status,program_payload&order=created_at.desc&limit=${limit}&church_id=eq.${await getActiveChurchId()}`,
       { method: 'GET' },
     );
 
