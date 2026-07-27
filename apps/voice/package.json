@@ -1,0 +1,16 @@
+{
+  "name": "unoworship-voice",
+  "version": "0.1.0",
+  "description": "우노워십 음성 자동 송출 모듈 — 설교 중 성경 구절 호명을 감지해 자막 송출 이벤트를 발행한다",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "verify": "node tools/verify.js",
+    "test": "node tools/verify.js",
+    "score": "node tools/score.js"
+  },
+  "license": "UNLICENSED"
+}

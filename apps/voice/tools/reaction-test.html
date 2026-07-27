@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>우노워십 · 확정 반응속도 실측</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: #14131a; color: #f2f1f3;
+    padding: 28px; line-height: 1.5;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+  .sub { color: #8a868f; font-size: 14px; margin-top: 6px; }
+
+  .modes { display: flex; gap: 8px; margin: 22px 0 18px; }
+  .modes button {
+    flex: 1; padding: 12px; border-radius: 10px; cursor: pointer;
+    border: 1px solid #34323c; background: #1e1d26; color: #cfcdd6;
+    font-size: 15px; font-weight: 600; font-family: inherit;
+  }
+  .modes button.on { background: #6c4bff; border-color: #6c4bff; color: #fff; }
+
+  .stage {
+    background: #1a1922; border: 1px solid #2b2a34; border-radius: 16px;
+    padding: 26px; min-height: 250px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .hint { text-align: center; color: #8a868f; font-size: 15px; }
+
+  .cands { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .cand {
+    border: 2px solid #34323c; background: #23222c; color: #cfcdd6;
+    border-radius: 12px; padding: 20px 12px; text-align: center;
+    font-family: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+    transition: none;
+  }
+  .cand .num {
+    display: block; font-size: 12px; color: #8a868f;
+    margin-bottom: 8px; font-weight: 600;
+  }
+  .cand.target { border-color: #ff5da2; background: #3a1f2e; color: #fff; }
+  .cand.target .num { color: #ff9ec4; }
+
+  .big { text-align: center; font-size: 42px; font-weight: 800; letter-spacing: -.02em; }
+  .ok  { color: #34d399; }
+  .bad { color: #fb7185; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 22px; font-size: 14px; }
+  th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid #2b2a34; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: #8a868f; font-weight: 600; }
+  .pass { color: #34d399; font-weight: 700; }
+  .fail { color: #fb7185; font-weight: 700; }
+  .note { margin-top: 18px; color: #8a868f; font-size: 13px; }
+  kbd {
+    background: #2b2a34; border: 1px solid #3d3b47; border-radius: 5px;
+    padding: 1px 6px; font-size: 12px; font-family: inherit;
+  }
+  .bar { height: 6px; background: #2b2a34; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .bar i { display: block; height: 100%; background: #6c4bff; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>확정 반응속도 실측</h1>
+  <p class="sub">
+    실측 기준선: 2026-07-26 설교에서 구절 호명 후 낭독까지 <b>평균 0.51초</b>.
+    이 시간 안에 확정이 가능한지 확인합니다.
+  </p>
+
+  <div class="modes">
+    <button data-mode="key"   class="on">숫자키 (1·2·3)</button>
+    <button data-mode="mouse">마우스 클릭</button>
+  </div>
+
+  <div class="stage" id="stage">
+    <p class="hint" id="hint">
+      준비되면 <kbd>스페이스</kbd> 를 눌러 시작하세요 · 20회 측정
+    </p>
+  </div>
+
+  <table id="tbl" hidden>
+    <thead>
+      <tr><th>방식</th><th>시행</th><th>평균</th><th>중앙값</th><th>최악(P90)</th><th>0.51초 이내</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <p class="note">
+    측정 방법: 무작위 대기(1.5~4초) 후 후보 하나가 분홍색으로 강조됩니다.
+    강조된 항목을 숫자키 또는 클릭으로 선택하기까지의 시간을 잽니다.
+    오답은 기록에서 제외되고 다시 시도합니다.
+  </p>
+</div>
+
+<script>
+const TRIALS = 20;
+const BUDGET = 510; // ms — 실측 평균 여유
+
+const REFS = [
+  ['요일 5:3', '롬 5:8', '히 1:3'],
+  ['눅 24:26', '마 22:37', '고전 13:4'],
+  ['요 13:34', '마 16:24', '요일 4:7'],
+];
+
+let mode = 'key';
+let results = { key: [], mouse: [] };
+let running = false, shownAt = 0, target = -1, count = 0, timer = null;
+
+const stage = document.getElementById('stage');
+const tbl = document.getElementById('tbl');
+
+document.querySelectorAll('.modes button').forEach(b => {
+  b.onclick = () => {
+    if (running) return;
+    mode = b.dataset.mode;
+    document.querySelectorAll('.modes button').forEach(x => x.classList.toggle('on', x === b));
+    idle();
+  };
+});
+
+function idle() {
+  stage.innerHTML = `<p class="hint">
+    <b>${mode === 'key' ? '숫자키' : '마우스'}</b> 방식 ·
+    <kbd>스페이스</kbd> 를 눌러 시작 · ${TRIALS}회</p>`;
+}
+
+function start() {
+  running = true; count = 0; results[mode] = [];
+  next();
+}
+
+function next() {
+  if (count >= TRIALS) return finish();
+  const set = REFS[Math.floor(count % REFS.length)];
+  target = count % 3;
+  stage.innerHTML = `
+    <div class="cands">
+      ${set.map((r, i) => `
+        <button class="cand" data-i="${i}">
+          <span class="num">${i + 1}</span>${r}
+        </button>`).join('')}
+    </div>
+    <p class="hint" style="margin-top:20px">대기 중…</p>
+    <div class="bar"><i style="width:${(count / TRIALS) * 100}%"></i></div>`;
+
+  stage.querySelectorAll('.cand').forEach(el => {
+    el.onclick = () => { if (mode === 'mouse') pick(+el.dataset.i); };
+  });
+
+  const wait = 1500 + Math.random() * 2500;
+  timer = setTimeout(() => {
+    const els = stage.querySelectorAll('.cand');
+    els[target].classList.add('target');
+    stage.querySelector('.hint').textContent =
+      mode === 'key' ? `${target + 1} 번을 누르세요` : '강조된 항목을 클릭하세요';
+    shownAt = performance.now();
+  }, wait);
+}
+
+function pick(i) {
+  if (!running || !shownAt) return;
+  const dt = performance.now() - shownAt;
+  shownAt = 0;
+  if (i !== target) {
+    stage.querySelector('.hint').textContent = '오답 — 다시 측정합니다';
+    setTimeout(next, 700);
+    return;
+  }
+  results[mode].push(dt);
+  count++;
+  const cls = dt <= BUDGET ? 'ok' : 'bad';
+  stage.innerHTML = `<div class="big ${cls}">${Math.round(dt)} ms</div>
+    <p class="hint" style="margin-top:10px">${count} / ${TRIALS}</p>`;
+  setTimeout(next, 500);
+}
+
+function finish() {
+  running = false;
+  render();
+  idle();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !running) { e.preventDefault(); start(); return; }
+  if (running && mode === 'key' && /^[123]$/.test(e.key)) pick(+e.key - 1);
+});
+
+function stats(a) {
+  if (!a.length) return null;
+  const s = [...a].sort((x, y) => x - y);
+  const mean = a.reduce((p, c) => p + c, 0) / a.length;
+  const med = s[Math.floor(s.length / 2)];
+  const p90 = s[Math.floor(s.length * 0.9)];
+  const within = a.filter(v => v <= BUDGET).length / a.length * 100;
+  return { n: a.length, mean, med, p90, within };
+}
+
+function render() {
+  const rows = [['숫자키', 'key'], ['마우스', 'mouse']]
+    .map(([label, k]) => {
+      const s = stats(results[k]);
+      if (!s) return '';
+      const cls = s.within >= 80 ? 'pass' : 'fail';
+      return `<tr>
+        <td>${label}</td><td>${s.n}</td>
+        <td>${Math.round(s.mean)} ms</td>
+        <td>${Math.round(s.med)} ms</td>
+        <td>${Math.round(s.p90)} ms</td>
+        <td class="${cls}">${s.within.toFixed(0)}%</td>
+      </tr>`;
+    }).join('');
+  if (rows.trim()) { tbl.hidden = false; tbl.querySelector('tbody').innerHTML = rows; }
+}
+
+idle();
+</script>
+</body>
+</html>

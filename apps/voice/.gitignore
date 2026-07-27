@@ -1,0 +1,9 @@
+node_modules/
+config/church.json
+*.log
+.DS_Store
+
+# 검증용 원본 오디오는 커밋하지 않는다 (용량·저작권)
+*.webm
+*.m4a
+*.wav
