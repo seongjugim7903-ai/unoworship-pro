@@ -87,6 +87,31 @@ function LoginInner() {
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   );
 
+  /** fetch 실패 시 원인 특정용 연결 진단 — Supabase 인증 서버 도달 여부를 확인한다 */
+  async function diagnoseConnectivity(): Promise<string> {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+    const results: string[] = [];
+    try {
+      const res = await fetch(`${supabaseUrl}/auth/v1/health`, {
+        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '' },
+        signal: AbortSignal.timeout(7000),
+      });
+      results.push(`인증 서버 연결: ${res.ok ? '정상' : `응답 ${res.status}`}`);
+    } catch (e) {
+      results.push(
+        `인증 서버 연결 실패 (${(e as Error).name}) — 이 네트워크에서 ${supabaseUrl.replace('https://', '')} 접속이 차단되었을 수 있습니다. ` +
+          '공유기/방화벽 설정 또는 다른 네트워크(핸드폰 핫스팟)로 확인해 보세요.'
+      );
+    }
+    try {
+      await fetch('/api/auth/device/verify', { method: 'POST', body: '{}', signal: AbortSignal.timeout(7000) });
+      results.push('웹 서버 연결: 정상');
+    } catch {
+      results.push('웹 서버 연결 실패 — 인터넷 연결 자체를 확인해 주세요.');
+    }
+    return results.join(' · ');
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
@@ -99,18 +124,27 @@ function LoginInner() {
       }
       const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) {
-        setError(
-          signInError.message === 'Invalid login credentials'
-            ? '이메일 또는 비밀번호가 올바르지 않습니다.'
-            : signInError.message
-        );
+        if (signInError.message === 'Invalid login credentials') {
+          setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+        } else if (/fetch/i.test(signInError.message)) {
+          const diagnosis = await diagnoseConnectivity();
+          setError(`인증 서버에 연결하지 못했습니다. [진단] ${diagnosis}`);
+        } else {
+          setError(`${signInError.name ?? 'Error'}: ${signInError.message}`);
+        }
         return;
       }
       // open-redirect 방지: 내부 경로만 허용
       const target = redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/';
       window.location.href = target;
     } catch (err) {
-      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      const detail = err instanceof Error ? `${err.name}: ${err.message}` : '알 수 없는 오류';
+      if (err instanceof Error && /fetch/i.test(err.message)) {
+        const diagnosis = await diagnoseConnectivity();
+        setError(`인증 서버에 연결하지 못했습니다. [진단] ${diagnosis}`);
+      } else {
+        setError(detail);
+      }
     } finally {
       setIsLoading(false);
     }
