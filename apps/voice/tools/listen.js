@@ -65,12 +65,16 @@ console.log('══════════════════════�
 //   현장에서는 믹서(M32) 또는 'Blackmagic'(ATEM)
 const deviceArg = process.argv.indexOf('--device');
 const device = deviceArg > 0 ? process.argv[deviceArg + 1] : (config.audio?.device ?? null);
+// 믹서 채널 선택 — 설교 마이크가 M32 CH3 이면 3. 없으면 장치 전체를 듣는다.
+const chArg = process.argv.indexOf('--channel');
+const channel = chArg > 0 ? Number(process.argv[chArg + 1]) : (config.audio?.channel ?? null);
 
-const stt = new AppleSpeechSTT({ hints, device });
+const stt = new AppleSpeechSTT({ hints, device, channel });
 
 stt.on('ready', (m) => {
   readyAt = Date.now();
-  console.log(`🎙  듣는 중 — ${m.locale} · ${m.onDevice ? '온디바이스' : '서버'} · ${m.sampleRate}Hz · 입력 ${m.device ?? '기본'}\n`);
+  const chLabel = m.channel ? ` · CH${m.channel}` : '';
+  console.log(`🎙  듣는 중 — ${m.locale} · ${m.onDevice ? '온디바이스' : '서버'} · ${m.sampleRate}Hz · 입력 ${m.device ?? '기본'}${chLabel}\n`);
 });
 
 stt.on('error', (m) => {

@@ -105,6 +105,8 @@ var outPath: String? = nil
 var allowServer = false
 var deviceMatch: String? = nil
 var listDevices = false
+var meterMode = false
+var channelPick: Int? = nil   // 1부터 시작하는 채널 번호 (믹서 CH3 = 3)
 
 var argIndex = 1
 let args = CommandLine.arguments
@@ -124,6 +126,11 @@ while argIndex < args.count {
     if argIndex < args.count { deviceMatch = args[argIndex] }
   case "--list-devices":
     listDevices = true
+  case "--meter":
+    meterMode = true
+  case "--channel":
+    argIndex += 1
+    if argIndex < args.count { channelPick = Int(args[argIndex]) }
   case "--allow-server":
     allowServer = true
   default:
@@ -151,6 +158,71 @@ if let path = hintsPath, let text = try? String(contentsOfFile: path, encoding: 
   hints = text.split(separator: "\n")
     .map { $0.trimmingCharacters(in: .whitespaces) }
     .filter { !$0.isEmpty }
+}
+
+/* ── 채널 레벨 측정 모드 (--meter) ────────────────────────────────────────
+ * 믹서를 꽂았을 때 "목사님 마이크가 몇 번 채널인지" 눈으로 찾기 위한 모드.
+ * 음성 인식을 돌리지 않고 채널별 소리 크기만 내보낸다.
+ *   {"type":"levels","ch":[0.01, 0.42, 0.00, ...]}
+ */
+func runMeter() {
+  let engine = AVAudioEngine()
+  let input = engine.inputNode
+
+  if let match = deviceMatch {
+    let devices = inputDevices()
+    guard let hit = devices.first(where: { $0.name.localizedCaseInsensitiveContains(match) }) else {
+      fail("입력 장치 '\(match)' 를 찾지 못했습니다. 사용 가능: \(devices.map { $0.name }.joined(separator: ", "))")
+    }
+    var deviceID = hit.id
+    let st = AudioUnitSetProperty(input.audioUnit!, kAudioOutputUnitProperty_CurrentDevice,
+                                  kAudioUnitScope_Global, 0, &deviceID,
+                                  UInt32(MemoryLayout<AudioDeviceID>.size))
+    guard st == noErr else { fail("입력 장치를 '\(hit.name)' 로 바꾸지 못했습니다 (OSStatus \(st)).") }
+  }
+
+  let format = input.outputFormat(forBus: 0)
+  let channels = Int(format.channelCount)
+  guard format.sampleRate > 0, channels > 0 else { fail("오디오 입력을 열지 못했습니다.") }
+
+  var peaks = [Float](repeating: 0, count: channels)
+  let lock = NSLock()
+
+  input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in
+    guard let data = buffer.floatChannelData else { return }
+    let n = Int(buffer.frameLength)
+    lock.lock()
+    for c in 0..<min(channels, Int(buffer.format.channelCount)) {
+      var peak: Float = 0
+      let samples = data[c]
+      for i in 0..<n { peak = max(peak, abs(samples[i])) }
+      peaks[c] = max(peaks[c], peak)
+    }
+    lock.unlock()
+  }
+
+  engine.prepare()
+  do { try engine.start() } catch { fail("오디오 엔진 시작 실패: \(error.localizedDescription)") }
+
+  emit(["type": "ready", "mode": "meter", "channels": channels, "sampleRate": format.sampleRate])
+
+  // 100ms 마다 채널별 피크를 내보내고 초기화한다
+  Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+    lock.lock()
+    let snapshot = peaks.map { Double(round($0 * 1000) / 1000) }
+    peaks = [Float](repeating: 0, count: channels)
+    lock.unlock()
+    emit(["type": "levels", "ch": snapshot])
+  }
+}
+
+if meterMode {
+  runMeter()
+  signal(SIGINT) { _ in exit(0) }
+  signal(SIGTERM) { _ in exit(0) }
+  let app = NSApplication.shared
+  app.setActivationPolicy(.accessory)
+  app.run()
 }
 
 // ── 인식기 준비 ─────────────────────────────────────────────────────────
@@ -287,13 +359,37 @@ SFSpeechRecognizer.requestAuthorization { status in
       fail("오디오 입력 장치를 열지 못했습니다. 시스템 설정 > 사운드 > 입력을 확인하세요.")
     }
 
+    // 없는 채널을 지정하면 조용히 전체 채널을 듣게 되어(반주·회중 섞임) 원인을 못 찾는다.
+    // 현장에서 번호를 잘못 넣는 실수를 즉시 알려준다.
+    if let pick = channelPick, pick < 1 || pick > Int(format.channelCount) {
+      fail("이 장치에는 \(pick)번 채널이 없습니다 (\(selectedDevice) 는 \(format.channelCount)채널). "
+         + "npm run find-channel 로 실제 채널을 확인하세요.")
+    }
+
     let sampleRate = format.sampleRate
+
+    // 믹서(M32 등)는 32채널을 한꺼번에 보낸다. 설교 마이크 채널만 뽑아 모노로 넘긴다.
+    //   그대로 넘기면 반주·회중 소리까지 섞여 숫자를 못 알아듣는다.
+    let monoFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate,
+                                   channels: 1, interleaved: false)
+    let pickIndex = channelPick.map { $0 - 1 }   // 1-based → 0-based
+
     input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
       stateLock.lock()
       audioFed += Double(buffer.frameLength) / sampleRate
       let req = request
       stateLock.unlock()
-      req?.append(buffer)
+
+      if let idx = pickIndex,
+         idx >= 0, idx < Int(buffer.format.channelCount),
+         let src = buffer.floatChannelData,
+         let mono = monoFormat.flatMap({ AVAudioPCMBuffer(pcmFormat: $0, frameCapacity: buffer.frameLength) }) {
+        mono.frameLength = buffer.frameLength
+        memcpy(mono.floatChannelData![0], src[idx], Int(buffer.frameLength) * MemoryLayout<Float>.size)
+        req?.append(mono)
+      } else {
+        req?.append(buffer)
+      }
     }
 
     engine.prepare()
@@ -313,6 +409,7 @@ SFSpeechRecognizer.requestAuthorization { status in
       "sampleRate": format.sampleRate,
       "channels": format.channelCount,
       "device": selectedDevice,
+      "channel": channelPick ?? 0,   // 0 = 채널 선택 없음(장치 전체)
     ])
   }
 }

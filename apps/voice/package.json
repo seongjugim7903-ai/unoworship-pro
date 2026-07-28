@@ -13,7 +13,8 @@
     "score": "node tools/score.js",
     "build:stt": "./stt/build.sh",
     "listen": "node tools/listen.js",
-    "latency": "node tools/latency.js"
+    "latency": "node tools/latency.js",
+    "find-channel": "node tools/find-channel.js"
   },
   "license": "UNLICENSED"
 }

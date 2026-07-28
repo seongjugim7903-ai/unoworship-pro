@@ -37,6 +37,8 @@ export class AppleSpeechSTT extends EventEmitter {
     this.locale = opts.locale ?? 'ko-KR';
     this.hints = opts.hints ?? [];
     this.device = opts.device ?? null;
+    // 믹서처럼 여러 채널이 한꺼번에 오는 장치에서 설교 마이크 채널만 고른다 (1부터). 예: M32 CH3 → 3
+    this.channel = opts.channel ?? null;
     this.outPath = opts.outPath ?? path.join(os.tmpdir(), `unoworship-stt-${Date.now()}.jsonl`);
     this.hintsPath = `${this.outPath}.hints`;
     this.pos = 0;
@@ -66,6 +68,7 @@ export class AppleSpeechSTT extends EventEmitter {
     const args = [APP_PATH, '--args', '--locale', this.locale, '--out', this.outPath];
     if (this.hints.length) args.push('--hints', this.hintsPath);
     if (this.device) args.push('--device', this.device);
+    if (this.channel) args.push('--channel', String(this.channel));
     spawn('open', args, { stdio: 'ignore', detached: true }).unref();
 
     this._follow();
