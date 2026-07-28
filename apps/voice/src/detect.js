@@ -39,6 +39,9 @@ export class Detector {
     this.repeatWindow = opts.repeatWindow ?? 20;  // 초
     // 장만 지목되고 절이 없을 때 본문 대조로 절을 찾는다 (교회 로컬 성경 데이터 필요)
     this.search = opts.bibleSource ? new ChapterSearch(opts.bibleSource, opts.search) : null;
+    // 절 수 검증용 — 게이트에 "그 장에 그 절이 실제로 있는가"를 넘긴다 (policy.js 참조).
+    //   verseCount 를 구현하지 않은 소스(합성 테스트 스텁 등)는 그대로 건너뛴다.
+    this.bible = typeof opts.bibleSource?.verseCount === 'function' ? opts.bibleSource : null;
   }
 
   inQuoteList(r) {
@@ -65,20 +68,30 @@ export class Detector {
     if (this.search) {
       const found = this.search.feed(text, at);
       if (found) {
-        const ev = {
-          at,
-          action: 'auto',
-          ref: { bookId: found.bookId, chapter: found.chapter, verses: found.verses, resolvedBy: 'text-search' },
-          display: formatRef(found),
-          confidence: found.score,
-          reason: 'chapter-text-search',
-          resolvedBy: 'text-search',
-          raw: text,
-        };
-        this.ctx.update(ev.ref, at);
-        events.push(ev);
-        this.emitted.push(ev);
-        this.last = ev;
+        const key = `${found.bookId}|${found.chapter}|${found.verses.join(',')}`;
+        // [FIX 2026-07-28] 방금 명시적으로 송출한 절을, 이어지는 낭독 대조가 또 보내던 문제.
+        //   실측: "마태복음 26장 13절"로 송출 → 0.8초 뒤 낭독 대조가 같은 절을 재송출.
+        //   중복 억제를 이 경로에도 적용하고, 여기서도 키를 갱신해 이후 경로와 상태를 공유한다.
+        if (this.lastKey === key && at - this.lastKeyAt < this.repeatWindow) {
+          this.ctx.update({ bookId: found.bookId, chapter: found.chapter, verses: found.verses }, at);
+        } else {
+          const ev = {
+            at,
+            action: 'auto',
+            ref: { bookId: found.bookId, chapter: found.chapter, verses: found.verses, resolvedBy: 'text-search' },
+            display: formatRef(found),
+            confidence: found.score,
+            reason: 'chapter-text-search',
+            resolvedBy: 'text-search',
+            raw: text,
+          };
+          this.ctx.update(ev.ref, at);
+          this.lastKey = key;
+          this.lastKeyAt = at;
+          events.push(ev);
+          this.emitted.push(ev);
+          this.last = ev;
+        }
       }
     }
 
@@ -87,8 +100,12 @@ export class Detector {
       if (!resolved) continue;
 
       const range = this.ctx.checkRange(resolved);
+      // 숫자 오인식 방어 — 해당 장의 실제 절 수를 넘긴다 (히 1장은 14절까지 → "33절"은 무효).
+      //   성경 데이터가 없으면 null 이라 게이트에서 이 검사만 건너뛴다 (기존 동작 유지).
+      const verseCount = this.bible?.verseCount(resolved.bookId, resolved.chapter) ?? null;
       const verdict = judge(resolved, text, range, {
         inQuoteList: this.inQuoteList(resolved),
+        verseCount,
       });
 
       // 문맥은 판정과 무관하게 갱신한다 (다음 "6절에"를 위해)

@@ -74,17 +74,104 @@ function fuzzyBook(token) {
   return { ...best, distance: bestD };
 }
 
-/**
- * 한글 수사는 지원하지 않는다.
- *
- * 2026-07-19 픽스처에서 치명적 오검출이 확인됐다:
- *   "대제사장"  → 사(4) + 장  → 4장
- *   "성경 구절"  → 구(9) + 절  → 9절
- * 일상 한국어와 충돌이 너무 커서 얻는 것보다 잃는 것이 크다.
- * 실제 STT(유튜브·Whisper·Apple)는 장·절 번호를 아라비아 숫자로 출력한다.
- */
 function toNumber(s) {
   return /^\d+$/.test(s) ? parseInt(s, 10) : NaN;
+}
+
+/* ── 한글 수사 (책 이름 뒤에서만) ───────────────────────────────────────────
+ *
+ * 원래는 전면 미지원이었다. 근거는 유효했다 —
+ *   "대제사장"  → 사(4) + 장 → 4장
+ *   "성경 구절"  → 구(9) + 절 → 9절
+ * 일상 한국어와 충돌이 커서 무조건 변환하면 오검출이 터진다.
+ *
+ * 그런데 2026-07-28 Apple Speech 실측에서 전제가 깨졌다.
+ *   정답 롬 5:8  →  STT "그래서 로마 스 오장 팔 절에는…"  →  미검출
+ * 유튜브 자동자막(픽스처)은 숫자로 쓰지만 Apple 온디바이스는 한글 수사로 쓴다.
+ * 엔진이 바뀌면 전제도 바뀐다.
+ *
+ * 그래서 무조건 변환이 아니라 **책 이름 바로 뒤 구간에서만** 변환한다.
+ *   "로마서 오장 팔절"  → 앞에 책 이름 → 변환      → rom 5:8
+ *   "성경 구절" · "대제사장" → 앞에 책 이름 없음 → 변환 안 함 (오검출 방지)
+ * 추가로 '장/절' 뒤가 조사·경계가 아니면(예: "사장님") 단어의 일부로 보고 건너뛴다.
+ */
+const SINO = { 일: 1, 이: 2, 삼: 3, 사: 4, 오: 5, 육: 6, 칠: 7, 팔: 8, 구: 9 };
+
+/** 한자어 수사 → 숫자. 시편 176절(백칠십육)까지 커버. 형식이 아니면 NaN */
+export function sinoToNumber(str) {
+  let total = 0;
+  let cur = 0;
+  let seen = false;
+  for (const ch of str) {
+    if (SINO[ch]) { cur = SINO[ch]; seen = true; }
+    else if (ch === '십') { total += (cur || 1) * 10; cur = 0; seen = true; }
+    else if (ch === '백') { total += (cur || 1) * 100; cur = 0; seen = true; }
+    else return NaN;
+  }
+  return seen ? total + cur : NaN;
+}
+
+// '장/절' 뒤에 올 수 있는 것 — 조사이거나 경계여야 한다. "사장님"의 '님'은 불가.
+const AFTER_MARKER_OK = /^(?:\s|$|[.,!?"')\]]|은|는|이|가|을|를|에|의|와|과|도|만|부터|까지|에서|에는|에도|이라|이며|말씀)/;
+const SINO_MARKER_RE = /([일이삼사오육칠팔구십백]{1,5})\s*(장|절|편)/g;
+
+/** 책 이름 뒤 구간에서만 한글 수사를 숫자로 바꾼다. */
+function convertSinoNumerals(text) {
+  if (!SINO_MARKER_RE.test(text)) { SINO_MARKER_RE.lastIndex = 0; return text; }
+  SINO_MARKER_RE.lastIndex = 0;
+
+  // 변환을 허용할 구간 — 2글자 이상 책 별칭이 나온 지점부터 앞으로 40자.
+  //   (1글자 별칭은 일상어 충돌이 커서 앵커로 쓰지 않는다)
+  const zones = [];
+  for (const { alias } of ALIAS_INDEX) {
+    if (alias.length < 2) continue;
+    let from = 0;
+    for (;;) {
+      const i = text.indexOf(alias, from);
+      if (i < 0) break;
+      from = i + 1;
+      if (text[i - 1] && HANGUL.test(text[i - 1])) continue; // 다른 단어의 일부
+      zones.push([i + alias.length, i + alias.length + 40]);
+    }
+  }
+  if (!zones.length) return text;
+  const inZone = (pos) => zones.some(([s, e]) => pos >= s && pos <= e);
+
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = SINO_MARKER_RE.exec(text))) {
+    const num = sinoToNumber(m[1]);
+    const after = text.slice(m.index + m[0].length);
+    if (!Number.isFinite(num) || num <= 0 || !inZone(m.index) || !AFTER_MARKER_OK.test(after)) continue;
+    out += text.slice(last, m.index) + num + m[2];
+    last = m.index + m[0].length;
+  }
+  return last === 0 ? text : out + text.slice(last);
+}
+
+/* ── STT 띄어쓰기 오인식 복구 ───────────────────────────────────────────────
+ * Apple Speech 실측: "로마서" → "로마 스".
+ * 그대로 두면 1글자 별칭 '스'(에스라)가 매칭돼 **에스라 5:8** 로 오검출된다.
+ * 공백을 접은 형태가 책 이름에 자모 거리 1 이내로 근접하면 붙여준다.
+ * 뒤에 장/절 표지가 있을 때만 시도해 일상어 오작동을 막는다.
+ */
+function repairBookSpacing(text) {
+  return text.replace(/([가-힣]{2,4})\s+([가-힣]{1,3})(?=\s*[0-9일이삼사오육칠팔구십백]{1,5}\s*(?:장|절|편))/g,
+    (whole, a, b) => {
+      const joined = a + b;
+      if (joined.length < 3) return whole;
+      const t = toJamo(joined);
+      let best = null, bestD = Infinity, tie = false;
+      for (const { alias } of ALIAS_INDEX) {
+        if (alias.length < 3) continue;
+        const d = editDistance(t, toJamo(alias));
+        if (d < bestD) { bestD = d; best = alias; tie = false; }
+        else if (d === bestD) tie = true;
+      }
+      // 이미 정확한 별칭이면 건드리지 않는다. 애매하면(동점) 포기.
+      return !best || tie || bestD > 1 ? whole : joined;
+    });
 }
 
 /**
@@ -181,7 +268,10 @@ function findMarkers(text) {
  * @returns {Array<{bookId:string|null, chapter:number|null, verses:number[], raw:string, at:number}>}
  */
 export function parseSpoken(rawText) {
-  const text = normalize(rawText);
+  // 전처리 2단계 — 파서 본체는 건드리지 않는다.
+  //   ① 띄어쓰기 오인식 복구 ("로마 스" → "로마서")  ② 책 이름 뒤 한글 수사 → 숫자
+  //   둘 다 조건이 안 맞으면 원문 그대로 통과하므로 기존 동작은 변하지 않는다.
+  const text = convertSinoNumerals(repairBookSpacing(normalize(rawText)));
   const books = findBooks(text);
   const marks = findMarkers(text);
   if (!marks.length && !books.length) return [];

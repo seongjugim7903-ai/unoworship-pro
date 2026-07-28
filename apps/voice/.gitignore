@@ -3,6 +3,9 @@ config/church.json
 *.log
 .DS_Store
 
+# STT 빌드 산출물 (stt/build.sh 로 각 맥에서 생성 — 서명이 기기별로 다르다)
+stt/UnoWorshipVoice.app/
+
 # 검증용 원본 오디오는 커밋하지 않는다 (용량·저작권)
 *.webm
 *.m4a

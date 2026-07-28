@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 음성 인식·마이크 권한(TCC)을 받기 위해 CLI 바이너리에 심는 번들 정보.
+     번들 ID 와 용도 설명이 없으면 macOS 가 권한 프롬프트를 띄우지 않는다. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>com.unoworship.voice.stt</string>
+  <key>CFBundleName</key>
+  <string>UnoWorship Voice STT</string>
+  <key>CFBundleDisplayName</key>
+  <string>우노워십 음성 인식</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>CFBundleExecutable</key>
+  <string>unoworship-stt</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>13.0</string>
+  <!-- 독 아이콘 없는 백그라운드 앱. 없으면 독에서 계속 튀며 권한 창을 못 띄운다. -->
+  <key>LSUIElement</key>
+  <true/>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>설교 중 호명하시는 성경 구절을 감지해 자막을 자동으로 송출하기 위해 음성 인식을 사용합니다. 인식은 이 맥 안에서만 처리됩니다.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>설교 음성을 받아 성경 구절 호명을 감지하기 위해 마이크(믹서 입력)를 사용합니다.</string>
+</dict>
+</plist>

@@ -10,7 +10,10 @@
   "scripts": {
     "verify": "node tools/verify.js",
     "test": "node tools/verify.js",
-    "score": "node tools/score.js"
+    "score": "node tools/score.js",
+    "build:stt": "./stt/build.sh",
+    "listen": "node tools/listen.js",
+    "latency": "node tools/latency.js"
   },
   "license": "UNLICENSED"
 }
