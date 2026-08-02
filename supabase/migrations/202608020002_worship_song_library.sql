@@ -43,7 +43,7 @@ create index if not exists worship_song_library_search_idx
   on public.worship_song_library (church_id, title);
 
 create index if not exists worship_song_library_recent_idx
-  on public.worship_song_library (church_id, last_used_at desc nullsfirst);
+  on public.worship_song_library (church_id, last_used_at desc nulls last);
 
 drop trigger if exists worship_song_library_set_updated_at on public.worship_song_library;
 create trigger worship_song_library_set_updated_at
