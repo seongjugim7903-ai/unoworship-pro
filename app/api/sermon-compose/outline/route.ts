@@ -56,6 +56,41 @@ function jsonError(message: string, status: number, code = 'SERMON_OUTLINE_SAVE_
   return NextResponse.json({ ok: false, code, message }, { status });
 }
 
+function clampLimit(value: string | null) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 20;
+  return Math.max(1, Math.min(50, Math.floor(parsed)));
+}
+
+/**
+ * 현장 Composer 가 읽어 갈 목록.
+ * 기존 /api/sermon-outlines 는 metadata 를 응답에 넣지 않아(수정 금지 대상)
+ * 파싱 구조와 제목·본문·설교자를 받을 수 없다. 그래서 여기서 metadata 까지 준다.
+ */
+export async function GET(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const params = new URLSearchParams({
+      select: 'id,created_at,updated_at,service_date,service_type,content,hymn,status,metadata',
+      order: 'service_date.desc.nullslast,created_at.desc',
+      limit: String(clampLimit(url.searchParams.get('limit'))),
+      church_id: `eq.${await getActiveChurchId()}`,
+    });
+
+    const outlines = await supabaseRest(`/sermon_outlines?${params.toString()}`, { method: 'GET' });
+    return NextResponse.json({ ok: true, outlines });
+  } catch (error) {
+    console.error('[sermon-compose-outline] list failed', error);
+
+    if (error instanceof SupabaseServerConfigError) {
+      return jsonError(error.message, 503, error.code);
+    }
+
+    const message = error instanceof Error ? error.message : '설교대지 목록을 불러오지 못했습니다.';
+    return jsonError(message, 500, 'SERMON_OUTLINE_LIST_FAILED');
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = BodySchema.parse(await request.json());
