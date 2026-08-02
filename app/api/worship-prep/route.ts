@@ -191,18 +191,17 @@ export async function POST(request: Request) {
       /* 라이브러리에서 그대로 쓰는 페이지가 먼저, 새로 올린 것이 뒤에 붙는다 */
       const pages: SheetPage[] = song.sheetPages.map((page) => ({ ...page, contentType: page.contentType }));
 
-      for (const [pageIndex, upload] of song.sheetUploads.entries()) {
+      for (const upload of song.sheetUploads) {
         const file = formData.get(upload.key);
         if (!(file instanceof File)) continue;
+        /* pages 는 아래에서 자라므로 그 길이만으로 번호를 매긴다 —
+           따로 센 인덱스를 더하면 01, 03, 05 처럼 튄다 */
+        const pageNo = String(pages.length + 1).padStart(2, '0');
         const contentType = file.type in SHEET_EXTENSIONS ? file.type : 'application/pdf';
         const extension = SHEET_EXTENSIONS[contentType] ?? 'pdf';
         /* 악보는 회차가 아니라 곡에 매인다 — 날짜 폴더에 두면 그 주 셋리스트를 다시
            저장할 때 같이 지워지고, 다음 주에 라이브러리에서 끌어와도 파일이 없다. */
-        const path = librarySheetPath(
-          teamSegment,
-          `${sanitizeSegment(song.title)}-${String(pages.length + pageIndex + 1).padStart(2, '0')}`,
-          extension,
-        );
+        const path = librarySheetPath(teamSegment, `${sanitizeSegment(song.title)}-${pageNo}`, extension);
         await uploadSupabaseObject({
           bucket: BUCKET_NAME,
           path,
