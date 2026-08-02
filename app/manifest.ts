@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Hephzibah Choir',
-    short_name: 'Hephzibah',
-    description: '찬양대 가사를 예배용 자막 이미지로 만들고 공유합니다.',
+    name: 'ULJU',
+    short_name: 'ULJU',
+    description: '설교대지 · 준비찬양 · 찬양대 자막을 예배용 프로그램으로 준비합니다.',
     start_url: '/?source=pwa',
     scope: '/',
     display: 'standalone',

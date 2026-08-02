@@ -6,14 +6,14 @@ import PwaInstallPrompt from './pwa/PwaInstallPrompt';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'UnoWorship Pro · 찬양대 자막 요청',
-  description: '찬양대 가사를 예배용 자막 이미지로 만들어 공유합니다.',
-  applicationName: 'Hephzibah Choir',
+  title: 'ULJU · 예배 준비',
+  description: '설교대지 · 준비찬양 · 찬양대 자막을 예배용 프로그램으로 준비합니다.',
+  applicationName: 'ULJU',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Hephzibah',
+    title: 'ULJU',
   },
   icons: {
     icon: [
