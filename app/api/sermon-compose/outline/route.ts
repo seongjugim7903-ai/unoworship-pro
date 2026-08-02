@@ -17,7 +17,7 @@ import {
   type SubHymnItem,
   type SubPraiseItem,
 } from '../../../../lib/sermon-compose/subProgram';
-import { insertSubProgram, type SavedSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
+import { replaceSubProgram, type SavedSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 import { parseSermonOutline } from '../../../../lib/sermon-compose/parseSermonOutline';
 import { PARSER_VERSION } from '../../../../lib/sermon-compose/types';
 
@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         caption: item.caption,
       }));
       subPrograms.push(
-        await insertSubProgram({
+        await replaceSubProgram({
           id: randomUUID(),
           kind: 'hymn',
           churchId,
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
         caption: item.caption,
       }));
       subPrograms.push(
-        await insertSubProgram({
+        await replaceSubProgram({
           id: randomUUID(),
           kind: 'praise',
           churchId,
