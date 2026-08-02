@@ -14,9 +14,9 @@ import { getActiveChurchId } from '../../../../lib/churchScope';
 import {
   MAX_ITEMS_PER_PROGRAM,
   MEDIA_BUCKET,
-  type MediaImageItem,
-} from '../../../../lib/sermon-compose/mediaProgram';
-import { insertMediaProgram } from '../../../../lib/sermon-compose/mediaProgramStore';
+  type SubImageItem,
+} from '../../../../lib/sermon-compose/subProgram';
+import { insertSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 
 export const runtime = 'nodejs';
 
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     const churchId = await getActiveChurchId();
     const programId = randomUUID();
 
-    const items: MediaImageItem[] = [];
+    const items: SubImageItem[] = [];
     for (const [index, meta] of payload.images.entries()) {
       const file = files[index] as File;
       const path = `churches/${churchId}/${programId}/${index + 1}.webp`;
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       items.push({ path, width: meta.width, height: meta.height, caption: meta.caption });
     }
 
-    const saved = await insertMediaProgram({
+    const saved = await insertSubProgram({
       id: programId,
       kind: 'image',
       churchId,

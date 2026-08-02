@@ -7,8 +7,8 @@
 import { useMemo, useState } from 'react';
 import {
   MAX_ITEMS_PER_PROGRAM,
-  defaultMediaProgramTitle,
-} from '../../lib/sermon-compose/mediaProgram';
+  defaultSubProgramTitle,
+} from '../../lib/sermon-compose/subProgram';
 import { parseYoutubeLink, youtubeThumbnailUrl } from '../../lib/sermon-compose/youtubeLink';
 import { getUpcomingService } from '../../lib/sermon-compose/upcomingService';
 import ServiceFields, { type ServiceFieldsValue } from './ServiceFields';
@@ -39,7 +39,7 @@ export default function SermonYoutubePanel() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
 
-  const autoTitle = defaultMediaProgramTitle(fields.serviceDate, fields.serviceType, 'youtube');
+  const autoTitle = defaultSubProgramTitle(fields.serviceDate, fields.serviceType, 'youtube');
   const busy = status === 'saving';
   const canSave = links.length > 0 && !busy;
 

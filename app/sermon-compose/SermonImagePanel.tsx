@@ -7,8 +7,8 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { compressImage } from '../../lib/sermon-compose/compressImage';
 import {
   MAX_ITEMS_PER_PROGRAM,
-  defaultMediaProgramTitle,
-} from '../../lib/sermon-compose/mediaProgram';
+  defaultSubProgramTitle,
+} from '../../lib/sermon-compose/subProgram';
 import { getUpcomingService } from '../../lib/sermon-compose/upcomingService';
 import ServiceFields, { type ServiceFieldsValue } from './ServiceFields';
 
@@ -51,7 +51,7 @@ export default function SermonImagePanel() {
     };
   }, []);
 
-  const autoTitle = defaultMediaProgramTitle(fields.serviceDate, fields.serviceType, 'image');
+  const autoTitle = defaultSubProgramTitle(fields.serviceDate, fields.serviceType, 'image');
   const busy = status === 'reading' || status === 'saving';
   const canSave = images.length > 0 && !busy;
 

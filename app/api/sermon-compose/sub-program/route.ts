@@ -4,8 +4,8 @@
 
 import { NextResponse } from 'next/server';
 import { SupabaseServerConfigError } from '../../../../lib/supabase/server';
-import type { MediaProgramKind } from '../../../../lib/sermon-compose/mediaProgram';
-import { listMediaPrograms } from '../../../../lib/sermon-compose/mediaProgramStore';
+import type { SubProgramKind } from '../../../../lib/sermon-compose/subProgram';
+import { listSubPrograms } from '../../../../lib/sermon-compose/subProgramStore';
 
 export const runtime = 'nodejs';
 
@@ -15,28 +15,28 @@ function clampLimit(value: string | null) {
   return Math.max(1, Math.min(50, Math.floor(parsed)));
 }
 
-function parseKind(value: string | null): MediaProgramKind | undefined {
+function parseKind(value: string | null): SubProgramKind | undefined {
   return value === 'image' || value === 'youtube' ? value : undefined;
 }
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const programs = await listMediaPrograms(
+    const programs = await listSubPrograms(
       clampLimit(url.searchParams.get('limit')),
       parseKind(url.searchParams.get('kind')),
     );
     return NextResponse.json({ ok: true, programs });
   } catch (error) {
-    console.error('[sermon-media-program] list failed', error);
+    console.error('[sermon-sub-program] list failed', error);
 
     if (error instanceof SupabaseServerConfigError) {
       return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: 503 });
     }
 
-    const message = error instanceof Error ? error.message : '참고자료 목록을 불러오지 못했습니다.';
+    const message = error instanceof Error ? error.message : '부속 프로그램 목록을 불러오지 못했습니다.';
     return NextResponse.json(
-      { ok: false, code: 'SERMON_MEDIA_PROGRAM_LIST_FAILED', message },
+      { ok: false, code: 'SERMON_SUB_PROGRAM_LIST_FAILED', message },
       { status: 500 },
     );
   }

@@ -1,12 +1,14 @@
 'use client';
 
 // 설교대지 화면의 소탭 래퍼.
-//   · 원문 저장 — 기존 SermonOutlinePage 를 그대로 렌더한다(그 파일은 수정하지 않는다)
-//   · 참고 이미지 — 신규 SermonImagePanel
+//   · 원문 저장   — 신규 SermonOutlinePanel (찬송가·찬양을 나눠 각각 프로그램으로 만든다)
+//   · 참고 사진   — 신규 SermonImagePanel
+//   · 참고 영상   — 신규 SermonYoutubePanel
 // 새 기능은 전부 app/sermon-compose 아래에만 둔다.
+// 기존 app/sermon/SermonOutlinePage.tsx 는 한 줄도 수정하지 않고 그대로 남겨 둔다.
 
 import { useState } from 'react';
-import SermonOutlinePage from '../sermon/SermonOutlinePage';
+import SermonOutlinePanel from './SermonOutlinePanel';
 import SermonImagePanel from './SermonImagePanel';
 import SermonYoutubePanel from './SermonYoutubePanel';
 
@@ -47,7 +49,7 @@ export default function SermonSection() {
         </div>
       </div>
 
-      {tab === 'outline' && <SermonOutlinePage />}
+      {tab === 'outline' && <SermonOutlinePanel />}
       {tab === 'image' && <SermonImagePanel />}
       {tab === 'youtube' && <SermonYoutubePanel />}
     </>

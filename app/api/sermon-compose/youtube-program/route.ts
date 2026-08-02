@@ -10,9 +10,9 @@ import { SupabaseServerConfigError } from '../../../../lib/supabase/server';
 import { getActiveChurchId } from '../../../../lib/churchScope';
 import {
   MAX_ITEMS_PER_PROGRAM,
-  type MediaYoutubeItem,
-} from '../../../../lib/sermon-compose/mediaProgram';
-import { insertMediaProgram } from '../../../../lib/sermon-compose/mediaProgramStore';
+  type SubYoutubeItem,
+} from '../../../../lib/sermon-compose/subProgram';
+import { insertSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 import { extractYoutubeId } from '../../../../lib/sermon-compose/youtubeLink';
 
 export const runtime = 'nodejs';
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     const body = BodySchema.parse(await request.json());
 
     /* 서버에서도 videoId 를 다시 뽑는다 — 클라이언트 검사만 믿지 않는다. */
-    const items: MediaYoutubeItem[] = [];
+    const items: SubYoutubeItem[] = [];
     for (const [index, link] of body.links.entries()) {
       const videoId = extractYoutubeId(link.url);
       if (!videoId) {
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       items.push({ url: link.url, videoId, caption: link.caption });
     }
 
-    const saved = await insertMediaProgram({
+    const saved = await insertSubProgram({
       id: randomUUID(),
       kind: 'youtube',
       churchId: await getActiveChurchId(),

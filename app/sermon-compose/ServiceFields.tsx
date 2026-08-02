@@ -19,10 +19,22 @@ interface Props {
   autoTitle: string;
   /** 자동으로 잡힌 예배 — 사용자가 바꿨는지 알려주는 안내에 쓴다 */
   detectedServiceType: string;
+  /**
+   * 프로그램 이름 입력칸 노출 여부. 프로그램을 여러 개 만드는 화면(원문 저장)은
+   * 이름을 하나로 받을 수 없어서 끄고, autoTitle 만 안내로 보여 준다.
+   */
+  showTitle?: boolean;
   disabled?: boolean;
 }
 
-export default function ServiceFields({ value, onChange, autoTitle, detectedServiceType, disabled }: Props) {
+export default function ServiceFields({
+  value,
+  onChange,
+  autoTitle,
+  detectedServiceType,
+  showTitle = true,
+  disabled,
+}: Props) {
   /* 예배 종류를 바꾸면 날짜도 그 예배의 다음 회차로 따라간다. */
   const handleServiceType = (serviceType: string) => {
     const auto = nextServiceDate(serviceType);
@@ -61,16 +73,20 @@ export default function ServiceFields({ value, onChange, autoTitle, detectedServ
           : `도래하는 정기예배(${value.serviceType})가 자동으로 선택됐습니다. 필요하면 바꾸세요.`}
       </p>
 
-      <label>
-        프로그램 이름
-        <span className="field-hint">비워두면 {autoTitle} 으로 저장됩니다.</span>
-        <input
-          value={value.title}
-          onChange={(event) => onChange({ ...value, title: event.target.value })}
-          placeholder={autoTitle}
-          disabled={disabled}
-        />
-      </label>
+      {showTitle ? (
+        <label>
+          프로그램 이름
+          <span className="field-hint">비워두면 {autoTitle} 으로 저장됩니다.</span>
+          <input
+            value={value.title}
+            onChange={(event) => onChange({ ...value, title: event.target.value })}
+            placeholder={autoTitle}
+            disabled={disabled}
+          />
+        </label>
+      ) : (
+        <p className="field-hint">만들어질 프로그램 이름 — {autoTitle}</p>
+      )}
     </>
   );
 }
