@@ -4,8 +4,10 @@ import { createSignedUrl, SupabaseServerConfigError } from '../../../lib/supabas
 export const runtime = 'nodejs';
 
 const BUCKET_NAME = 'worship-sheets';
-// 업로드 경로는 worship/<team>/<date>/NN-title.ext 형태(전부 ascii로 정규화됨).
-const PATH_PATTERN = /^worship\/[A-Za-z0-9._/-]+$/;
+// 악보 경로는 두 가지다(전부 ascii 로 정규화됨).
+//   library/<team>/<title>.ext        곡에 매인 악보 — 지금 올리는 것은 전부 이쪽이다
+//   worship/<team>/<date>/NN-title.ext  회차 폴더에 있던 예전 악보
+const PATH_PATTERN = /^(library|worship)\/[A-Za-z0-9._/-]+$/;
 
 export async function GET(request: Request) {
   try {

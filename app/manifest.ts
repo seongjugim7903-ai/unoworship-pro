@@ -8,7 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/?source=pwa',
     scope: '/',
     display: 'standalone',
-    orientation: 'portrait',
+    /* 연주용 악보 보기는 아이패드를 가로로 눕혀 쓴다 — 세로 고정하면 그 화면이 막힌다 */
+    orientation: 'any',
     background_color: '#f5f7fb',
     theme_color: '#6754d9',
     lang: 'ko-KR',

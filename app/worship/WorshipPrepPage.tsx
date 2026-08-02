@@ -455,6 +455,11 @@ export default function WorshipPrepPage() {
             <label>일자<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
           </div>
 
+          {/* 반주자 아이패드에서 이 주소를 북마크해 연주 중에 본다 */}
+          <a className="play-link" href={`/worship/play?team=${encodeURIComponent(team)}`} target="_blank" rel="noreferrer">
+            🎹 연주용 악보 보기
+          </a>
+
           {keyFlow.length > 0 && (
             <div className="key-flow" aria-label="조 흐름">
               {keyFlow.map((step, index) => (

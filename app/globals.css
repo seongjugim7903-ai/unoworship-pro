@@ -240,3 +240,84 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
   .preview-meta span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .header-copy { font-size: 13px; }
 }
+
+/* ─── 연주용 악보 보기 ────────────────────────────────────────────────────
+   찬양 중에 아이패드로 본다. 어두운 예배당에서 다크모드는 오히려 안 읽히므로
+   흰 배경을 고정한다. 가로에서는 셋 목록을 옆에, 세로에서는 아래에 둔다. */
+.play-state { display: grid; place-items: center; min-height: 100dvh; padding: 24px; color: #46536b; font-size: 14px; text-align: center; }
+
+.play-root { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; background: #fff; color: #1d2637; }
+
+.play-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid #e7ebf2; }
+.play-head-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; min-width: 0; }
+.play-count { flex-shrink: 0; padding: 2px 7px; border-radius: 99px; background: #eef1f7; color: #6b7789; font-size: 11px; font-weight: 700; }
+.play-title { overflow: hidden; font-size: 17px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.play-meta { color: #2f6fd0; font-size: 13px; font-weight: 700; }
+.play-arrangement { color: #8a96a9; font-size: 11px; }
+.play-chrome-toggle { flex-shrink: 0; padding: 6px 10px; border: 1px solid #d8dfe9; border-radius: 6px; background: #fff; color: #46536b; font-size: 11px; cursor: pointer; }
+
+.play-body { display: flex; flex: 1; min-height: 0; }
+
+.play-sheet { position: relative; display: grid; flex: 1; place-items: center; min-width: 0; padding: 6px; background: #fff; }
+.play-sheet img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.play-nosheet { display: grid; gap: 10px; place-items: center; color: #8a96a9; font-size: 13px; }
+.play-open { padding: 8px 14px; border-radius: 6px; background: #2f6fd0; color: #fff; font-size: 12px; text-decoration: none; }
+
+/* 손이 건반에 있다 — 양끝을 크게 잡아 대충 눌러도 넘어가게 한다 */
+.play-zone { position: absolute; top: 0; bottom: 0; width: 22%; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.play-zone.left { left: 0; }
+.play-zone.right { right: 0; }
+
+/* 다음 곡은 악보 위에도 늘 떠 있다 — 넘기기 전에 무엇이 오는지 알아야 한다 */
+.play-upnext { position: absolute; right: 10px; bottom: 8px; max-width: 60%; overflow: hidden; padding: 5px 10px; border-radius: 99px; background: rgba(29, 38, 55, 0.72); color: #fff; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+
+.play-list { display: flex; gap: 6px; overflow: auto; padding: 8px; background: #f7f9fc; }
+.play-list-item { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: inherit; text-align: left; cursor: pointer; }
+.play-list-no { display: grid; flex-shrink: 0; place-items: center; width: 20px; height: 20px; border-radius: 99px; background: #eef1f7; color: #6b7789; font-size: 10px; font-weight: 700; }
+.play-list-body { display: grid; gap: 2px; min-width: 0; }
+.play-list-body strong { overflow: hidden; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.play-list-body em { color: #8a96a9; font-size: 10px; font-style: normal; }
+.play-list-badge { flex-shrink: 0; padding: 2px 7px; border-radius: 99px; background: #2f6fd0; color: #fff; font-size: 10px; font-weight: 700; }
+
+/* 지금 곡과 다음 곡만 확실히 도드라지게 한다 */
+.play-list-item.current { border-color: #2f6fd0; background: #eaf1fd; box-shadow: inset 3px 0 0 #2f6fd0; }
+.play-list-item.current .play-list-no { background: #2f6fd0; color: #fff; }
+.play-list-item.next { border-color: #b9cdf0; background: #f4f8ff; }
+
+.play-root.chrome-hidden .play-list { display: none; }
+.play-root.chrome-hidden .play-head-main { display: none; }
+
+/* 가로(아이패드를 눕힌 상태) — 셋 목록을 옆 레일로. 악보 높이를 최대한 남긴다 */
+@media (orientation: landscape) and (min-width: 700px) {
+  .play-body { flex-direction: row; }
+  .play-list { flex-direction: column; flex-shrink: 0; width: 232px; border-left: 1px solid #e7ebf2; }
+  .play-list-item { width: 100%; }
+}
+
+/* 세로 — 아래 가로 스트립. 악보가 세로로 길어 목록은 얇게 */
+@media (orientation: portrait), (max-width: 699px) {
+  .play-body { flex-direction: column; }
+  .play-list { flex-direction: row; flex-shrink: 0; border-top: 1px solid #e7ebf2; }
+  .play-list-item { flex-shrink: 0; max-width: 62vw; }
+}
+
+/* 머리말 아이콘 — 손이 건반에 있으니 넉넉하게 잡는다 */
+.play-head-actions { display: flex; flex-shrink: 0; gap: 6px; }
+.play-icon { display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid #d8dfe9; border-radius: 8px; background: #fff; color: #46536b; font-size: 15px; line-height: 1; cursor: pointer; }
+.play-icon:hover { border-color: #2f6fd0; color: #2f6fd0; }
+
+/* 전체 곡 목록 — 세로 모드에서 아래 스트립만으로는 다 안 보인다 */
+.play-overlay { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: rgba(255, 255, 255, 0.98); }
+.play-overlay-head { display: flex; align-items: center; justify-content: space-between; }
+.play-overlay-head strong { font-size: 14px; }
+.play-overlay-grid { display: grid; flex: 1; gap: 8px; align-content: start; overflow: auto; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.play-overlay-item { display: flex; align-items: center; gap: 9px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; color: inherit; text-align: left; cursor: pointer; }
+.play-overlay-item.current { border-color: #2f6fd0; background: #eaf1fd; }
+.play-overlay-item.current .play-list-no { background: #2f6fd0; color: #fff; }
+.play-overlay-item.next { border-color: #b9cdf0; background: #f4f8ff; }
+
+.play-shortcuts { display: flex; flex-wrap: wrap; gap: 6px 14px; padding-top: 8px; border-top: 1px solid #e7ebf2; color: #8a96a9; font-size: 11px; }
+.play-shortcuts b { color: #46536b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.play-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 9px 13px; border: 1px solid #d8dfe9; border-radius: 8px; background: #fff; color: #46536b; font-size: 12px; font-weight: 700; text-decoration: none; }
+.play-link:hover { border-color: #2f6fd0; color: #2f6fd0; }
