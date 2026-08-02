@@ -9,6 +9,12 @@ import {
   uploadSupabaseObject,
 } from '../../../lib/supabase/server';
 import { getActiveChurchId } from '../../../lib/churchScope';
+import {
+  isLibrarySheet,
+  librarySheetPath,
+  listLibrarySheetPaths,
+  upsertLibrarySong,
+} from '../../../lib/worship-prep/songLibrary';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +29,12 @@ const SHEET_EXTENSIONS: Record<string, string> = {
 const SongSchema = z.object({
   title: z.string().trim().min(1, '찬양 제목을 입력해 주세요.'),
   songKey: z.string().trim().optional().default(''),
+  /* 반주자가 실제로 치는 조. 악보는 C인데 A로 부르는 일이 흔해서 songKey 와 나눈다 */
+  sungKey: z.string().trim().optional().default(''),
+  /* 없으면 매주 다른 속도로 시작한다 */
+  tempoBpm: z.coerce.number().int().min(20).max(300).nullable().optional().default(null),
+  /* 4/4 · 6/8 · 3/4 — 6/8 을 4/4 로 들어가면 첫 마디에서 무너진다 */
+  timeSignature: z.string().trim().max(10).optional().default(''),
   arrangement: z.enum(['chorus_only', 'chorus_first', 'custom']).default('chorus_first'),
   arrangementCustom: z.string().trim().optional().default(''),
   /* 새 악보 파일이 있으면 이 키로 multipart에 함께 온다. */
@@ -50,10 +62,6 @@ function clampLimit(value: string | null) {
   return Math.max(1, Math.min(100, Math.floor(parsed)));
 }
 
-function formatDate(value: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : new Date().toISOString().slice(0, 10);
-}
-
 function sanitizeSegment(value: string) {
   const slug = value
     .normalize('NFKD')
@@ -65,7 +73,7 @@ function sanitizeSegment(value: string) {
   return `s-${createHash('sha1').update(value).digest('hex').slice(0, 10)}`;
 }
 
-const SELECT_COLUMNS = 'id,created_at,service_date,service_type,team,song_order,title,song_key,arrangement,arrangement_custom,sheet_bucket,sheet_path,sheet_content_type';
+const SELECT_COLUMNS = 'id,created_at,service_date,service_type,team,song_order,title,song_key,sung_key,tempo_bpm,time_signature,arrangement,arrangement_custom,sheet_bucket,sheet_path,sheet_content_type';
 
 function normalizeSearch(value: string | null) {
   return String(value ?? '').trim().replace(/[(),*]/g, ' ').replace(/\s+/g, ' ').slice(0, 60);
@@ -122,7 +130,6 @@ export async function POST(request: Request) {
       return jsonError('payload가 없습니다.', 400, 'NO_PAYLOAD');
     }
     const payload = PrepSchema.parse(JSON.parse(rawPayload));
-    const dateSegment = formatDate(payload.serviceDate);
     const teamSegment = sanitizeSegment(payload.team);
 
     const hasNewSheet = payload.songs.some((song) => song.sheetKey && formData.get(song.sheetKey) instanceof File);
@@ -145,7 +152,16 @@ export async function POST(request: Request) {
       `/worship_prep_songs?${deleteFilter}&select=sheet_path`,
       { method: 'GET' },
     );
-    const previousSheets = previous.map((row) => row.sheet_path).filter((path): path is string => Boolean(path));
+    /* 지우면 안 되는 악보가 세 종류 있다.
+         · 라이브러리 소유(library/…) — 곡에 매인 파일이라 회차를 다시 저장한다고 없어지면 안 된다
+         · 라이브러리가 참조 중인 예전 악보 — 옮겨 심은 것은 아직 회차 폴더에 있다
+         · 이번 저장이 그대로 다시 쓰는 경로 — 지우고 나서 참조하면 깨진 링크가 된다 */
+    const reused = new Set(payload.songs.map((song) => song.sheetPath).filter(Boolean) as string[]);
+    const libraryPaths = await listLibrarySheetPaths(churchId).catch(() => new Set<string>());
+    const previousSheets = previous
+      .map((row) => row.sheet_path)
+      .filter((path): path is string => Boolean(path))
+      .filter((path) => !isLibrarySheet(path) && !reused.has(path) && !libraryPaths.has(path));
     if (previousSheets.length > 0) {
       await deleteSupabaseObjects({ bucket: BUCKET_NAME, paths: previousSheets }).catch((error) => {
         console.warn('[worship-prep] previous sheet cleanup failed', error);
@@ -161,12 +177,9 @@ export async function POST(request: Request) {
       if (sheetFile instanceof File) {
         const contentType = sheetFile.type in SHEET_EXTENSIONS ? sheetFile.type : 'application/pdf';
         const extension = SHEET_EXTENSIONS[contentType] ?? 'pdf';
-        const path = [
-          'worship',
-          teamSegment,
-          dateSegment,
-          `${String(index + 1).padStart(2, '0')}-${sanitizeSegment(song.title)}.${extension}`,
-        ].join('/');
+        /* 악보는 회차가 아니라 곡에 매인다 — 날짜 폴더에 두면 그 주 셋리스트를 다시
+           저장할 때 같이 지워지고, 다음 주에 라이브러리에서 끌어와도 파일이 없다. */
+        const path = librarySheetPath(teamSegment, sanitizeSegment(song.title), extension);
         await uploadSupabaseObject({
           bucket: BUCKET_NAME,
           path,
@@ -186,6 +199,9 @@ export async function POST(request: Request) {
         song_order: index + 1,
         title: song.title,
         song_key: song.songKey,
+        sung_key: song.sungKey,
+        tempo_bpm: song.tempoBpm,
+        time_signature: song.timeSignature,
         arrangement: song.arrangement,
         arrangement_custom: song.arrangement === 'custom' ? song.arrangementCustom : '',
         sheet_bucket: sheetPath ? BUCKET_NAME : null,
@@ -201,6 +217,29 @@ export async function POST(request: Request) {
       { method: 'POST', body: JSON.stringify(rows) },
       { prefer: 'return=representation' },
     );
+
+    /* 곡을 라이브러리에 자동 등록·갱신한다. 따로 등록하는 절차를 두면 아무도 쓰지 않는다.
+       실패해도 회차 저장은 이미 끝났으므로 막지 않는다 — 다음 저장 때 다시 들어간다. */
+    for (const row of rows) {
+      try {
+        await upsertLibrarySong({
+          churchId,
+          team: payload.team,
+          title: String(row.title),
+          songKey: String(row.song_key ?? ''),
+          sungKey: String(row.sung_key ?? ''),
+          tempoBpm: (row.tempo_bpm as number | null) ?? null,
+          timeSignature: String(row.time_signature ?? ''),
+          arrangement: String(row.arrangement ?? 'chorus_first'),
+          arrangementCustom: String(row.arrangement_custom ?? ''),
+          sheetPath: (row.sheet_path as string | null) ?? null,
+          sheetContentType: (row.sheet_content_type as string | null) ?? null,
+          usedAt: payload.serviceDate || null,
+        });
+      } catch (error) {
+        console.warn('[worship-prep] library upsert failed', row.title, error);
+      }
+    }
 
     return NextResponse.json({ ok: true, songCount: inserted.length });
   } catch (error) {

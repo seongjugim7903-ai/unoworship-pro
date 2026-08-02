@@ -31,11 +31,21 @@ const ARRANGEMENTS: Array<{ value: Arrangement; label: string }> = [
 interface SongRow {
   key: string;
   title: string;
+  /** 악보에 적힌 조 */
   songKey: string;
+  /** 실제로 부르는 조. 악보는 C인데 A로 부르는 일이 흔하다 */
+  sungKey: string;
+  /** 없으면 매주 다른 속도로 시작한다 */
+  tempoBpm: string;
+  /** 4/4 · 6/8 — 6/8 을 4/4 로 들어가면 첫 마디에서 무너진다 */
+  timeSignature: string;
   arrangement: Arrangement;
   arrangementCustom: string;
   sheet: File | null;
   sheetName: string;
+  /** 라이브러리에서 끌어온 악보 — 다시 올리지 않고 경로만 넘긴다 */
+  sheetPath: string;
+  sheetContentType: string;
 }
 
 interface SavedSong {
@@ -50,10 +60,30 @@ interface SavedSong {
   sheet_path: string | null;
 }
 
+/** 곡 라이브러리 한 건 — /api/worship-songs */
+interface LibrarySong {
+  id: string;
+  team: string;
+  title: string;
+  song_key: string;
+  sung_key: string;
+  tempo_bpm: number | null;
+  time_signature: string;
+  arrangement: string;
+  arrangement_custom: string;
+  sheet_path: string | null;
+  sheet_content_type: string | null;
+  last_used_at: string | null;
+}
+
 let rowSeq = 0;
 function newRow(): SongRow {
   rowSeq += 1;
-  return { key: `song-${rowSeq}`, title: '', songKey: '', arrangement: 'chorus_first', arrangementCustom: '', sheet: null, sheetName: '' };
+  return {
+    key: `song-${rowSeq}`, title: '', songKey: '', sungKey: '', tempoBpm: '', timeSignature: '',
+    arrangement: 'chorus_first', arrangementCustom: '', sheet: null, sheetName: '',
+    sheetPath: '', sheetContentType: '',
+  };
 }
 
 function todayISO() {
@@ -75,7 +105,7 @@ export default function WorshipPrepPage() {
   const [saveMessage, setSaveMessage] = useState('');
   const [recent, setRecent] = useState<SavedSong[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<SavedSong[]>([]);
+  const [searchResults, setSearchResults] = useState<LibrarySong[]>([]);
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'done'>('idle');
   const searchSeqRef = useRef(0);
 
@@ -85,7 +115,7 @@ export default function WorshipPrepPage() {
       if (raw) {
         const draft = JSON.parse(raw) as {
           serviceType?: string; serviceDate?: string; team?: string;
-          songs?: Array<Pick<SongRow, 'title' | 'songKey' | 'arrangement' | 'arrangementCustom'>>;
+          songs?: Array<Pick<SongRow, 'title' | 'songKey' | 'sungKey' | 'tempoBpm' | 'timeSignature' | 'arrangement' | 'arrangementCustom' | 'sheetPath' | 'sheetContentType'>>;
         };
         setServiceType(draft.serviceType || '주일낮예배');
         setServiceDate(draft.serviceDate || todayISO());
@@ -95,8 +125,13 @@ export default function WorshipPrepPage() {
             ...newRow(),
             title: song.title || '',
             songKey: song.songKey || '',
+            sungKey: song.sungKey || '',
+            tempoBpm: song.tempoBpm || '',
+            timeSignature: song.timeSignature || '',
             arrangement: (song.arrangement as Arrangement) || 'chorus_first',
             arrangementCustom: song.arrangementCustom || '',
+            sheetPath: song.sheetPath || '',
+            sheetContentType: song.sheetContentType || '',
           })));
         }
       } else {
@@ -115,7 +150,7 @@ export default function WorshipPrepPage() {
     // 파일은 직렬화 불가 — 텍스트 필드만 초안 저장.
     const draft = {
       serviceType, serviceDate, team,
-      songs: songs.map(({ title, songKey, arrangement, arrangementCustom }) => ({ title, songKey, arrangement, arrangementCustom })),
+      songs: songs.map(({ title, songKey, sungKey, tempoBpm, timeSignature, arrangement, arrangementCustom, sheetPath, sheetContentType }) => ({ title, songKey, sungKey, tempoBpm, timeSignature, arrangement, arrangementCustom, sheetPath, sheetContentType })),
     };
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
   }, [draftReady, serviceType, serviceDate, team, songs]);
@@ -130,7 +165,7 @@ export default function WorshipPrepPage() {
     }
   }, []);
 
-  /* 제목 검색 — 입력하면 디바운스 후 전체 라이브러리에서 제목 매칭. */
+  /* 제목 검색 — 곡 라이브러리에서 찾는다. 결과를 누르면 곡 행이 채워진다(악보 포함). */
   useEffect(() => {
     const term = searchTerm.trim();
     if (!term) {
@@ -142,8 +177,8 @@ export default function WorshipPrepPage() {
     const timer = window.setTimeout(async () => {
       const seq = ++searchSeqRef.current;
       try {
-        const response = await fetch(`/api/worship-prep?limit=30&search=${encodeURIComponent(term)}`);
-        const result = await response.json() as { ok?: boolean; songs?: SavedSong[] };
+        const response = await fetch(`/api/worship-songs?limit=30&search=${encodeURIComponent(term)}`);
+        const result = await response.json() as { ok?: boolean; songs?: LibrarySong[] };
         if (seq !== searchSeqRef.current) return;
         setSearchResults(result.ok && Array.isArray(result.songs) ? result.songs : []);
         setSearchStatus('done');
@@ -219,6 +254,44 @@ export default function WorshipPrepPage() {
     prevLenRef.current = songs.length;
   }, [songs.length, isMobile, scrollToSong]);
 
+  /* 라이브러리 곡 → 곡 행. 악보는 다시 올리지 않고 경로만 물려받는다. */
+  const applyLibrarySong = useCallback((song: LibrarySong) => {
+    setSongs((prev) => {
+      /* 비어 있는 행이 있으면 거기에 채우고, 없으면 새 행을 붙인다 */
+      const emptyIndex = prev.findIndex((row) => !row.title.trim());
+      const filled: SongRow = {
+        ...newRow(),
+        title: song.title,
+        songKey: song.song_key || '',
+        sungKey: song.sung_key || '',
+        tempoBpm: song.tempo_bpm ? String(song.tempo_bpm) : '',
+        timeSignature: song.time_signature || '',
+        arrangement: (song.arrangement as Arrangement) || 'chorus_first',
+        arrangementCustom: song.arrangement_custom || '',
+        sheetPath: song.sheet_path || '',
+        sheetContentType: song.sheet_content_type || '',
+        sheetName: song.sheet_path ? '라이브러리 악보' : '',
+      };
+      if (emptyIndex >= 0) {
+        const next = [...prev];
+        next[emptyIndex] = { ...filled, key: prev[emptyIndex].key };
+        return next;
+      }
+      return [...prev, filled];
+    });
+    setSearchTerm('');
+  }, []);
+
+  const handleDeleteLibrarySong = useCallback(async (song: LibrarySong) => {
+    if (!window.confirm(`'${song.title}'을 곡 라이브러리에서 뺍니다. 지난 회차 기록은 그대로 남습니다.`)) return;
+    try {
+      await fetch(`/api/worship-songs?id=${encodeURIComponent(song.id)}`, { method: 'DELETE' });
+      setSearchResults((prev) => prev.filter((item) => item.id !== song.id));
+    } catch (error) {
+      console.warn('[worship-prep] library delete failed', error);
+    }
+  }, []);
+
   const handleSave = async () => {
     if (!isValid || saveStatus === 'saving') return;
     const filled = songs.filter((song) => song.title.trim());
@@ -231,6 +304,9 @@ export default function WorshipPrepPage() {
         const entry: Record<string, unknown> = {
           title: song.title.trim(),
           songKey: song.songKey.trim(),
+          sungKey: song.sungKey.trim(),
+          tempoBpm: song.tempoBpm.trim() ? Number(song.tempoBpm.trim()) : null,
+          timeSignature: song.timeSignature.trim(),
           arrangement: song.arrangement,
           arrangementCustom: song.arrangementCustom.trim(),
         };
@@ -238,6 +314,10 @@ export default function WorshipPrepPage() {
           const sheetKey = `sheet-${index}`;
           entry.sheetKey = sheetKey;
           formData.append(sheetKey, song.sheet, song.sheet.name);
+        } else if (song.sheetPath) {
+          /* 라이브러리에서 끌어온 악보 — 다시 올리지 않고 경로만 넘긴다 */
+          entry.sheetPath = song.sheetPath;
+          entry.sheetContentType = song.sheetContentType;
         }
         return entry;
       });
@@ -294,7 +374,14 @@ export default function WorshipPrepPage() {
       </div>
       <label>찬양 제목<input value={song.title} onChange={(event) => updateSong(song.key, { title: event.target.value })} placeholder="예: 나의 하나님" /></label>
       <div className="song-inline">
-        <label>조 (Key)<input value={song.songKey} onChange={(event) => updateSong(song.key, { songKey: event.target.value })} placeholder="예: G, Am" /></label>
+        <label>악보 조<input value={song.songKey} onChange={(event) => updateSong(song.key, { songKey: event.target.value })} placeholder="예: C" /></label>
+        <label>부르는 조<input value={song.sungKey} onChange={(event) => updateSong(song.key, { sungKey: event.target.value })} placeholder="예: A" /></label>
+      </div>
+      <div className="song-inline">
+        <label>템포 (BPM)<input value={song.tempoBpm} inputMode="numeric" onChange={(event) => updateSong(song.key, { tempoBpm: event.target.value.replace(/[^0-9]/g, '') })} placeholder="예: 72" /></label>
+        <label>박자<input value={song.timeSignature} onChange={(event) => updateSong(song.key, { timeSignature: event.target.value })} placeholder="예: 4/4, 6/8" /></label>
+      </div>
+      <div className="song-inline">
         <label>찬양 구성<select value={song.arrangement} onChange={(event) => updateSong(song.key, { arrangement: event.target.value as Arrangement })}>{ARRANGEMENTS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       </div>
       {song.arrangement === 'custom' && (
@@ -316,13 +403,35 @@ export default function WorshipPrepPage() {
             <input
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="제목으로 검색 (전체 곡에서)"
+              placeholder="제목으로 검색 — 누르면 곡이 채워집니다"
             />
           </label>
         </div>
         {searchTerm.trim() && (
           <div className="search-body">
-            {renderSongList(searchResults, searchStatus === 'loading' ? '검색 중...' : '검색 결과가 없습니다.')}
+            {searchResults.length === 0 ? (
+              <div className="empty-state"><div className="empty-icon">♪</div>
+                <p>{searchStatus === 'loading' ? '검색 중...' : '검색 결과가 없습니다.'}</p></div>
+            ) : (
+              <div className="search-result-list">
+                {searchResults.map((item) => (
+                  <article className="search-result" key={item.id}>
+                    <button type="button" className="library-pick" onClick={() => applyLibrarySong(item)}>
+                      <strong>{item.title}</strong>
+                      <span>
+                        {item.team}
+                        {item.sung_key ? ` · ${item.sung_key}` : item.song_key ? ` · ${item.song_key}` : ''}
+                        {item.tempo_bpm ? ` · ${item.tempo_bpm}BPM` : ''}
+                        {item.time_signature ? ` · ${item.time_signature}` : ''}
+                        {item.sheet_path ? ' · 악보 있음' : ' · 악보 없음'}
+                      </span>
+                    </button>
+                    <button type="button" className="text-button danger"
+                      onClick={() => handleDeleteLibrarySong(item)}>빼기</button>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>

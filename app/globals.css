@@ -147,6 +147,9 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .image-card-footer > div { display: flex; gap: 5px; }
 .text-button, .share-button { height: 28px; padding: 0 8px; border: 1px solid #d7deea; color: #5f6d84; background: #fff; }
 .search-result-actions { display: flex; gap: 5px; }
+/* 라이브러리 곡 — 카드 전체가 '가져오기' 버튼이다 */
+.library-pick { display: block; width: 100%; min-width: 0; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.library-pick:hover strong { color: #1d4ed8; text-decoration: underline; }
 .text-button.danger { border-color: #f2cfd6; color: #c24455; }
 .text-button.danger:hover { border-color: #d98a97; background: #fff5f6; }
 .text-button:disabled { opacity: .5; }
