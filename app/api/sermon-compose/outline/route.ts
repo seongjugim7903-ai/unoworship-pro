@@ -26,7 +26,14 @@ export const runtime = 'nodejs';
 const BodySchema = z.object({
   serviceType: z.string().trim().min(1).default('주일낮예배'),
   serviceDate: z.string().trim().optional().default(''),
-  content: z.string().trim().min(1, '설교대지 내용을 입력해 주세요.'),
+  /* 주보만 올리고 협조문은 나중에 붙이는 경우가 있어 내용은 비어 있어도 받는다. */
+  content: z.string().trim().optional().default(''),
+  /* 주보 또는 협조문에서 채워진 값 — 사람이 고쳤을 수 있으니 그대로 받는다. */
+  sermonTitle: z.string().trim().optional().default(''),
+  scriptureRef: z.string().trim().optional().default(''),
+  preacher: z.string().trim().optional().default(''),
+  /* 주보에서 뽑은 해당 예배 순서표 원문 — 나중에 되짚을 수 있게 남긴다. */
+  serviceOrder: z.string().optional().default(''),
   hymnTitle: z.string().trim().optional().default(''),
   praiseTitle: z.string().trim().optional().default(''),
   hymns: z
@@ -52,6 +59,12 @@ function jsonError(message: string, status: number, code = 'SERMON_OUTLINE_SAVE_
 export async function POST(request: Request) {
   try {
     const body = BodySchema.parse(await request.json());
+
+    /* 협조문도 본문도 없으면 설교대지를 만들 수 없다. */
+    if (!body.content && !body.scriptureRef) {
+      return jsonError('협조문 내용이나 본문(요절) 중 하나는 필요합니다.', 400, 'EMPTY_OUTLINE');
+    }
+
     const churchId = await getActiveChurchId();
     const origin = request.headers.get('origin');
 
@@ -80,6 +93,12 @@ export async function POST(request: Request) {
             appUrl: origin,
             parserVersion: PARSER_VERSION,
             parsed,
+            /* 현장에서 설교대지 3종을 만들 때 쓰는 값 — 협조문 파싱보다 이쪽이 우선이다.
+               사람이 화면에서 고친 최종값이기 때문이다. */
+            sermonTitle: body.sermonTitle || parsed.sermonTitle,
+            scriptureRef: body.scriptureRef || parsed.scriptureRef,
+            preacher: body.preacher,
+            serviceOrder: body.serviceOrder,
           },
         }),
       },
