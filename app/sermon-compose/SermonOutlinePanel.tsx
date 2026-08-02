@@ -130,18 +130,24 @@ export default function SermonOutlinePanel() {
     if (!raw.trim()) return;
 
     const order = parseServiceOrder(raw);
-    const put = (setter: (v: string) => void, current: string, incoming: string) => {
-      if (mode === 'overwrite') {
-        if (incoming.trim()) setter(incoming.trim());
-      } else {
-        fillIfEmpty(setter, current, incoming);
-      }
+    /* 예배를 바꾼 경우(overwrite)에는 이전 예배 값이 남으면 안 된다.
+       주보에 없으면 협조문에서, 그것도 없으면 비운다. */
+    const outline = parseSermonOutline(content);
+    const put = (
+      setter: (v: string) => void,
+      current: string,
+      incoming: string,
+      fallback = '',
+    ) => {
+      if (mode === 'overwrite') setter(incoming.trim() || fallback.trim());
+      else fillIfEmpty(setter, current, incoming);
     };
 
-    put(setSermonTitle, sermonTitle, order.sermonTitle);
-    put(setScriptureRef, scriptureRef, order.scriptureRef);
-    put(setHymnText, hymnText, order.hymnNumbers.map((n) => `${n}장`).join(', '));
-    put(setPraiseText, praiseText, order.praiseSongs.join('\n'));
+    put(setSermonTitle, sermonTitle, order.sermonTitle, outline.sermonTitle);
+    put(setScriptureRef, scriptureRef, order.scriptureRef, outline.scriptureRef);
+    put(setHymnText, hymnText, order.hymnNumbers.map((n) => `${n}장`).join(', '),
+      outline.hymnNumbers.map((n) => `${n}장`).join(', '));
+    put(setPraiseText, praiseText, order.praiseSongs.join('\n'), outline.praiseSongs.join('\n'));
 
     /* 설교자는 선택지에 있으면 고르고, 없으면 직접기입으로 넘긴다. */
     const untouched = preacherSelect === PREACHER_OPTIONS[0] && !customPreacher;
@@ -153,6 +159,10 @@ export default function SermonOutlinePanel() {
         setPreacherSelect(PREACHER_CUSTOM);
         setCustomPreacher(order.preacher);
       }
+    } else if (mode === 'overwrite') {
+      /* 바꾼 예배의 순서에 설교자가 없으면 이전 예배 설교자를 지우고 기본값으로 되돌린다. */
+      setPreacherSelect(PREACHER_OPTIONS[0]);
+      setCustomPreacher('');
     }
     setPreacherSource(order.preacherSource);
   };
@@ -172,11 +182,13 @@ export default function SermonOutlinePanel() {
     }
   };
 
-  /* 주보에서 읽어온 순서표를 손으로 고친 뒤 다시 채울 수 있게 한다.
-     읽기는 됐는데 항목 이름이 달라 못 알아본 경우를 사람이 바로 잡는 통로다. */
-  const refillFromOrderText = () => {
-    if (!orderText.trim()) return;
-    const order = parseServiceOrder(orderText);
+  /* 순서표를 손으로 고치면 아래 칸이 바로 따라온다 — 따로 누를 버튼이 없다.
+     읽기는 됐는데 항목 이름이 달라 못 알아본 경우를 그 자리에서 바로잡는 통로다. */
+  const handleOrderTextChange = (next: string) => {
+    setOrderText(next);
+    if (!next.trim()) return;
+
+    const order = parseServiceOrder(next);
     if (order.sermonTitle) setSermonTitle(order.sermonTitle);
     if (order.scriptureRef) setScriptureRef(order.scriptureRef);
     if (order.hymnNumbers.length > 0) setHymnText(order.hymnNumbers.map((n) => `${n}장`).join(', '));
@@ -290,37 +302,24 @@ export default function SermonOutlinePanel() {
               주보에서 읽은 {fields.serviceType} 순서
               <span className="field-hint">
                 {orderText.trim()
-                  ? '항목 이름이 달라 못 알아본 것이 있으면 여기서 고치고 다시 채우세요.'
-                  : `주보에서 ${fields.serviceType} 순서를 찾지 못했습니다. 직접 적어도 됩니다.`}
+                  ? '여기를 고치면 아래 칸이 바로 따라옵니다.'
+                  : `주보에서 ${fields.serviceType} 순서를 찾지 못했습니다. 직접 적으면 아래 칸이 채워집니다.`}
               </span>
               <textarea
                 value={orderText}
-                onChange={(event) => setOrderText(event.target.value)}
+                onChange={(event) => handleOrderTextChange(event.target.value)}
                 placeholder={'성경봉독: 요14:1-3\n말씀선포: 마음에 근심하지 말라!\n찬송: 310장'}
                 rows={orderText.trim() ? 7 : 3}
                 disabled={busy}
               />
             </label>
           )}
-          {bulletinOrders && orderText.trim() && (
-            <>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={refillFromOrderText}
-                disabled={busy}
-                style={{ width: '100%' }}
-              >
-                이 순서로 아래 칸 다시 채우기
-              </button>
-              {orderUnread && (
-                <p className="info-message">
-                  순서는 읽었지만 <b>성경봉독 · 말씀선포 · 찬송</b> 항목을 알아보지 못했습니다.
-                  위 내용을 <span style={{ fontFamily: 'ui-monospace, monospace' }}>항목: 내용</span> 형태로
-                  고친 뒤 다시 채우기를 눌러 주세요.
-                </p>
-              )}
-            </>
+          {bulletinOrders && orderUnread && (
+            <p className="info-message">
+              순서는 읽었지만 <b>성경봉독 · 말씀선포 · 찬송</b> 항목을 알아보지 못했습니다.
+              위 내용을 <span style={{ fontFamily: 'ui-monospace, monospace' }}>항목: 내용</span> 형태로
+              고치면 아래 칸이 바로 채워집니다.
+            </p>
           )}
 
           <div className="song-inline">
