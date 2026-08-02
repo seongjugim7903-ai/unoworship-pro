@@ -8,6 +8,7 @@ import {
   BulletinExtractConfigError,
   extractBulletinOrders,
 } from '../../../../lib/sermon-compose/bulletinExtract';
+import { AnthropicServiceError } from '../../../../lib/sermon-compose/anthropicError';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -51,7 +52,15 @@ export async function POST(request: Request) {
       return jsonError(error.message, 503, error.code);
     }
 
-    const message = error instanceof Error ? error.message : '주보 분석 중 오류가 발생했습니다.';
-    return jsonError(message, 500);
+    /* 크레딧 부족·인증 실패 등 — 사람이 조치할 수 있는 사유는 그 문장을 그대로 올린다. */
+    if (error instanceof AnthropicServiceError) {
+      return jsonError(error.message, 503, error.code);
+    }
+
+    /* 그 밖의 오류는 원문(JSON 덩어리일 수 있음)을 화면에 흘리지 않는다. 로그에는 남는다. */
+    return jsonError(
+      '주보를 읽는 중 오류가 발생했습니다. 잠시 뒤 다시 시도해 주세요.',
+      500,
+    );
   }
 }

@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 // 뽑을 것을 줄이면 프롬프트가 짧아져 정확도가 올라간다.
 
 import type { BulletinOrders } from './bulletinSections';
+import { toAnthropicServiceError } from './anthropicError';
 
 export class BulletinExtractConfigError extends Error {
   code = 'BULLETIN_OCR_NOT_CONFIGURED';
@@ -57,21 +58,29 @@ export async function extractBulletinOrders(input: {
   }
 
   const client = new Anthropic();
-  const response = await client.messages.create({
-    /* 기존 주보 추출기와 같은 모델 — 실사용으로 검증된 조합을 그대로 쓴다. */
-    model: 'claude-opus-4-8',
-    max_tokens: 8000,
-    output_config: { format: { type: 'json_schema', schema: ORDER_SCHEMA } },
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: input.mediaType, data: input.base64 } },
-          { type: 'text', text: PROMPT },
-        ],
-      },
-    ],
-  });
+  let response;
+  try {
+    response = await client.messages.create({
+      /* 기존 주보 추출기와 같은 모델 — 실사용으로 검증된 조합을 그대로 쓴다. */
+      model: 'claude-opus-4-8',
+      max_tokens: 8000,
+      output_config: { format: { type: 'json_schema', schema: ORDER_SCHEMA } },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: input.mediaType, data: input.base64 } },
+            { type: 'text', text: PROMPT },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    /* 크레딧·인증·과부하는 사람이 조치할 수 있는 사유라 문장으로 바꿔 올린다. */
+    const known = toAnthropicServiceError(error);
+    if (known) throw known;
+    throw error;
+  }
 
   const text = response.content
     .filter((block): block is Anthropic.TextBlock => block.type === 'text')
