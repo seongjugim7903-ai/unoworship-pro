@@ -266,8 +266,10 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .play-pages.spread > * { max-width: calc(50% - 5px); }
 .play-page-plain { max-width: 100%; max-height: 100%; object-fit: contain; }
 
-/* 크롭 — 잘린 비율로 상자를 두고 이미지를 키워 밀어 넣는다. 여백이 화면을 먹지 않게 */
-.play-page { position: relative; max-width: 100%; max-height: 100%; overflow: hidden; }
+/* 크롭 — 잘린 비율로 상자를 두고 이미지를 키워 밀어 넣는다. 여백이 화면을 먹지 않게.
+   안쪽 이미지가 absolute 라 내재 크기가 없다 — 상자에 height 를 주지 않으면
+   flex 안에서 폭 0 으로 접혀 악보가 통째로 안 보인다. */
+.play-page { position: relative; height: 100%; max-width: 100%; overflow: hidden; }
 .play-page img { position: absolute; height: auto; }
 
 .play-icon.on { border-color: #2f6fd0; background: #2f6fd0; color: #fff; }
