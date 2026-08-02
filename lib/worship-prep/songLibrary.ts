@@ -9,6 +9,7 @@
 //   같이 지워진다. 곡에 붙어 다녀야 하므로 library/{팀}/{제목} 아래에 둔다.
 
 import { supabaseRest } from '../supabase/server';
+import type { SheetPage } from './sheetPages';
 
 export const SHEET_BUCKET = 'worship-sheets';
 
@@ -35,11 +36,12 @@ export interface LibrarySong {
   sheet_bucket: string | null;
   sheet_path: string | null;
   sheet_content_type: string | null;
+  sheet_pages: SheetPage[];
   last_used_at: string | null;
 }
 
 export const LIBRARY_COLUMNS =
-  'id,team,title,song_key,sung_key,tempo_bpm,time_signature,arrangement,arrangement_custom,sheet_bucket,sheet_path,sheet_content_type,last_used_at';
+  'id,team,title,song_key,sung_key,tempo_bpm,time_signature,arrangement,arrangement_custom,sheet_bucket,sheet_path,sheet_content_type,sheet_pages,last_used_at';
 
 export interface UpsertSongInput {
   churchId: string;
@@ -51,8 +53,8 @@ export interface UpsertSongInput {
   timeSignature?: string;
   arrangement?: string;
   arrangementCustom?: string;
-  sheetPath?: string | null;
-  sheetContentType?: string | null;
+  /** 악보 페이지들. 넘기지 않으면 기존 악보를 그대로 둔다 */
+  sheetPages?: SheetPage[];
   /** 준비찬양 저장으로 들어온 경우 그 예배 날짜 — 최근에 쓴 곡을 앞에 보여주기 위해 남긴다 */
   usedAt?: string | null;
 }
@@ -76,10 +78,12 @@ export async function upsertLibrarySong(input: UpsertSongInput): Promise<void> {
     arrangement_custom: input.arrangementCustom ?? '',
     last_used_at: input.usedAt || null,
   };
-  if (input.sheetPath) {
+  if (input.sheetPages && input.sheetPages.length > 0) {
+    const first = input.sheetPages[0];
+    row.sheet_pages = input.sheetPages;
     row.sheet_bucket = SHEET_BUCKET;
-    row.sheet_path = input.sheetPath;
-    row.sheet_content_type = input.sheetContentType ?? null;
+    row.sheet_path = first.path;
+    row.sheet_content_type = first.contentType || null;
   }
 
   await supabaseRest(
@@ -116,11 +120,16 @@ export async function listLibrarySongs(opts: {
  * 그것까지 막으려면 실제 참조를 봐야 한다.
  */
 export async function listLibrarySheetPaths(churchId: string): Promise<Set<string>> {
-  const rows = await supabaseRest<Array<{ sheet_path: string | null }>>(
-    `/worship_song_library?select=sheet_path&church_id=eq.${churchId}&sheet_path=not.is.null`,
+  const rows = await supabaseRest<Array<{ sheet_path: string | null; sheet_pages: SheetPage[] | null }>>(
+    `/worship_song_library?select=sheet_path,sheet_pages&church_id=eq.${churchId}`,
     { method: 'GET' },
   );
-  return new Set(rows.map((row) => row.sheet_path).filter((path): path is string => Boolean(path)));
+  const paths = new Set<string>();
+  for (const row of rows) {
+    if (row.sheet_path) paths.add(row.sheet_path);
+    for (const page of row.sheet_pages ?? []) if (page?.path) paths.add(page.path);
+  }
+  return paths;
 }
 
 /** 라이브러리에서만 뺀다. 회차 기록(worship_prep_songs)은 건드리지 않는다 */

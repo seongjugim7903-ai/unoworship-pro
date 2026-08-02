@@ -5,6 +5,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { nextServiceDate } from '../../lib/nextServiceDate';
 import { buildKeyFlow, relationLabel } from '../../lib/worship-prep/songKey';
+import { measureSheet } from '../../lib/worship-prep/measureSheet';
+import { readSheetPages, type SheetPage } from '../../lib/worship-prep/sheetPages';
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(false);
@@ -42,11 +44,10 @@ interface SongRow {
   timeSignature: string;
   arrangement: Arrangement;
   arrangementCustom: string;
-  sheet: File | null;
-  sheetName: string;
-  /** 라이브러리에서 끌어온 악보 — 다시 올리지 않고 경로만 넘긴다 */
-  sheetPath: string;
-  sheetContentType: string;
+  /** 이번에 새로 올리는 악보 — 여러 장. 실제 악보는 보통 2~4페이지다 */
+  sheetFiles: File[];
+  /** 라이브러리에서 끌어온 페이지 — 다시 올리지 않고 그대로 쓴다 */
+  sheetPages: SheetPage[];
 }
 
 interface SavedSong {
@@ -74,6 +75,7 @@ interface LibrarySong {
   arrangement_custom: string;
   sheet_path: string | null;
   sheet_content_type: string | null;
+  sheet_pages?: SheetPage[];
   last_used_at: string | null;
 }
 
@@ -82,8 +84,7 @@ function newRow(): SongRow {
   rowSeq += 1;
   return {
     key: `song-${rowSeq}`, title: '', songKey: '', sungKey: '', tempoBpm: '', timeSignature: '',
-    arrangement: 'chorus_first', arrangementCustom: '', sheet: null, sheetName: '',
-    sheetPath: '', sheetContentType: '',
+    arrangement: 'chorus_first', arrangementCustom: '', sheetFiles: [], sheetPages: [],
   };
 }
 
@@ -116,7 +117,7 @@ export default function WorshipPrepPage() {
       if (raw) {
         const draft = JSON.parse(raw) as {
           serviceType?: string; serviceDate?: string; team?: string;
-          songs?: Array<Pick<SongRow, 'title' | 'songKey' | 'sungKey' | 'tempoBpm' | 'timeSignature' | 'arrangement' | 'arrangementCustom' | 'sheetPath' | 'sheetContentType'>>;
+          songs?: Array<Pick<SongRow, 'title' | 'songKey' | 'sungKey' | 'tempoBpm' | 'timeSignature' | 'arrangement' | 'arrangementCustom' | 'sheetPages'>>;
         };
         setServiceType(draft.serviceType || '주일낮예배');
         setServiceDate(draft.serviceDate || todayISO());
@@ -131,8 +132,7 @@ export default function WorshipPrepPage() {
             timeSignature: song.timeSignature || '',
             arrangement: (song.arrangement as Arrangement) || 'chorus_first',
             arrangementCustom: song.arrangementCustom || '',
-            sheetPath: song.sheetPath || '',
-            sheetContentType: song.sheetContentType || '',
+            sheetPages: song.sheetPages ?? [],
           })));
         }
       } else {
@@ -151,7 +151,7 @@ export default function WorshipPrepPage() {
     // 파일은 직렬화 불가 — 텍스트 필드만 초안 저장.
     const draft = {
       serviceType, serviceDate, team,
-      songs: songs.map(({ title, songKey, sungKey, tempoBpm, timeSignature, arrangement, arrangementCustom, sheetPath, sheetContentType }) => ({ title, songKey, sungKey, tempoBpm, timeSignature, arrangement, arrangementCustom, sheetPath, sheetContentType })),
+      songs: songs.map(({ title, songKey, sungKey, tempoBpm, timeSignature, arrangement, arrangementCustom, sheetPages }) => ({ title, songKey, sungKey, tempoBpm, timeSignature, arrangement, arrangementCustom, sheetPages })),
     };
     window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
   }, [draftReady, serviceType, serviceDate, team, songs]);
@@ -216,8 +216,9 @@ export default function WorshipPrepPage() {
   };
 
   const handleSheetChange = (key: string, event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    updateSong(key, { sheet: file, sheetName: file?.name ?? '' });
+    const files = Array.from(event.target.files ?? []);
+    /* 새로 고르면 기존 선택을 대체한다 — 페이지 순서는 고른 순서다 */
+    updateSong(key, { sheetFiles: files });
   };
 
   const isMobile = useIsMobile();
@@ -275,9 +276,8 @@ export default function WorshipPrepPage() {
         timeSignature: song.time_signature || '',
         arrangement: (song.arrangement as Arrangement) || 'chorus_first',
         arrangementCustom: song.arrangement_custom || '',
-        sheetPath: song.sheet_path || '',
-        sheetContentType: song.sheet_content_type || '',
-        sheetName: song.sheet_path ? '라이브러리 악보' : '',
+        sheetPages: readSheetPages(song),
+        sheetFiles: [],
       };
       if (emptyIndex >= 0) {
         const next = [...prev];
@@ -307,7 +307,7 @@ export default function WorshipPrepPage() {
     setSaveMessage('준비찬양을 저장하고 있습니다...');
     try {
       const formData = new FormData();
-      const payloadSongs = filled.map((song, index) => {
+      const payloadSongs = await Promise.all(filled.map(async (song, index) => {
         const entry: Record<string, unknown> = {
           title: song.title.trim(),
           songKey: song.songKey.trim(),
@@ -317,17 +317,17 @@ export default function WorshipPrepPage() {
           arrangement: song.arrangement,
           arrangementCustom: song.arrangementCustom.trim(),
         };
-        if (song.sheet) {
-          const sheetKey = `sheet-${index}`;
-          entry.sheetKey = sheetKey;
-          formData.append(sheetKey, song.sheet, song.sheet.name);
-        } else if (song.sheetPath) {
-          /* 라이브러리에서 끌어온 악보 — 다시 올리지 않고 경로만 넘긴다 */
-          entry.sheetPath = song.sheetPath;
-          entry.sheetContentType = song.sheetContentType;
-        }
+        /* 라이브러리에서 끌어온 페이지는 그대로 두고, 새로 고른 파일만 올린다 */
+        entry.sheetPages = song.sheetFiles.length > 0 ? [] : song.sheetPages;
+        entry.sheetUploads = await Promise.all(song.sheetFiles.map(async (file, page) => {
+          const key = `sheet-${index}-${page}`;
+          formData.append(key, file, file.name);
+          /* 원본 크기와 흰 여백을 여기서 잰다 — 태블릿 화면의 3~4할을 여백이 먹는다 */
+          const measured = await measureSheet(file);
+          return { key, w: measured.w, h: measured.h, crop: measured.crop };
+        }));
         return entry;
-      });
+      }));
       formData.append('payload', JSON.stringify({ serviceType, serviceDate, team, songs: payloadSongs }));
 
       const response = await fetch('/api/worship-prep', { method: 'POST', body: formData });
@@ -394,9 +394,13 @@ export default function WorshipPrepPage() {
       {song.arrangement === 'custom' && (
         <label>구성 직접 기입<input value={song.arrangementCustom} onChange={(event) => updateSong(song.key, { arrangementCustom: event.target.value })} placeholder="예: 1절 → 후렴 → 2절 → 후렴 반복" /></label>
       )}
-      <label className="sheet-field">찬양 악보<span className="field-hint">이미지 또는 PDF. 팀별로 저장됩니다.</span>
-        <input type="file" accept="image/*,application/pdf" onChange={(event) => handleSheetChange(song.key, event)} />
-        {song.sheetName && <small className="sheet-name">{song.sheetName}</small>}
+      <label className="sheet-field">찬양 악보<span className="field-hint">여러 장 선택 가능. 고른 순서가 페이지 순서입니다.</span>
+        <input type="file" multiple accept="image/*,application/pdf" onChange={(event) => handleSheetChange(song.key, event)} />
+        {song.sheetFiles.length > 0 ? (
+          <small className="sheet-name">새 악보 {song.sheetFiles.length}장 — {song.sheetFiles.map((file) => file.name).join(', ')}</small>
+        ) : song.sheetPages.length > 0 ? (
+          <small className="sheet-name">라이브러리 악보 {song.sheetPages.length}장</small>
+        ) : null}
       </label>
     </article>
   );

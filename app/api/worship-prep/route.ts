@@ -9,6 +9,7 @@ import {
   uploadSupabaseObject,
 } from '../../../lib/supabase/server';
 import { getActiveChurchId } from '../../../lib/churchScope';
+import type { SheetPage } from '../../../lib/worship-prep/sheetPages';
 import {
   isLibrarySheet,
   librarySheetPath,
@@ -37,11 +38,28 @@ const SongSchema = z.object({
   timeSignature: z.string().trim().max(10).optional().default(''),
   arrangement: z.enum(['chorus_only', 'chorus_first', 'custom']).default('chorus_first'),
   arrangementCustom: z.string().trim().optional().default(''),
-  /* 새 악보 파일이 있으면 이 키로 multipart에 함께 온다. */
-  sheetKey: z.string().trim().optional(),
-  /* 기존 악보를 그대로 재사용할 때의 경로. */
-  sheetPath: z.string().trim().optional(),
-  sheetContentType: z.string().trim().optional(),
+  /* 새로 올리는 악보 — 장마다 multipart 키 하나. 브라우저에서 잰 크기·여백이 같이 온다. */
+  sheetUploads: z.array(z.object({
+    key: z.string().trim().min(1),
+    w: z.coerce.number().int().min(0).optional().default(0),
+    h: z.coerce.number().int().min(0).optional().default(0),
+    crop: z.object({
+      l: z.coerce.number().min(0).max(1),
+      t: z.coerce.number().min(0).max(1),
+      r: z.coerce.number().min(0).max(1),
+      b: z.coerce.number().min(0).max(1),
+    }).optional(),
+  })).optional().default([]),
+  /* 라이브러리에서 끌어와 그대로 다시 쓰는 페이지들 */
+  sheetPages: z.array(z.object({
+    path: z.string().trim().min(1),
+    contentType: z.string().trim().optional().default(''),
+    w: z.coerce.number().int().min(0).optional(),
+    h: z.coerce.number().int().min(0).optional(),
+    crop: z.object({
+      l: z.coerce.number(), t: z.coerce.number(), r: z.coerce.number(), b: z.coerce.number(),
+    }).optional(),
+  })).optional().default([]),
 });
 
 const PrepSchema = z.object({
@@ -73,7 +91,7 @@ function sanitizeSegment(value: string) {
   return `s-${createHash('sha1').update(value).digest('hex').slice(0, 10)}`;
 }
 
-const SELECT_COLUMNS = 'id,created_at,service_date,service_type,team,song_order,title,song_key,sung_key,tempo_bpm,time_signature,arrangement,arrangement_custom,sheet_bucket,sheet_path,sheet_content_type';
+const SELECT_COLUMNS = 'id,created_at,service_date,service_type,team,song_order,title,song_key,sung_key,tempo_bpm,time_signature,arrangement,arrangement_custom,sheet_bucket,sheet_path,sheet_content_type,sheet_pages';
 
 function normalizeSearch(value: string | null) {
   return String(value ?? '').trim().replace(/[(),*]/g, ' ').replace(/\s+/g, ' ').slice(0, 60);
@@ -132,7 +150,7 @@ export async function POST(request: Request) {
     const payload = PrepSchema.parse(JSON.parse(rawPayload));
     const teamSegment = sanitizeSegment(payload.team);
 
-    const hasNewSheet = payload.songs.some((song) => song.sheetKey && formData.get(song.sheetKey) instanceof File);
+    const hasNewSheet = payload.songs.some((song) => song.sheetUploads.some((upload) => formData.get(upload.key) instanceof File));
     if (hasNewSheet) {
       await ensureSupabaseBucket({
         bucket: BUCKET_NAME,
@@ -156,7 +174,7 @@ export async function POST(request: Request) {
          · 라이브러리 소유(library/…) — 곡에 매인 파일이라 회차를 다시 저장한다고 없어지면 안 된다
          · 라이브러리가 참조 중인 예전 악보 — 옮겨 심은 것은 아직 회차 폴더에 있다
          · 이번 저장이 그대로 다시 쓰는 경로 — 지우고 나서 참조하면 깨진 링크가 된다 */
-    const reused = new Set(payload.songs.map((song) => song.sheetPath).filter(Boolean) as string[]);
+    const reused = new Set(payload.songs.flatMap((song) => song.sheetPages.map((page) => page.path)));
     const libraryPaths = await listLibrarySheetPaths(churchId).catch(() => new Set<string>());
     const previousSheets = previous
       .map((row) => row.sheet_path)
@@ -170,26 +188,33 @@ export async function POST(request: Request) {
     await supabaseRest(`/worship_prep_songs?${deleteFilter}`, { method: 'DELETE' });
 
     const rows = await Promise.all(payload.songs.map(async (song, index) => {
-      let sheetPath = song.sheetPath ?? null;
-      let sheetContentType = song.sheetContentType ?? null;
+      /* 라이브러리에서 그대로 쓰는 페이지가 먼저, 새로 올린 것이 뒤에 붙는다 */
+      const pages: SheetPage[] = song.sheetPages.map((page) => ({ ...page, contentType: page.contentType }));
 
-      const sheetFile = song.sheetKey ? formData.get(song.sheetKey) : null;
-      if (sheetFile instanceof File) {
-        const contentType = sheetFile.type in SHEET_EXTENSIONS ? sheetFile.type : 'application/pdf';
+      for (const [pageIndex, upload] of song.sheetUploads.entries()) {
+        const file = formData.get(upload.key);
+        if (!(file instanceof File)) continue;
+        const contentType = file.type in SHEET_EXTENSIONS ? file.type : 'application/pdf';
         const extension = SHEET_EXTENSIONS[contentType] ?? 'pdf';
         /* 악보는 회차가 아니라 곡에 매인다 — 날짜 폴더에 두면 그 주 셋리스트를 다시
            저장할 때 같이 지워지고, 다음 주에 라이브러리에서 끌어와도 파일이 없다. */
-        const path = librarySheetPath(teamSegment, sanitizeSegment(song.title), extension);
+        const path = librarySheetPath(
+          teamSegment,
+          `${sanitizeSegment(song.title)}-${String(pages.length + pageIndex + 1).padStart(2, '0')}`,
+          extension,
+        );
         await uploadSupabaseObject({
           bucket: BUCKET_NAME,
           path,
-          body: Buffer.from(await sheetFile.arrayBuffer()),
+          body: Buffer.from(await file.arrayBuffer()),
           contentType,
           upsert: true,
         });
-        sheetPath = path;
-        sheetContentType = contentType;
+        pages.push({ path, contentType, w: upload.w || undefined, h: upload.h || undefined, crop: upload.crop });
       }
+
+      /* sheet_path 는 1페이지를 가리킨다 — 예전 화면·API 가 그대로 동작한다 */
+      const first = pages[0] ?? null;
 
       return {
         church_id: churchId,
@@ -204,9 +229,10 @@ export async function POST(request: Request) {
         time_signature: song.timeSignature,
         arrangement: song.arrangement,
         arrangement_custom: song.arrangement === 'custom' ? song.arrangementCustom : '',
-        sheet_bucket: sheetPath ? BUCKET_NAME : null,
-        sheet_path: sheetPath,
-        sheet_content_type: sheetContentType,
+        sheet_pages: pages,
+        sheet_bucket: first ? BUCKET_NAME : null,
+        sheet_path: first?.path ?? null,
+        sheet_content_type: first?.contentType || null,
         source: payload.source,
         metadata: { appUrl: request.headers.get('origin') ?? null },
       };
@@ -232,8 +258,7 @@ export async function POST(request: Request) {
           timeSignature: String(row.time_signature ?? ''),
           arrangement: String(row.arrangement ?? 'chorus_first'),
           arrangementCustom: String(row.arrangement_custom ?? ''),
-          sheetPath: (row.sheet_path as string | null) ?? null,
-          sheetContentType: (row.sheet_content_type as string | null) ?? null,
+          sheetPages: row.sheet_pages as SheetPage[],
           usedAt: payload.serviceDate || null,
         });
       } catch (error) {
