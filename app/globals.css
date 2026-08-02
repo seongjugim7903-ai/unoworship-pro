@@ -150,6 +150,13 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 /* 라이브러리 곡 — 카드 전체가 '가져오기' 버튼이다 */
 .library-pick { display: block; width: 100%; min-width: 0; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
 .library-pick:hover strong { color: #1d4ed8; text-decoration: underline; }
+
+/* 조 흐름 — 인도자가 셋 순서의 조 연결을 한눈에 본다 */
+.key-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 12px; padding: 9px 11px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fbfcff; }
+.key-flow-step { display: inline-flex; align-items: center; gap: 6px; }
+.key-flow-step strong { color: #263247; font-size: 12px; font-weight: 700; }
+.key-flow-arrow { display: inline-flex; align-items: center; gap: 3px; color: #b6c0d0; font-size: 11px; }
+.key-flow-arrow em { color: #8a96a9; font-size: 10px; font-style: normal; }
 .text-button.danger { border-color: #f2cfd6; color: #c24455; }
 .text-button.danger:hover { border-color: #d98a97; background: #fff5f6; }
 .text-button:disabled { opacity: .5; }

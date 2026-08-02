@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { nextServiceDate } from '../../lib/nextServiceDate';
+import { buildKeyFlow, relationLabel } from '../../lib/worship-prep/songKey';
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(false);
@@ -197,6 +198,12 @@ export default function WorshipPrepPage() {
   }, [team, loadRecent]);
 
   const isValid = useMemo(() => songs.some((song) => song.title.trim()), [songs]);
+
+  /* 조 흐름 — 실제로 부르는 조로 본다. 비어 있으면 악보 조를 쓴다(전조 없이 그대로 치는 경우). */
+  const keyFlow = useMemo(
+    () => buildKeyFlow(songs.filter((song) => song.title.trim()).map((song) => song.sungKey.trim() || song.songKey.trim())),
+    [songs],
+  );
 
   const handleServiceTypeChange = (next: string) => {
     setServiceType(next);
@@ -447,6 +454,21 @@ export default function WorshipPrepPage() {
             <label>정기예배<select value={serviceType} onChange={(event) => handleServiceTypeChange(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
             <label>일자<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
           </div>
+
+          {keyFlow.length > 0 && (
+            <div className="key-flow" aria-label="조 흐름">
+              {keyFlow.map((step, index) => (
+                <span className="key-flow-step" key={`${step.label}-${index}`}>
+                  {step.relation && (
+                    <span className="key-flow-arrow">
+                      →{relationLabel(step.relation) && <em>{relationLabel(step.relation)}</em>}
+                    </span>
+                  )}
+                  <strong>{step.label}</strong>
+                </span>
+              ))}
+            </div>
+          )}
           <label>찬양팀<select value={team} onChange={(event) => setTeam(event.target.value)}>{TEAMS.map((name) => <option key={name}>{name}</option>)}</select></label>
 
           {isMobile ? (
