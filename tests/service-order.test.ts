@@ -105,7 +105,28 @@ describe('parseServiceOrder — 설교자 판별', () => {
     expect(parsed.preacher).toBe('');
   });
 
-  it('콜론이 없는 줄은 미분류로 남긴다', () => {
+  it('하이픈·물결 채움 문자도 구분자로 본다', () => {
+    const dash = parseServiceOrder('성경봉독 ------- 빌4:6-7\n설      교 ------- 감사하며 삽시다');
+    expect(dash.scriptureRef).toBe('빌4:6-7');
+    expect(dash.sermonTitle).toBe('감사하며 삽시다');
+
+    const tilde = parseServiceOrder('찬      송 ~~~~~~~ 214장');
+    expect(tilde.hymnNumbers).toEqual([214]);
+  });
+
+  it('채움 문자 없이 공백만으로 벌어져 있어도 읽는다', () => {
+    const parsed = parseServiceOrder('성경봉독      빌4:6-7\n찬      송            214장');
+    expect(parsed.scriptureRef).toBe('빌4:6-7');
+    expect(parsed.hymnNumbers).toEqual([214]);
+  });
+
+  it('항목 글자 사이 공백에서 잘리지 않는다', () => {
+    /* '찬      송' 의 내부 공백(6칸)보다 값 앞 공백(12칸)이 넓다 — 넓은 쪽에서 끊어야 한다 */
+    const parsed = parseServiceOrder('말 씀 선 포            감사하며 삽시다');
+    expect(parsed.sermonTitle).toBe('감사하며 삽시다');
+  });
+
+  it('구분자가 없는 줄은 미분류로 남긴다', () => {
     expect(parseServiceOrder('주일낮예배 순서').unmatched).toEqual(['주일낮예배 순서']);
   });
 

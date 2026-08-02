@@ -41,20 +41,33 @@ export interface ServiceOrderFields {
 /** '한만상 목사', '김동경 강도사' 처럼 이름 + 직함 */
 const NAME_WITH_TITLE = /([가-힣]{2,5})\s*(담임목사|부목사|원로목사|목사|강도사|전도사|선교사|장로|권사|집사)/;
 
-/** '묵      도 ................ 다같이' 처럼 늘어난 공백·점선을 정리한다 */
+/**
+ * 주보가 항목과 내용 사이에 넣는 채움 문자.
+ * 점선만 있는 게 아니다 — 하이픈·물결·가운뎃점을 쓰는 주보도 흔하다.
+ */
+const LEADER = /[.·․‥…∙•*=_\-–—~〜]{2,}/;
+
+/** '묵      도 ................ 다같이' 처럼 늘어난 공백·채움 문자를 정리한다 */
 function tidy(value: string): string {
   return value
-    .replace(/[.·…]{2,}/g, ' ')
+    .replace(new RegExp(LEADER.source, 'g'), ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 /**
- * '항목 ...... 내용' 또는 '항목: 내용' 으로 나눈다. 나눌 수 없으면 null.
+ * 항목과 내용을 나눈다. 나눌 수 없으면 null.
  *
- * 점선을 콜론보다 먼저 본다. 주보 순서표의 원래 구분자가 점선이고,
- * 내용 쪽에 콜론이 들어가는 경우(성경 장절 '요 14:1-3')가 흔하기 때문이다.
- * 콜론으로 나눌 때도 첫 콜론에서 끊는다(비탐욕) — 같은 이유다.
+ * 세 가지를 순서대로 시도한다.
+ *   1) 채움 문자 — '성경봉독 ...... 요 14:1-3'
+ *   2) 콜론      — '성경봉독: 요 14:1-3'  (첫 콜론에서 끊는다)
+ *   3) 넓은 공백 — '성경봉독      요 14:1-3'
+ *
+ * 채움 문자를 콜론보다 먼저 보는 이유는 내용 쪽에 콜론이 들어가는 경우
+ * (성경 장절 '요 14:1-3')가 흔하기 때문이다. 콜론도 첫 콜론에서 끊는다.
+ *
+ * 넓은 공백은 맨 마지막이다. '찬      송      310장' 처럼 항목 글자 사이에도
+ * 공백이 들어가므로, 가장 넓은 공백 덩어리에서만 끊는다.
  */
 function splitEntry(rawLine: string): { label: string; value: string } | null {
   const build = (rawLabel: string, rawValue: string) => {
@@ -63,14 +76,31 @@ function splitEntry(rawLine: string): { label: string; value: string } | null {
     return label && value ? { label, value } : null;
   };
 
-  const dotted = /^(.+?)[.·…]{2,}(.+)$/.exec(rawLine);
-  if (dotted) {
-    const built = build(dotted[1], dotted[2]);
+  const leader = new RegExp(`^(.+?)${LEADER.source}(.+)$`).exec(rawLine);
+  if (leader) {
+    const built = build(leader[1], leader[2]);
     if (built) return built;
   }
 
+  /* 항목 이름에는 숫자가 없다. 잘라낸 왼쪽에 숫자가 있으면 값 안의 콜론('빌4:6-7')에서
+     잘못 끊은 것이므로 이 방법을 버리고 공백 쪽으로 넘어간다. */
   const colon = /^([^:：]+?)[:：]\s*(.+)$/.exec(rawLine);
-  return colon ? build(colon[1], colon[2]) : null;
+  if (colon && !/\d/.test(colon[1])) {
+    const built = build(colon[1], colon[2]);
+    if (built) return built;
+  }
+
+  /* 가장 넓은 공백 덩어리를 찾아 거기서 끊는다. 2칸 미만은 항목 글자 사이 공백으로 본다. */
+  let widest: { index: number; length: number } | null = null;
+  for (const match of rawLine.matchAll(/\s{2,}/g)) {
+    const index = match.index ?? 0;
+    const length = match[0].length;
+    if (index === 0 || index + length >= rawLine.length) continue;
+    if (!widest || length > widest.length) widest = { index, length };
+  }
+  if (!widest) return null;
+
+  return build(rawLine.slice(0, widest.index), rawLine.slice(widest.index + widest.length));
 }
 
 /** 곡명 뒤에 붙은 담당자 표기를 떼어낸다 — '주 품에 / 찬양대' → '주 품에' */
