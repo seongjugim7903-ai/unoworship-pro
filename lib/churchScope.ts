@@ -13,14 +13,14 @@
 
 import { supabaseRest } from './supabase/server';
 
-let cached: { slug: string; id: string } | null = null;
+let cached: { slug: string; id: string; name: string } | null = null;
 
-export async function getActiveChurchId(): Promise<string> {
+async function loadActiveChurch(): Promise<{ id: string; name: string }> {
   const slug = (process.env.UNOWORSHIP_DEFAULT_CHURCH_SLUG || 'ulju').trim();
-  if (cached && cached.slug === slug) return cached.id;
+  if (cached && cached.slug === slug) return { id: cached.id, name: cached.name };
 
-  const rows = await supabaseRest<Array<{ id: string }>>(
-    `/churches?select=id&slug=eq.${encodeURIComponent(slug)}&limit=1`,
+  const rows = await supabaseRest<Array<{ id: string; name: string }>>(
+    `/churches?select=id,name&slug=eq.${encodeURIComponent(slug)}&limit=1`,
     { method: 'GET' },
   );
   if (!rows?.length) {
@@ -29,8 +29,20 @@ export async function getActiveChurchId(): Promise<string> {
         '멀티테넌트 마이그레이션(202607230001)을 먼저 적용해 주세요.',
     );
   }
-  cached = { slug, id: rows[0].id };
-  return rows[0].id;
+  cached = { slug, id: rows[0].id, name: rows[0].name };
+  return { id: rows[0].id, name: rows[0].name };
+}
+
+export async function getActiveChurchId(): Promise<string> {
+  return (await loadActiveChurch()).id;
+}
+
+/**
+ * 교회 표시명 — 설교자 자막의 소속 슬롯 등에 쓴다.
+ * 교회마다 다른 값이므로 코드에 박아 두지 않고 churches 레코드에서 읽는다.
+ */
+export async function getActiveChurchName(): Promise<string> {
+  return (await loadActiveChurch()).name;
 }
 
 /** PostgREST 필터 조각: `church_id=eq.<id>` */

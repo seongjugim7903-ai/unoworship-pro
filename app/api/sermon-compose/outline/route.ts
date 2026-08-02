@@ -11,7 +11,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { SupabaseServerConfigError, supabaseRest } from '../../../../lib/supabase/server';
-import { getActiveChurchId } from '../../../../lib/churchScope';
+import { getActiveChurchId, getActiveChurchName } from '../../../../lib/churchScope';
 import {
   MAX_ITEMS_PER_PROGRAM,
   type SubHymnItem,
@@ -133,6 +133,8 @@ export async function POST(request: Request) {
             sermonTitle: body.sermonTitle || parsed.sermonTitle,
             scriptureRef: body.scriptureRef || parsed.scriptureRef,
             preacher: body.preacher,
+            /* 설교자 자막의 소속 슬롯 — 교회마다 다르므로 churches 레코드에서 읽는다. */
+            churchName: await getActiveChurchName(),
             serviceOrder: body.serviceOrder,
           },
         }),
