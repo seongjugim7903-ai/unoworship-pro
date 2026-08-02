@@ -17,10 +17,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/icons/hephzibah-icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/hephzibah-icon-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icons/ulju-icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/ulju-icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: [{ url: '/icons/hephzibah-icon-192.png', sizes: '192x192', type: 'image/png' }],
+    apple: [{ url: '/icons/ulju-icon-192.png', sizes: '192x192', type: 'image/png' }],
   },
 };
 

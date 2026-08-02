@@ -16,19 +16,19 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ['productivity', 'utilities'],
     icons: [
       {
-        src: '/icons/hephzibah-icon-192.png',
+        src: '/icons/ulju-icon-192.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/icons/hephzibah-icon-512.png',
+        src: '/icons/ulju-icon-512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
       },
       {
-        src: '/icons/hephzibah-icon-maskable-512.png',
+        src: '/icons/ulju-icon-maskable-512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'maskable',
