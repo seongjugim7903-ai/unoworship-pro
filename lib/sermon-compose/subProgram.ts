@@ -5,10 +5,11 @@
 //   youtube — 참고 영상 링크
 //   hymn    — 찬송가 장 번호. 가사는 현장 UnoLive 가 /api/hymn 으로 채운다
 //   praise  — 찬양 곡명. 슬라이드는 현장 UnoLive 가 PPT 변환본에서 찾아 채운다
+//   news    — 교회소식. 빈 줄로 나눈 소식 한 건이 한 섹션이 된다
 //
 // hymn·praise 는 이 앱에 원본 데이터가 없어서 '무엇을 쓸지'만 적어 보내는 주문서다.
 
-export type SubProgramKind = 'image' | 'youtube' | 'hymn' | 'praise';
+export type SubProgramKind = 'image' | 'youtube' | 'hymn' | 'praise' | 'news';
 
 /** kind='image' */
 export interface SubImageItem {
@@ -43,7 +44,18 @@ export interface SubPraiseItem {
   caption: string;
 }
 
-export type SubProgramItem = SubImageItem | SubYoutubeItem | SubHymnItem | SubPraiseItem;
+/** kind='news' — 소식 한 건이 한 섹션이 된다 */
+export interface SubNewsItem {
+  /** 소식 본문. 줄바꿈은 그대로 유지한다 */
+  body: string;
+}
+
+export type SubProgramItem =
+  | SubImageItem
+  | SubYoutubeItem
+  | SubHymnItem
+  | SubPraiseItem
+  | SubNewsItem;
 
 export interface SermonSubProgram {
   id: string;
@@ -66,6 +78,7 @@ const KIND_SUFFIX: Record<SubProgramKind, string> = {
   youtube: '참고영상',
   hymn: '찬송가',
   praise: '찬양',
+  news: '교회소식',
 };
 
 /**

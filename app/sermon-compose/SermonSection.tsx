@@ -2,6 +2,7 @@
 
 // 설교대지 화면의 소탭 래퍼.
 //   · 원문 저장   — 신규 SermonOutlinePanel (찬송가·찬양을 나눠 각각 프로그램으로 만든다)
+//   · 교회소식    — 신규 SermonChurchNewsPanel (빈 줄마다 한 섹션)
 //   · 참고 사진   — 신규 SermonImagePanel
 //   · 참고 영상   — 신규 SermonYoutubePanel
 // 새 기능은 전부 app/sermon-compose 아래에만 둔다.
@@ -9,13 +10,15 @@
 
 import { useState } from 'react';
 import SermonOutlinePanel from './SermonOutlinePanel';
+import SermonChurchNewsPanel from './SermonChurchNewsPanel';
 import SermonImagePanel from './SermonImagePanel';
 import SermonYoutubePanel from './SermonYoutubePanel';
 
-type Tab = 'outline' | 'image' | 'youtube';
+type Tab = 'outline' | 'news' | 'image' | 'youtube';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'outline', label: '원문 저장' },
+  { id: 'news', label: '교회소식' },
   { id: 'image', label: '참고 사진' },
   { id: 'youtube', label: '참고 영상' },
 ];
@@ -50,6 +53,7 @@ export default function SermonSection() {
       </div>
 
       {tab === 'outline' && <SermonOutlinePanel />}
+      {tab === 'news' && <SermonChurchNewsPanel />}
       {tab === 'image' && <SermonImagePanel />}
       {tab === 'youtube' && <SermonYoutubePanel />}
     </>

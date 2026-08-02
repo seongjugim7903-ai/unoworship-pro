@@ -23,14 +23,15 @@ set file_size_limit = excluded.file_size_limit,
 --    kind='youtube' → items = [{ url, videoId, caption }]
 --    kind='hymn'    → items = [{ number, caption }]
 --    kind='praise'  → items = [{ songName, caption }]
---    네 종류를 한 테이블에 두는 이유: 저장·조회·정리 흐름이 완전히 같고,
+--    kind='news'    → items = [{ body }]            (빈 줄로 나눈 소식 한 건이 한 섹션)
+--    한 테이블에 두는 이유: 저장·조회·정리 흐름이 완전히 같고,
 --    Composer 가 목록 하나만 읽으면 되기 때문이다.
 create table if not exists public.sermon_sub_programs (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   church_id uuid references public.churches(id) on delete cascade,
-  kind text not null check (kind in ('image', 'youtube', 'hymn', 'praise')),
+  kind text not null check (kind in ('image', 'youtube', 'hymn', 'praise', 'news')),
   service_type text not null default '주일낮예배',
   service_date date,
   title text not null default '설교 부속 프로그램',
