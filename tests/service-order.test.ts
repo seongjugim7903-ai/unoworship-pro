@@ -68,6 +68,61 @@ describe('parseServiceOrder — 표기 흔들림', () => {
   });
 });
 
+// 실제 주보 OCR 결과 (울주교회 수요예배). 라벨이 '성경봉독'이 아니라 '성경'이고,
+// 설교제목은 라벨 없이 성경 줄 다음에 오며, 설교자는 '집례'로 적힌다.
+const REAL_WEDNESDAY = `시간: 오후7:30
+집례: 김동경 강도사
+찬양과 경배
+기도: 합심기도
+성경: 히10:32-39(신364)
+물러나지 않는 믿음
+찬송: 336장`;
+
+describe('parseServiceOrder — 실제 주보 (수요예배)', () => {
+  const parsed = parseServiceOrder(REAL_WEDNESDAY);
+
+  it("'성경' 라벨을 본문으로 읽고 쪽수 표기를 떼어낸다", () => {
+    expect(parsed.scriptureRef).toBe('히10:32-39');
+  });
+
+  it('성경 바로 다음 줄의 라벨 없는 문장을 설교제목으로 본다', () => {
+    expect(parsed.sermonTitle).toBe('물러나지 않는 믿음');
+  });
+
+  it("'집례'를 설교자로 읽는다", () => {
+    expect(parsed.preacher).toBe('김동경 강도사');
+    expect(parsed.preacherSource).toBe('presider');
+  });
+
+  it('찬송가를 읽는다', () => {
+    expect(parsed.hymnNumbers).toEqual([336]);
+  });
+
+  it('OCR 이 같은 블록을 두 번 뱉어도 결과가 같다', () => {
+    const twice = parseServiceOrder(`${REAL_WEDNESDAY}\n${REAL_WEDNESDAY}`);
+    expect(twice.scriptureRef).toBe('히10:32-39');
+    expect(twice.sermonTitle).toBe('물러나지 않는 믿음');
+    expect(twice.hymnNumbers).toEqual([336]);
+  });
+});
+
+describe('parseServiceOrder — 라벨 없는 설교제목', () => {
+  it('성경 줄 앞의 라벨 없는 줄은 제목으로 보지 않는다', () => {
+    const parsed = parseServiceOrder('찬양과 경배\n성경: 롬8:28\n합력하여 선을 이루라');
+    expect(parsed.sermonTitle).toBe('합력하여 선을 이루라');
+  });
+
+  it('말씀선포 항목이 따로 있으면 그것을 쓴다', () => {
+    const parsed = parseServiceOrder('성경: 롬8:28\n엉뚱한 줄\n말씀선포: 합력하여 선을 이루라');
+    expect(parsed.sermonTitle).toBe('합력하여 선을 이루라');
+  });
+
+  it('성경 다음 줄이 다른 항목이면 제목으로 삼지 않는다', () => {
+    const parsed = parseServiceOrder('성경: 롬8:28\n찬송: 405장');
+    expect(parsed.sermonTitle).toBe('');
+  });
+});
+
 describe('parseServiceOrder — 설교자 판별', () => {
   it('설교자 항목이 축도보다 아래에 있어도 설교자 항목이 이긴다', () => {
     const parsed = parseServiceOrder('축도: 한만상 목사\n설교자: 김동경 강도사');

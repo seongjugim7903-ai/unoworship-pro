@@ -16,6 +16,8 @@ export type PreacherSource =
   | 'explicit'
   /** '말씀선포: 제목 / 한만상 목사' 처럼 설교 줄에 이름이 붙어 있음 */
   | 'sermonLine'
+  /** '집례: 김동경 강도사' — 그 예배를 집례하는 사람. 대개 설교자와 같다 */
+  | 'presider'
   /** 축도 항목에서 끌어온 추정값 — 담임목사일 수 있어 확인이 필요하다 */
   | 'benediction'
   /** 못 찾음 */
@@ -108,6 +110,17 @@ function stripPerformer(value: string): string {
   return tidy(value.split(/[/|]/)[0]);
 }
 
+/**
+ * 성경 표기 뒤의 쪽수 안내를 떼어낸다 — '히10:32-39(신364)' → '히10:32-39'.
+ * 주보는 성경책 쪽수를 괄호로 덧붙이는 경우가 많다(신약 364쪽).
+ */
+function stripPageHint(value: string): string {
+  return tidy(value.replace(/[(（]\s*[가-힣]{0,2}\s*\d+\s*(?:쪽|p|P)?\s*[)）]\s*$/, ''));
+}
+
+/** 예배 순서의 항목 이름으로 볼 만한 줄인지 — 라벨 없는 설교제목을 가려낼 때 쓴다 */
+const KNOWN_ITEM = /(묵도|찬송|찬양|경배|기도|봉헌|헌금|헌금위원|광고|축도|성경|봉독|말씀|설교|주기도|사도신경|교독문|성찬|폐회|개회|인도|사회|반주|集禮|집례|시간)/;
+
 /** 값 전체가 사람 이름 + 직함인지 — '한만상 목사' */
 function isPersonOnly(value: string): boolean {
   const matched = NAME_WITH_TITLE.exec(value);
@@ -154,16 +167,23 @@ export function parseServiceOrder(raw: string): ServiceOrderFields {
      축도가 설교자 항목보다 위에 있어도 축도가 이기면 안 된다. */
   let explicitPreacher = '';
   let sermonLinePreacher = '';
+  let presiderPreacher = '';
   let benedictionPreacher = '';
 
-  for (const line of raw.split('\n')) {
+  /* 라벨 없는 줄의 위치를 기억해 둔다. 설교제목이 성경 줄 바로 다음에
+     라벨 없이 오는 주보가 있어서(울주교회 수요예배), 나중에 그 자리를 본다. */
+  const looseLines = new Map<number, string>();
+  let scriptureLine = -1;
+
+  const lines = raw.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
     /* 점선을 살려서 넘겨야 하므로 여기서는 앞뒤 공백만 턴다. */
-    const rawLine = line.trim();
+    const rawLine = lines[index].trim();
     if (!rawLine) continue;
 
     const entry = splitEntry(rawLine);
     if (!entry) {
-      fields.unmatched.push(tidy(rawLine));
+      looseLines.set(index, tidy(rawLine));
       continue;
     }
 
@@ -178,14 +198,24 @@ export function parseServiceOrder(raw: string): ServiceOrderFields {
       continue;
     }
 
+    // 집례자는 그 예배를 이끄는 사람 — 수요·금요 예배에서는 대개 설교자와 같다.
+    if (/집례/.test(label)) {
+      if (!presiderPreacher) presiderPreacher = findPerson(value);
+      continue;
+    }
+
     // 축도는 담임목사가 맡는 경우가 많아 설교자와 다를 수 있다 — 최후 수단으로만 쓴다.
     if (/축도/.test(label)) {
       if (!benedictionPreacher) benedictionPreacher = findPerson(value);
       continue;
     }
 
-    if (/(성경봉독|봉독|성경말씀|본문)/.test(label)) {
-      if (!fields.scriptureRef) fields.scriptureRef = value;
+    // '성경봉독' 뿐 아니라 '성경' 한 글자짜리 라벨을 쓰는 주보도 많다.
+    if (/(성경봉독|봉독|성경말씀|성경|본문)/.test(label)) {
+      if (!fields.scriptureRef) {
+        fields.scriptureRef = stripPageHint(value);
+        scriptureLine = index;
+      }
       continue;
     }
 
@@ -215,12 +245,32 @@ export function parseServiceOrder(raw: string): ServiceOrderFields {
     // 묵도·기도·헌금·광고 등 설교대지와 무관한 항목은 조용히 흘려보낸다.
   }
 
+  /* 설교제목 라벨이 없는 주보 — 성경 줄 바로 다음의 라벨 없는 문장을 제목으로 본다.
+     ('성경: 히10:32-39(신364)' 다음 줄에 '물러나지 않는 믿음' 만 적혀 있는 형식)
+     앞줄이 아니라 '바로 다음 줄'만 보고, 순서 항목 이름처럼 생긴 줄은 제외한다. */
+  if (!fields.sermonTitle && scriptureLine >= 0) {
+    for (let index = scriptureLine + 1; index < lines.length; index += 1) {
+      if (!lines[index].trim()) continue; // 빈 줄은 건너뛴다
+      const candidate = looseLines.get(index);
+      if (candidate && !KNOWN_ITEM.test(candidate)) {
+        fields.sermonTitle = candidate;
+        looseLines.delete(index);
+      }
+      break; // 바로 다음 줄만 본다
+    }
+  }
+
+  fields.unmatched = [...looseLines.values()];
+
   if (explicitPreacher) {
     fields.preacher = explicitPreacher;
     fields.preacherSource = 'explicit';
   } else if (sermonLinePreacher) {
     fields.preacher = sermonLinePreacher;
     fields.preacherSource = 'sermonLine';
+  } else if (presiderPreacher) {
+    fields.preacher = presiderPreacher;
+    fields.preacherSource = 'presider';
   } else if (benedictionPreacher) {
     fields.preacher = benedictionPreacher;
     fields.preacherSource = 'benediction';
