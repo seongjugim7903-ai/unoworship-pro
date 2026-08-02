@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import ChoirRequestPage from './choir/ChoirRequestPage';
-import SermonOutlinePage from './sermon/SermonOutlinePage';
+import SermonSection from './sermon-compose/SermonSection';
 import WorshipPrepPage from './worship/WorshipPrepPage';
 
 type View = 'home' | 'choir' | 'sermon' | 'worship';
@@ -55,7 +55,7 @@ export default function WorkspaceTabs() {
         <span className="feature-title">{current?.label}</span>
       </header>
       {view === 'choir' && <ChoirRequestPage />}
-      {view === 'sermon' && <SermonOutlinePage />}
+      {view === 'sermon' && <SermonSection />}
       {view === 'worship' && <WorshipPrepPage />}
     </>
   );
