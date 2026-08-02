@@ -50,6 +50,10 @@ create trigger worship_song_library_set_updated_at
 before update on public.worship_song_library
 for each row execute function public.set_updated_at();
 
+-- 접근은 서버(service role)만 한다. service role 은 RLS 를 통과하므로 정책은 두지 않는다 —
+-- anon/authenticated 키로는 아무 것도 안 보이는 것이 맞다. 다른 테이블과 같은 규칙이다.
+alter table public.worship_song_library enable row level security;
+
 -- 지금까지 저장한 곡을 라이브러리로 옮겨 심는다.
 -- 이걸 안 하면 라이브러리가 비어서, 쓰던 곡이 검색에서 통째로 사라진 것처럼 보인다.
 -- (교회·팀·제목) 하나당 가장 최근 회차의 값을 쓴다.
