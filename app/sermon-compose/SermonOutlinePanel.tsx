@@ -108,6 +108,17 @@ export default function SermonOutlinePanel() {
     const outline = parseSermonOutline(next);
     fillIfEmpty(setSermonTitle, sermonTitle, outline.sermonTitle);
     fillIfEmpty(setScriptureRef, scriptureRef, outline.scriptureRef);
+    /* 협조문에 '설교자:' 줄이 있을 때만 반영한다. 없으면 기본값(한만상 목사)이 그대로 남고,
+       사람이 이미 다른 설교자를 고른 상태면 건드리지 않는다. */
+    if (outline.preacher && preacherSelect === PREACHER_OPTIONS[0] && !customPreacher) {
+      if (PREACHER_OPTIONS.includes(outline.preacher)) {
+        setPreacherSelect(outline.preacher);
+        setCustomPreacher('');
+      } else {
+        setPreacherSelect(PREACHER_CUSTOM);
+        setCustomPreacher(outline.preacher);
+      }
+    }
     /* 협조문에도 '찬양:' 줄이 있으면 받아 둔다 — 주보와 겹치면 먼저 채워진 쪽이 남는다. */
     fillIfEmpty(setHymnText, hymnText, outline.hymnNumbers.map((n) => `${n}장`).join(', '));
     fillIfEmpty(setPraiseText, praiseText, outline.praiseSongs.join('\n'));

@@ -49,6 +49,8 @@ export interface ParsedSermonOutline {
   sermonTitle: string;
   /** '성경:' 또는 '본문:' 줄 */
   scriptureRef: string;
+  /** '설교자:' 줄. 협조문에 없으면 '' — 그 경우 설교자 칸은 비워 둔다 */
+  preacher: string;
   points: ParsedPoint[];
   /** '찬양:' 줄 원문 — 참고 표시용. 이 기능에서 프로그램을 만들지는 않는다 */
   praiseLine: string;

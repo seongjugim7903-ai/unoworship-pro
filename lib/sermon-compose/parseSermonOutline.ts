@@ -8,6 +8,8 @@ import { detectServiceType, looksLikeServiceHeader } from './serviceTypeHint';
 const SCRIPTURE_LABEL = /^(?:성경|본문|말씀)\s*[:：]\s*(.*)$/;
 /** '제목: 마음에 근심하지 말라!' */
 const TITLE_LABEL = /^제목\s*[:：]\s*(.*)$/;
+/** '설교자: 한만상 목사' · '강사: ...' — 협조문에 없으면 이 값은 빈 문자열로 남는다 */
+const PREACHER_LABEL = /^(?:설교자|설교|강사)\s*[:：]\s*(.*)$/;
 /** '찬양: 310장, 493장, ...' */
 const PRAISE_LABEL = /^(?:찬양|찬송)\s*[:：]\s*(.*)$/;
 
@@ -79,6 +81,7 @@ export function parseSermonOutline(raw: string): ParsedSermonOutline {
     serviceTypeHint: '',
     sermonTitle: '',
     scriptureRef: '',
+    preacher: '',
     points: [],
     praiseLine: '',
     hymnNumbers: [],
@@ -99,6 +102,12 @@ export function parseSermonOutline(raw: string): ParsedSermonOutline {
     const title = TITLE_LABEL.exec(line);
     if (title) {
       if (!result.sermonTitle) result.sermonTitle = title[1].trim();
+      continue;
+    }
+
+    const preacher = PREACHER_LABEL.exec(line);
+    if (preacher) {
+      if (!result.preacher) result.preacher = preacher[1].trim();
       continue;
     }
 
