@@ -24,8 +24,10 @@ const SERVICE_TYPES = ['주일낮예배', '주일오후예배', '수요예배', 
 const TEAMS = ['주일1부', '주일2부', '수요예배', '금요기도회'];
 const DRAFT_KEY = 'unoworship-pro:worship-prep-draft:v1';
 
-type Arrangement = 'chorus_only' | 'chorus_first' | 'custom';
+type Arrangement = 'full' | 'chorus_only' | 'chorus_first' | 'custom';
 const ARRANGEMENTS: Array<{ value: Arrangement; label: string }> = [
+  // 가장 흔한 경우 — 악보에 있는 절을 1절부터 순서대로 다 부른다. 기본값.
+  { value: 'full', label: '절 전체' },
   { value: 'chorus_first', label: '후렴 먼저' },
   { value: 'chorus_only', label: '후렴만' },
   { value: 'custom', label: '직접 기입' },
@@ -84,7 +86,7 @@ function newRow(): SongRow {
   rowSeq += 1;
   return {
     key: `song-${rowSeq}`, title: '', songKey: '', sungKey: '', tempoBpm: '', timeSignature: '',
-    arrangement: 'chorus_first', arrangementCustom: '', sheetFiles: [], sheetPages: [],
+    arrangement: 'full', arrangementCustom: '', sheetFiles: [], sheetPages: [],
   };
 }
 
@@ -130,7 +132,7 @@ export default function WorshipPrepPage() {
             sungKey: song.sungKey || '',
             tempoBpm: song.tempoBpm || '',
             timeSignature: song.timeSignature || '',
-            arrangement: (song.arrangement as Arrangement) || 'chorus_first',
+            arrangement: (song.arrangement as Arrangement) || 'full',
             arrangementCustom: song.arrangementCustom || '',
             sheetPages: song.sheetPages ?? [],
           })));
@@ -274,7 +276,7 @@ export default function WorshipPrepPage() {
         sungKey: song.sung_key || '',
         tempoBpm: song.tempo_bpm ? String(song.tempo_bpm) : '',
         timeSignature: song.time_signature || '',
-        arrangement: (song.arrangement as Arrangement) || 'chorus_first',
+        arrangement: (song.arrangement as Arrangement) || 'full',
         arrangementCustom: song.arrangement_custom || '',
         sheetPages: readSheetPages(song),
         sheetFiles: [],
