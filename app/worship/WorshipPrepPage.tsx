@@ -600,8 +600,9 @@ export default function WorshipPrepPage() {
       {sheetPreview && isMobile && (
         <div className="sheet-fullscreen" role="dialog" aria-label={`${sheetPreview.title} 악보`}>
           <div className="sheet-fullscreen-bar">
+            {/* 악보를 덮고 있는 동안의 유일한 뒤로가기 — 검색어·결과는 그대로 두므로 목록이 그대로 돌아온다 */}
+            <button type="button" className="sheet-back" onClick={() => setSheetPreview(null)}>← 검색으로 돌아가기</button>
             <strong>{sheetPreview.title}</strong>
-            <button type="button" onClick={() => setSheetPreview(null)}>닫기</button>
           </div>
           <div className="sheet-fullscreen-body">
             {Array.from({ length: sheetPageCount(sheetPreview) }, (_, page) => {
