@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { nextServiceDate } from '../../lib/nextServiceDate';
+import { getUpcomingService } from '../../lib/sermon-compose/upcomingService';
 import { buildKeyFlow, relationLabel } from '../../lib/worship-prep/songKey';
 import { measureSheet } from '../../lib/worship-prep/measureSheet';
 import { readSheetPages, type SheetPage } from '../../lib/worship-prep/sheetPages';
@@ -90,18 +91,17 @@ function newRow(): SongRow {
   };
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function arrangementLabel(value: string, custom: string) {
   if (value === 'custom') return custom || '직접 기입';
   return ARRANGEMENTS.find((item) => item.value === value)?.label ?? value;
 }
 
 export default function WorshipPrepPage() {
-  const [serviceType, setServiceType] = useState('주일낮예배');
-  const [serviceDate, setServiceDate] = useState('');
+  /* 도래하는 정기예배를 기본값으로 잡는다(설교대지 페이지와 같은 규칙).
+     렌더마다 시각이 흔들리지 않게 한 번만 계산한다. */
+  const upcoming = useMemo(() => getUpcomingService(), []);
+  const [serviceType, setServiceType] = useState<string>(upcoming.serviceType);
+  const [serviceDate, setServiceDate] = useState(upcoming.serviceDate);
   const [team, setTeam] = useState('주일1부');
   const [songs, setSongs] = useState<SongRow[]>([newRow()]);
   const [draftReady, setDraftReady] = useState(false);
@@ -116,13 +116,18 @@ export default function WorshipPrepPage() {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const draft = JSON.parse(raw) as {
-          serviceType?: string; serviceDate?: string; team?: string;
-          songs?: Array<Pick<SongRow, 'title' | 'songKey' | 'sungKey' | 'tempoBpm' | 'timeSignature' | 'arrangement' | 'arrangementCustom' | 'sheetPages'>>;
-        };
-        setServiceType(draft.serviceType || '주일낮예배');
-        setServiceDate(draft.serviceDate || todayISO());
+      const draft = raw
+        ? JSON.parse(raw) as {
+            serviceType?: string; serviceDate?: string; team?: string;
+            songs?: Array<Pick<SongRow, 'title' | 'songKey' | 'sungKey' | 'tempoBpm' | 'timeSignature' | 'arrangement' | 'arrangementCustom' | 'sheetPages'>>;
+          }
+        : null;
+      /* 임시저장은 저장 후에도 남는다. 지난 예배 것이면 무시하고 도래하는 예배로 새로 시작한다
+         (그러지 않으면 다음 주에 들어와도 지난주 예배가 계속 떠 있다). */
+      const isStale = Boolean(draft?.serviceDate && draft.serviceDate < upcoming.serviceDate);
+      if (draft && !isStale) {
+        setServiceType(draft.serviceType || upcoming.serviceType);
+        setServiceDate(draft.serviceDate || upcoming.serviceDate);
         setTeam(draft.team || '주일1부');
         if (draft.songs?.length) {
           setSongs(draft.songs.map((song) => ({
@@ -137,12 +142,10 @@ export default function WorshipPrepPage() {
             sheetPages: song.sheetPages ?? [],
           })));
         }
-      } else {
-        setServiceDate(todayISO());
       }
+      /* 임시저장이 없거나 지난 것이면 초기값(도래하는 정기예배)을 그대로 둔다. */
     } catch (error) {
       console.warn('[worship-prep] draft load failed', error);
-      setServiceDate(todayISO());
     } finally {
       setDraftReady(true);
     }
