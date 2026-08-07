@@ -36,7 +36,7 @@ const SongSchema = z.object({
   tempoBpm: z.coerce.number().int().min(20).max(300).nullable().optional().default(null),
   /* 4/4 · 6/8 · 3/4 — 6/8 을 4/4 로 들어가면 첫 마디에서 무너진다 */
   timeSignature: z.string().trim().max(10).optional().default(''),
-  arrangement: z.enum(['chorus_only', 'chorus_first', 'custom']).default('chorus_first'),
+  arrangement: z.enum(['full', 'chorus_only', 'chorus_first', 'custom']).default('full'),
   arrangementCustom: z.string().trim().optional().default(''),
   /* 새로 올리는 악보 — 장마다 multipart 키 하나. 브라우저에서 잰 크기·여백이 같이 온다. */
   sheetUploads: z.array(z.object({
@@ -255,7 +255,7 @@ export async function POST(request: Request) {
           sungKey: String(row.sung_key ?? ''),
           tempoBpm: (row.tempo_bpm as number | null) ?? null,
           timeSignature: String(row.time_signature ?? ''),
-          arrangement: String(row.arrangement ?? 'chorus_first'),
+          arrangement: String(row.arrangement ?? 'full'),
           arrangementCustom: String(row.arrangement_custom ?? ''),
           sheetPages: row.sheet_pages as SheetPage[],
           usedAt: payload.serviceDate || null,

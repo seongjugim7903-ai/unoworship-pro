@@ -74,7 +74,7 @@ export async function upsertLibrarySong(input: UpsertSongInput): Promise<void> {
     sung_key: input.sungKey ?? '',
     tempo_bpm: input.tempoBpm ?? null,
     time_signature: input.timeSignature ?? '',
-    arrangement: input.arrangement ?? 'chorus_first',
+    arrangement: input.arrangement ?? 'full',
     arrangement_custom: input.arrangementCustom ?? '',
     last_used_at: input.usedAt || null,
   };

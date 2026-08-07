@@ -23,7 +23,7 @@ const EditSchema = z.object({
   sungKey: z.string().trim().optional().default(''),
   tempoBpm: z.coerce.number().int().min(20).max(300).nullable().optional().default(null),
   timeSignature: z.string().trim().max(10).optional().default(''),
-  arrangement: z.enum(['chorus_only', 'chorus_first', 'custom']).default('chorus_first'),
+  arrangement: z.enum(['full', 'chorus_only', 'chorus_first', 'custom']).default('full'),
   arrangementCustom: z.string().trim().optional().default(''),
 });
 
