@@ -91,6 +91,18 @@ function newRow(): SongRow {
   };
 }
 
+/** 라이브러리 곡의 악보 이미지 주소 — 여러 장이면 첫 장. 악보가 없으면 null */
+function sheetSrc(song: LibrarySong, page = 0): string | null {
+  const path = song.sheet_pages?.[page]?.path ?? (page === 0 ? song.sheet_path : null);
+  return path ? `/api/worship-sheet?path=${encodeURIComponent(path)}` : null;
+}
+
+/** 악보 장 수 — sheet_pages 가 없으면 단일 악보(sheet_path) 기준 */
+function sheetPageCount(song: LibrarySong): number {
+  if (song.sheet_pages?.length) return song.sheet_pages.length;
+  return song.sheet_path ? 1 : 0;
+}
+
 function arrangementLabel(value: string, custom: string) {
   if (value === 'custom') return custom || '직접 기입';
   return ARRANGEMENTS.find((item) => item.value === value)?.label ?? value;
@@ -112,6 +124,9 @@ export default function WorshipPrepPage() {
   const [searchResults, setSearchResults] = useState<LibrarySong[]>([]);
   const [searchStatus, setSearchStatus] = useState<'idle' | 'loading' | 'done'>('idle');
   const searchSeqRef = useRef(0);
+  /* 검색 결과의 악보 썸네일을 눌렀을 때 크게 볼 곡.
+     데스크톱은 '저장 곡' 자리에 펼치고, 모바일은 전체 화면으로 띄운다. */
+  const [sheetPreview, setSheetPreview] = useState<LibrarySong | null>(null);
 
   useEffect(() => {
     try {
@@ -149,6 +164,9 @@ export default function WorshipPrepPage() {
     } finally {
       setDraftReady(true);
     }
+    /* 마운트 시 1회만 — upcoming 은 useMemo 로 고정된 값이라 의존성에 넣지 않는다.
+       (넣으면 값이 같아도 재실행 판정이 흔들려 임시저장 복원이 다시 돌 수 있다) */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -442,6 +460,19 @@ export default function WorshipPrepPage() {
                         {item.sheet_path ? ' · 악보 있음' : ' · 악보 없음'}
                       </span>
                     </button>
+                    {/* 악보 썸네일 — 누르면 크게 본다(데스크톱: 저장 곡 자리, 모바일: 전체 화면) */}
+                    {sheetSrc(item) && (
+                      <button
+                        type="button"
+                        className="sheet-thumb"
+                        onClick={() => setSheetPreview(item)}
+                        title={`${item.title} 악보 보기`}
+                      >
+                        {/* 라이브러리 악보는 크기가 제각각이라 next/image 최적화 대신 원본을 축소해 쓴다 */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={sheetSrc(item)!} alt={`${item.title} 악보`} loading="lazy" />
+                      </button>
+                    )}
                     <button type="button" className="text-button danger"
                       onClick={() => handleDeleteLibrarySong(item)}>빼기</button>
                   </article>
@@ -537,14 +568,52 @@ export default function WorshipPrepPage() {
           )}
         </section>
 
-        <section className="panel preview-panel">
-          <div className="panel-heading">
-            <div><span className="step-number success">02</span><h2>{team} 저장 곡</h2></div>
-            <span className="section-count">{recent.length}곡</span>
-          </div>
-          {renderSongList(recent, '이 팀에 저장된 곡이 없습니다.')}
-        </section>
+        {/* 데스크톱에서 악보를 보는 동안에는 이 자리를 악보가 차지한다. 모바일은 아래 전체 화면으로 */}
+        {sheetPreview && !isMobile ? (
+          <section className="panel preview-panel">
+            <div className="panel-heading">
+              <div><span className="step-number success">02</span><h2>{sheetPreview.title} 악보</h2></div>
+              <button type="button" className="text-button" onClick={() => setSheetPreview(null)}>닫기</button>
+            </div>
+            <div className="sheet-view">
+              {Array.from({ length: sheetPageCount(sheetPreview) }, (_, page) => {
+                const src = sheetSrc(sheetPreview, page);
+                return src ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={page} src={src} alt={`${sheetPreview.title} 악보 ${page + 1}장`} />
+                ) : null;
+              })}
+            </div>
+          </section>
+        ) : (
+          <section className="panel preview-panel">
+            <div className="panel-heading">
+              <div><span className="step-number success">02</span><h2>{team} 저장 곡</h2></div>
+              <span className="section-count">{recent.length}곡</span>
+            </div>
+            {renderSongList(recent, '이 팀에 저장된 곡이 없습니다.')}
+          </section>
+        )}
       </div>
+
+      {/* 모바일 — 악보는 전체 화면으로. 좁은 화면에서 옆에 끼워 넣으면 음표가 안 보인다 */}
+      {sheetPreview && isMobile && (
+        <div className="sheet-fullscreen" role="dialog" aria-label={`${sheetPreview.title} 악보`}>
+          <div className="sheet-fullscreen-bar">
+            <strong>{sheetPreview.title}</strong>
+            <button type="button" onClick={() => setSheetPreview(null)}>닫기</button>
+          </div>
+          <div className="sheet-fullscreen-body">
+            {Array.from({ length: sheetPageCount(sheetPreview) }, (_, page) => {
+              const src = sheetSrc(sheetPreview, page);
+              return src ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={page} src={src} alt={`${sheetPreview.title} 악보 ${page + 1}장`} />
+              ) : null;
+            })}
+          </div>
+        </div>
+      )}
 
       <footer className="page-footer">UnoWorship Pro · 헵시바 선교단</footer>
     </main>
