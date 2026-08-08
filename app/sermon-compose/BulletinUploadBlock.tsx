@@ -209,8 +209,8 @@ export default function BulletinUploadBlock({ serviceType, serviceDate, onOrders
 
   /** 지금 고른 예배의 순서를 찾았는지 — 못 찾았으면 그 사실을 알려 준다 */
   const currentKey = BULLETIN_SERVICES.find((service) => service.serviceType === serviceType)?.key;
-  const currentOrder = currentKey ? orders[currentKey] : '';
-  const foundServices = BULLETIN_SERVICES.filter(({ key }) => orders[key].trim());
+  const currentOrder = (currentKey ? orders[currentKey] : '') ?? '';
+  const foundServices = BULLETIN_SERVICES.filter(({ key }) => (orders[key] ?? '').trim());
 
   /* fieldset 은 UA 기본 min-inline-size:min-content 라 부모 안에서 쪼그라든다 — div 를 쓴다. */
   return (

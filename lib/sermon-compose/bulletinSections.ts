@@ -69,21 +69,23 @@ export function mergeBulletinOrders(results: Partial<BulletinOrders>[]): Bulleti
 }
 
 /** 사람이 읽을 합본 텍스트 — weekly_bulletins.content 로 저장한다 */
-export function toBulletinText(orders: BulletinOrders): string {
+export function toBulletinText(orders: Partial<BulletinOrders>): string {
   const parts = BULLETIN_SERVICES.map(({ key, serviceType }) => {
-    const body = orders[key].trim();
+    const body = (orders[key] ?? '').trim();
     return body ? `[${serviceType}]\n${body}` : '';
   });
-  if (orders.news.trim()) parts.push(`[교회소식]\n${orders.news.trim()}`);
+  const news = (orders.news ?? '').trim();
+  if (news) parts.push(`[교회소식]\n${news}`);
   return parts.filter(Boolean).join('\n\n');
 }
 
-/** 뽑힌 것이 하나라도 있는지 — 교회소식만 있어도 되살릴 값이 있다 */
-export function hasAnyBulletinOrder(orders: BulletinOrders): boolean {
-  return ALL_SECTIONS.some((key) => orders[key].trim().length > 0);
+/** 뽑힌 것이 하나라도 있는지 — 교회소식만 있어도 되살릴 값이 있다.
+    섹션이 늘어나기 전 데이터가 들어올 수 있어 없는 키를 빈 값으로 본다. */
+export function hasAnyBulletinOrder(orders: Partial<BulletinOrders>): boolean {
+  return ALL_SECTIONS.some((key) => (orders[key] ?? '').trim().length > 0);
 }
 
 /** 순서표에서 항목 줄 개수 — 미리보기에 몇 줄이 잡혔는지 보여 준다 */
-export function countOrderLines(value: string): number {
-  return value.split('\n').filter((line) => line.trim().length > 0).length;
+export function countOrderLines(value: string | undefined): number {
+  return (value ?? '').split('\n').filter((line) => line.trim().length > 0).length;
 }

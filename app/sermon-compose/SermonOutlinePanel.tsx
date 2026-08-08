@@ -174,7 +174,7 @@ export default function SermonOutlinePanel() {
     mode: 'fill' | 'overwrite',
   ) => {
     const key = BULLETIN_SERVICES.find((s) => s.serviceType === serviceType)?.key;
-    const raw = key ? orders[key] : '';
+    const raw = (key ? orders[key] : '') ?? '';
     setOrderText(raw);
     if (!raw.trim()) return;
 
@@ -247,8 +247,10 @@ export default function SermonOutlinePanel() {
     applyOrderFor(fields.serviceType, orders, 'fill');
     /* 교회소식은 예배 종류와 무관하다 — 주보에 한 벌뿐이라 순서 적용과 따로 채운다.
        한 줄에 한 건으로 받아 빈 줄로 벌린다(splitNewsBlocks 규칙). */
-    if (!newsText.trim() && orders.news.trim()) {
-      setNewsText(orders.news.split('\n').map((line) => line.trim()).filter(Boolean).join('\n\n'));
+    /* 교회소식이 없던 시절 캐시가 들어올 수 있어 없는 값으로 본다 */
+    const news = (orders.news ?? '').trim();
+    if (!newsText.trim() && news) {
+      setNewsText(news.split('\n').map((line) => line.trim()).filter(Boolean).join('\n\n'));
     }
   };
 

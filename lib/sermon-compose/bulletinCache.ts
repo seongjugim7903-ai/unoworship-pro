@@ -7,7 +7,7 @@
 // 서버에 두지 않는 이유 — 아직 저장 전 단계의 임시 결과이고, 기존 설교대지 화면도
 // 초안을 localStorage 에 두는 방식을 쓰고 있다.
 
-import type { BulletinOrders } from './bulletinSections';
+import { emptyBulletinOrders, type BulletinOrders } from './bulletinSections';
 import { toWeekStart } from '../weekStart';
 
 const CACHE_KEY = 'unoworship-pro:sermon-compose:bulletin:v1';
@@ -45,7 +45,9 @@ export function loadBulletinCache(serviceDate: string): CachedBulletin | null {
 
     return {
       weekStart: parsed.weekStart,
-      orders: parsed.orders as BulletinOrders,
+      /* 섹션이 늘어나기 전에 저장된 캐시에는 없는 키가 있다(교회소식 추가 전 3키).
+         빈 값으로 채워 넘긴다 — 그냥 넘기면 화면이 undefined.trim() 으로 터진다. */
+      orders: { ...emptyBulletinOrders(), ...(parsed.orders as Partial<BulletinOrders>) },
       savedAt: parsed.savedAt ?? 0,
     };
   } catch (error) {
