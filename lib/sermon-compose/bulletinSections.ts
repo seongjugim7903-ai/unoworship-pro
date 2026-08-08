@@ -1,6 +1,8 @@
-// 주보에서 뽑아낼 예배 순서 세 가지의 정의와 병합 규칙.
-// 주일낮예배 · 주일오후예배 · 수요예배만 다룬다 — 교회소식과 금요기도회는 뽑지 않는다
-// (교회소식은 자체 탭에서 직접 입력받는다).
+// 주보에서 뽑아낼 것들의 정의와 병합 규칙.
+//
+// 예배 순서 세 가지(주일낮 · 주일오후 · 수요)와 교회소식을 뽑는다. 금요기도회는 뽑지 않는다.
+// 교회소식은 예배 순서가 아니라 주보 좌측 상단의 알림 목록이라, 예배 카드와 섞이지 않도록
+// BULLETIN_SERVICES 에서 빼고 섹션 키로만 둔다. 뽑은 소식은 교회소식 탭이 캐시에서 집어 간다.
 //
 // 각 순서가 나중에 어느 프로그램으로 흘러가는지도 여기 한 곳에 적어 둔다.
 // 실제 분배는 다음 단계에서 붙인다 — 지금은 어디로 갈지 화면에 보여 주기만 한다.
@@ -33,11 +35,20 @@ export const BULLETIN_SERVICES: BulletinServiceDef[] = [
   },
 ];
 
-export type BulletinOrders = Record<BulletinServiceKey, string>;
+/** 예배 순서 세 가지 + 교회소식 */
+export type BulletinSectionKey = BulletinServiceKey | 'news';
+
+export type BulletinOrders = Record<BulletinSectionKey, string>;
 
 export function emptyBulletinOrders(): BulletinOrders {
-  return { sundayMorning: '', sundayAfternoon: '', wednesday: '' };
+  return { sundayMorning: '', sundayAfternoon: '', wednesday: '', news: '' };
 }
+
+/** 병합·판정에 쓰는 전체 섹션 키 — 예배 카드 목록(BULLETIN_SERVICES)과는 별개다 */
+const ALL_SECTIONS: BulletinSectionKey[] = [
+  ...BULLETIN_SERVICES.map(({ key }) => key),
+  'news',
+];
 
 /**
  * 주보는 보통 앞뒤 여러 면이라 면마다 따로 분석한다.
@@ -47,7 +58,7 @@ export function mergeBulletinOrders(results: Partial<BulletinOrders>[]): Bulleti
   const merged = emptyBulletinOrders();
 
   for (const result of results) {
-    for (const { key } of BULLETIN_SERVICES) {
+    for (const key of ALL_SECTIONS) {
       const value = (result[key] ?? '').trim();
       if (!value) continue;
       merged[key] = merged[key] ? `${merged[key]}\n${value}` : value;
@@ -59,17 +70,17 @@ export function mergeBulletinOrders(results: Partial<BulletinOrders>[]): Bulleti
 
 /** 사람이 읽을 합본 텍스트 — weekly_bulletins.content 로 저장한다 */
 export function toBulletinText(orders: BulletinOrders): string {
-  return BULLETIN_SERVICES.map(({ key, serviceType }) => {
+  const parts = BULLETIN_SERVICES.map(({ key, serviceType }) => {
     const body = orders[key].trim();
     return body ? `[${serviceType}]\n${body}` : '';
-  })
-    .filter(Boolean)
-    .join('\n\n');
+  });
+  if (orders.news.trim()) parts.push(`[교회소식]\n${orders.news.trim()}`);
+  return parts.filter(Boolean).join('\n\n');
 }
 
-/** 순서가 하나라도 있는지 */
+/** 뽑힌 것이 하나라도 있는지 — 교회소식만 있어도 되살릴 값이 있다 */
 export function hasAnyBulletinOrder(orders: BulletinOrders): boolean {
-  return BULLETIN_SERVICES.some(({ key }) => orders[key].trim().length > 0);
+  return ALL_SECTIONS.some((key) => orders[key].trim().length > 0);
 }
 
 /** 순서표에서 항목 줄 개수 — 미리보기에 몇 줄이 잡혔는지 보여 준다 */

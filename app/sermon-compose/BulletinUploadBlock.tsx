@@ -218,7 +218,7 @@ export default function BulletinUploadBlock({ serviceType, serviceDate, onOrders
       <label className="sheet-field">
         주보에서 불러오기
         <span className="field-hint">
-          고르면 바로 읽어서 제목·본문·설교자·찬송가를 채웁니다. 앞뒤 여러 면을 한 번에 올려도 됩니다({MAX_PAGES}면까지).
+          고르면 바로 읽어서 제목·본문·설교자·찬송가·교회소식을 채웁니다. 앞뒤 여러 면을 한 번에 올려도 됩니다({MAX_PAGES}면까지).
         </span>
         <input
           type="file"

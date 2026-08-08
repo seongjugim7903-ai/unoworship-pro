@@ -15,8 +15,10 @@ import { getActiveChurchId, getActiveChurchName } from '../../../../lib/churchSc
 import {
   MAX_ITEMS_PER_PROGRAM,
   type SubHymnItem,
+  type SubNewsItem,
   type SubPraiseItem,
 } from '../../../../lib/sermon-compose/subProgram';
+import { splitNewsBlocks } from '../../../../lib/sermon-compose/churchNews';
 import { replaceSubProgram, type SavedSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 import { parseSermonOutline } from '../../../../lib/sermon-compose/parseSermonOutline';
 import { PARSER_VERSION } from '../../../../lib/sermon-compose/types';
@@ -46,6 +48,10 @@ const BodySchema = z.object({
     .max(MAX_ITEMS_PER_PROGRAM)
     .optional()
     .default([]),
+  /* 주보 좌측 상단에서 읽은 교회소식. 빈 줄로 나눈 한 건이 한 섹션이 된다.
+     교회소식 탭과 같은 규칙으로 서버에서 다시 나눈다 — 클라이언트가 나눈 결과를 믿지 않는다. */
+  newsTitle: z.string().trim().optional().default(''),
+  news: z.string().optional().default(''),
 });
 
 interface OutlineRow {
@@ -158,6 +164,31 @@ export async function POST(request: Request) {
           serviceType: body.serviceType,
           serviceDate: body.serviceDate,
           title: body.hymnTitle,
+          items,
+          originHeader: origin,
+        }),
+      );
+    }
+
+    /* 교회소식 — 찬송가·찬양과 같이 한 예배에 하나뿐이라 교체 저장한다 */
+    const newsBlocks = splitNewsBlocks(body.news);
+    if (newsBlocks.length > MAX_ITEMS_PER_PROGRAM) {
+      return jsonError(
+        `교회소식은 한 프로그램에 ${MAX_ITEMS_PER_PROGRAM}건까지 넣을 수 있습니다. (지금 ${newsBlocks.length}건)`,
+        400,
+        'TOO_MANY_NEWS',
+      );
+    }
+    if (newsBlocks.length > 0) {
+      const items: SubNewsItem[] = newsBlocks.map((block) => ({ body: block }));
+      subPrograms.push(
+        await replaceSubProgram({
+          id: randomUUID(),
+          kind: 'news',
+          churchId,
+          serviceType: body.serviceType,
+          serviceDate: body.serviceDate,
+          title: body.newsTitle,
           items,
           originHeader: origin,
         }),

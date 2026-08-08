@@ -12,7 +12,8 @@
 //   설교대지 · 말씀찾기(본문) · 말씀찾기(인용) · 찬송가 · 찬양(PPT)
 
 import { useMemo, useRef, useState } from 'react';
-import { defaultSubProgramTitle, parseHymnNumber } from '../../lib/sermon-compose/subProgram';
+import { MAX_ITEMS_PER_PROGRAM, defaultSubProgramTitle, parseHymnNumber } from '../../lib/sermon-compose/subProgram';
+import { splitNewsBlocks } from '../../lib/sermon-compose/churchNews';
 import { getUpcomingService } from '../../lib/sermon-compose/upcomingService';
 import { parseSermonOutline } from '../../lib/sermon-compose/parseSermonOutline';
 import { parseServiceOrder, type PreacherSource } from '../../lib/sermon-compose/serviceOrder';
@@ -80,6 +81,8 @@ export default function SermonOutlinePanel() {
   const [content, setContent] = useState('');
   const [hymnText, setHymnText] = useState('');
   const [praiseText, setPraiseText] = useState('');
+  /* 주보 좌측 상단 교회소식 — 한 줄이 소식 한 건이라 빈 줄로 벌려 저장한다 */
+  const [newsText, setNewsText] = useState('');
   const [orderText, setOrderText] = useState('');
   /* 주보 분석 결과 전체 — 예배 종류를 바꾸면 그 예배 순서로 다시 채워야 해서 들고 있는다. */
   const [bulletinOrders, setBulletinOrders] = useState<BulletinOrders | null>(null);
@@ -90,10 +93,12 @@ export default function SermonOutlinePanel() {
 
   const hymns = useMemo(() => readHymnNumbers(hymnText), [hymnText]);
   const praises = useMemo(() => readPraiseSongs(praiseText), [praiseText]);
+  const newsBlocks = useMemo(() => splitNewsBlocks(newsText), [newsText]);
   const parsed = useMemo(() => parseSermonOutline(content), [content]);
 
   const preacher = preacherSelect === PREACHER_CUSTOM ? customPreacher.trim() : preacherSelect;
   const hymnTitle = defaultSubProgramTitle(fields.serviceDate, fields.serviceType, 'hymn');
+  const newsTitle = defaultSubProgramTitle(fields.serviceDate, fields.serviceType, 'news');
   const praiseTitle = defaultSubProgramTitle(fields.serviceDate, fields.serviceType, 'praise');
   const busy = status === 'saving';
   const quoteCount = parsed.points.reduce((sum, point) => sum + point.quotes.length, 0);
@@ -240,6 +245,11 @@ export default function SermonOutlinePanel() {
   const handleBulletinOrders = (orders: BulletinOrders) => {
     setBulletinOrders(orders);
     applyOrderFor(fields.serviceType, orders, 'fill');
+    /* 교회소식은 예배 종류와 무관하다 — 주보에 한 벌뿐이라 순서 적용과 따로 채운다.
+       한 줄에 한 건으로 받아 빈 줄로 벌린다(splitNewsBlocks 규칙). */
+    if (!newsText.trim() && orders.news.trim()) {
+      setNewsText(orders.news.split('\n').map((line) => line.trim()).filter(Boolean).join('\n\n'));
+    }
   };
 
   /** 예배 종류를 바꾸면 주보에서 그 예배 순서를 다시 꺼내 채운다. */
@@ -293,9 +303,10 @@ export default function SermonOutlinePanel() {
     { name: '말씀찾기(인용)', ready: parsed.points.length > 0, note: `대지 ${parsed.points.length}개 · 인용 ${quoteCount}개` },
     { name: '찬송가', ready: hymns.numbers.length > 0, note: hymns.numbers.map((n) => `${n}장`).join(', ') || '장 번호 없음' },
     { name: '찬양(PPT)', ready: praises.length > 0, note: praises.join(', ') || '곡명 없음' },
+    { name: '교회소식', ready: newsBlocks.length > 0, note: newsBlocks.length > 0 ? `${newsBlocks.length}건` : '소식 없음' },
   ];
 
-  const canSave = Boolean(content.trim() || scriptureRef.trim()) && !busy;
+  const canSave = Boolean(content.trim() || scriptureRef.trim()) && newsBlocks.length <= MAX_ITEMS_PER_PROGRAM && !busy;
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -317,6 +328,8 @@ export default function SermonOutlinePanel() {
           serviceOrder: orderText,
           hymnTitle,
           praiseTitle,
+          newsTitle,
+          news: newsText,
           hymns: hymns.numbers.map((number) => ({ number, caption: '' })),
           praises: praises.map((songName) => ({ songName, caption: '' })),
         }),
@@ -353,7 +366,7 @@ export default function SermonOutlinePanel() {
           <ServiceFields
             value={fields}
             onChange={handleFieldsChange}
-            autoTitle={`${hymnTitle} · ${praiseTitle}`}
+            autoTitle={[hymnTitle, praiseTitle, newsBlocks.length > 0 ? newsTitle : ''].filter(Boolean).join(' · ')}
             detectedServiceType={upcoming.serviceType}
             showTitle={false}
             disabled={busy}
@@ -383,6 +396,29 @@ export default function SermonOutlinePanel() {
               />
             </label>
           )}
+          {bulletinOrders && (
+            <label>
+              주보에서 읽은 교회소식
+              <span className="field-hint">
+                {newsText.trim()
+                  ? '빈 줄로 나뉜 한 덩어리가 소식 한 장이 됩니다. 고치면 그대로 저장됩니다.'
+                  : '주보에서 교회소식을 찾지 못했습니다. 직접 적으면 소식 프로그램으로 저장됩니다.'}
+              </span>
+              <textarea
+                value={newsText}
+                onChange={(event) => setNewsText(event.target.value)}
+                placeholder={'매주 목요일은 울주전도의 날로 실천합니다.\n\n8월 1일(토) 월삭감사예배를 드립니다.'}
+                rows={newsText.trim() ? 7 : 3}
+                disabled={busy}
+              />
+            </label>
+          )}
+          {bulletinOrders && newsBlocks.length > MAX_ITEMS_PER_PROGRAM && (
+            <p className="error-message">
+              교회소식은 한 프로그램에 {MAX_ITEMS_PER_PROGRAM}건까지입니다. (지금 {newsBlocks.length}건)
+            </p>
+          )}
+
           {bulletinOrders && orderUnread && (
             <p className="info-message">
               순서는 읽었지만 <b>성경봉독 · 말씀선포 · 찬송</b> 항목을 알아보지 못했습니다.
