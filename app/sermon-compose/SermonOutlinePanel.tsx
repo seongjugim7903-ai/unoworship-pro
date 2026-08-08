@@ -11,7 +11,7 @@
 // 저장하면 현장에서 만들어질 프로그램은 다섯이다.
 //   설교대지 · 말씀찾기(본문) · 말씀찾기(인용) · 찬송가 · 찬양(PPT)
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { defaultSubProgramTitle, parseHymnNumber } from '../../lib/sermon-compose/subProgram';
 import { getUpcomingService } from '../../lib/sermon-compose/upcomingService';
 import { parseSermonOutline } from '../../lib/sermon-compose/parseSermonOutline';
@@ -103,11 +103,35 @@ export default function SermonOutlinePanel() {
     if (!current.trim() && incoming.trim()) setter(incoming.trim());
   };
 
+  /**
+   * 설교제목·본문·설교자는 주보가 협조문보다 정확하다.
+   *
+   * 협조문은 대지와 인용구절을 적어 보내는 문서라 이 세 값은 곁다리로 들어 있고
+   * 형식도 제각각이다. 주보는 그 예배의 공식 순서표라 이 값들의 출처로 더 낫다.
+   *
+   * 다만 '주보가 항상 이긴다'로 두면 사람이 고쳐 놓은 값까지 되돌린다. 그래서
+   * 값이 어디서 왔는지를 기억해 두고, 협조문이 채운 값일 때만 주보가 덮어쓴다.
+   * 사람이 직접 손댄 칸은 출처가 지워져 어느 쪽도 건드리지 않는다.
+   */
+  type AutoField = 'sermonTitle' | 'scriptureRef' | 'preacher';
+  const filledBy = useRef<Partial<Record<AutoField, 'outline' | 'bulletin'>>>({});
+  const forget = (field: AutoField) => { delete filledBy.current[field]; };
+
+  /** 협조문이 채운 값이면 주보가 덮어쓴다 */
+  const bulletinWins = (field: AutoField, current: string) =>
+    !current.trim() || filledBy.current[field] === 'outline';
+
   const handleContentChange = (next: string) => {
     setContent(next);
     const outline = parseSermonOutline(next);
-    fillIfEmpty(setSermonTitle, sermonTitle, outline.sermonTitle);
-    fillIfEmpty(setScriptureRef, scriptureRef, outline.scriptureRef);
+    if (!sermonTitle.trim() && outline.sermonTitle.trim()) {
+      setSermonTitle(outline.sermonTitle.trim());
+      filledBy.current.sermonTitle = 'outline';
+    }
+    if (!scriptureRef.trim() && outline.scriptureRef.trim()) {
+      setScriptureRef(outline.scriptureRef.trim());
+      filledBy.current.scriptureRef = 'outline';
+    }
     /* 협조문에 '설교자:' 줄이 있을 때만 반영한다. 없으면 기본값(한만상 목사)이 그대로 남고,
        사람이 이미 다른 설교자를 고른 상태면 건드리지 않는다. */
     if (outline.preacher && preacherSelect === PREACHER_OPTIONS[0] && !customPreacher) {
@@ -118,9 +142,10 @@ export default function SermonOutlinePanel() {
         setPreacherSelect(PREACHER_CUSTOM);
         setCustomPreacher(outline.preacher);
       }
+      filledBy.current.preacher = 'outline';
     }
     /* 협조문에도 '찬양:' 줄이 있으면 받아 둔다 — 주보와 겹치면 먼저 채워진 쪽이 남는다. */
-    fillIfEmpty(setHymnText, hymnText, outline.hymnNumbers.map((n) => `${n}장`).join(', '));
+    fillIfEmpty(setHymnText, hymnText, outline.hymnNumbers.map((n) => `${n}장`).join('\n'));
     fillIfEmpty(setPraiseText, praiseText, outline.praiseSongs.join('\n'));
   };
 
@@ -154,15 +179,35 @@ export default function SermonOutlinePanel() {
       else fillIfEmpty(setter, current, incoming);
     };
 
-    put(setSermonTitle, sermonTitle, order.sermonTitle, outline.sermonTitle);
-    put(setScriptureRef, scriptureRef, order.scriptureRef, outline.scriptureRef);
-    put(setHymnText, hymnText, order.hymnNumbers.map((n) => `${n}장`).join(', '),
-      outline.hymnNumbers.map((n) => `${n}장`).join(', '));
+    /* 설교제목·본문은 주보가 협조문을 이긴다(사람이 고친 값은 제외) */
+    const putPrimary = (
+      field: AutoField,
+      setter: (v: string) => void,
+      current: string,
+      incoming: string,
+      fallback: string,
+    ) => {
+      if (mode === 'overwrite') {
+        setter(incoming.trim() || fallback.trim());
+        filledBy.current[field] = incoming.trim() ? 'bulletin' : 'outline';
+        return;
+      }
+      if (!bulletinWins(field, current) || !incoming.trim()) return;
+      setter(incoming.trim());
+      filledBy.current[field] = 'bulletin';
+    };
+
+    putPrimary('sermonTitle', setSermonTitle, sermonTitle, order.sermonTitle, outline.sermonTitle);
+    putPrimary('scriptureRef', setScriptureRef, scriptureRef, order.scriptureRef, outline.scriptureRef);
+    /* 찬송가는 한 줄에 하나씩 — 찬양(PPT) 칸과 같은 규칙이라 눈으로 세기 쉽다 */
+    put(setHymnText, hymnText, order.hymnNumbers.map((n) => `${n}장`).join('\n'),
+      outline.hymnNumbers.map((n) => `${n}장`).join('\n'));
     put(setPraiseText, praiseText, order.praiseSongs.join('\n'), outline.praiseSongs.join('\n'));
 
-    /* 설교자는 선택지에 있으면 고르고, 없으면 직접기입으로 넘긴다. */
+    /* 설교자는 선택지에 있으면 고르고, 없으면 직접기입으로 넘긴다.
+       협조문이 채웠거나 아직 손대지 않은 경우에만 주보가 덮어쓴다. */
     const untouched = preacherSelect === PREACHER_OPTIONS[0] && !customPreacher;
-    if (order.preacher && (mode === 'overwrite' || untouched)) {
+    if (order.preacher && (mode === 'overwrite' || untouched || filledBy.current.preacher === 'outline')) {
       if (PREACHER_OPTIONS.includes(order.preacher)) {
         setPreacherSelect(order.preacher);
         setCustomPreacher('');
@@ -170,10 +215,12 @@ export default function SermonOutlinePanel() {
         setPreacherSelect(PREACHER_CUSTOM);
         setCustomPreacher(order.preacher);
       }
+      filledBy.current.preacher = 'bulletin';
     } else if (mode === 'overwrite') {
       /* 바꾼 예배의 순서에 설교자가 없으면 이전 예배 설교자를 지우고 기본값으로 되돌린다. */
       setPreacherSelect(PREACHER_OPTIONS[0]);
       setCustomPreacher('');
+      forget('preacher');
     }
     setPreacherSource(order.preacherSource);
   };
@@ -202,7 +249,7 @@ export default function SermonOutlinePanel() {
     const order = parseServiceOrder(next);
     if (order.sermonTitle) setSermonTitle(order.sermonTitle);
     if (order.scriptureRef) setScriptureRef(order.scriptureRef);
-    if (order.hymnNumbers.length > 0) setHymnText(order.hymnNumbers.map((n) => `${n}장`).join(', '));
+    if (order.hymnNumbers.length > 0) setHymnText(order.hymnNumbers.map((n) => `${n}장`).join('\n'));
     if (order.praiseSongs.length > 0) setPraiseText(order.praiseSongs.join('\n'));
     if (order.preacher) {
       if (PREACHER_OPTIONS.includes(order.preacher)) {
@@ -336,11 +383,21 @@ export default function SermonOutlinePanel() {
           <div className="song-inline">
             <label>
               설교제목
-              <input value={sermonTitle} onChange={(e) => setSermonTitle(e.target.value)} placeholder="예: 마음에 근심하지 말라!" disabled={busy} />
+              <input
+                value={sermonTitle}
+                onChange={(e) => { setSermonTitle(e.target.value); forget('sermonTitle'); }}
+                placeholder="예: 마음에 근심하지 말라!"
+                disabled={busy}
+              />
             </label>
             <label>
               본문 (요절)
-              <input value={scriptureRef} onChange={(e) => setScriptureRef(e.target.value)} placeholder="예: 요14:1-3" disabled={busy} />
+              <input
+                value={scriptureRef}
+                onChange={(e) => { setScriptureRef(e.target.value); forget('scriptureRef'); }}
+                placeholder="예: 요14:1-3"
+                disabled={busy}
+              />
             </label>
           </div>
 
@@ -351,6 +408,7 @@ export default function SermonOutlinePanel() {
               onChange={(e) => {
                 setPreacherSelect(e.target.value);
                 if (e.target.value !== PREACHER_CUSTOM) setCustomPreacher('');
+                forget('preacher');
               }}
               disabled={busy}
             >
@@ -361,7 +419,12 @@ export default function SermonOutlinePanel() {
           {preacherSelect === PREACHER_CUSTOM && (
             <label>
               설교자 이름
-              <input value={customPreacher} onChange={(e) => setCustomPreacher(e.target.value)} placeholder="이름을 직접 입력" disabled={busy} />
+              <input
+                value={customPreacher}
+                onChange={(e) => { setCustomPreacher(e.target.value); forget('preacher'); }}
+                placeholder="이름을 직접 입력"
+                disabled={busy}
+              />
             </label>
           )}
           {preacherSource === 'benediction' && (
@@ -385,13 +448,13 @@ export default function SermonOutlinePanel() {
 
           <label>
             찬송가
-            <span className="field-hint">장 번호만 적으세요. 가사는 현장에서 자동으로 채웁니다.</span>
+            <span className="field-hint">장 번호를 한 줄에 하나씩. 가사는 현장에서 자동으로 채웁니다.</span>
             <textarea
               className="hymn-input"
               value={hymnText}
               onChange={(event) => setHymnText(event.target.value)}
-              placeholder={'310장, 493장, 382장'}
-              rows={2}
+              placeholder={'310장\n493장\n382장'}
+              rows={3}
               disabled={busy}
             />
           </label>
