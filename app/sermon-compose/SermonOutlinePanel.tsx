@@ -113,7 +113,7 @@ export default function SermonOutlinePanel() {
    * 값이 어디서 왔는지를 기억해 두고, 협조문이 채운 값일 때만 주보가 덮어쓴다.
    * 사람이 직접 손댄 칸은 출처가 지워져 어느 쪽도 건드리지 않는다.
    */
-  type AutoField = 'sermonTitle' | 'scriptureRef' | 'preacher';
+  type AutoField = 'sermonTitle' | 'scriptureRef' | 'preacher' | 'praise';
   const filledBy = useRef<Partial<Record<AutoField, 'outline' | 'bulletin'>>>({});
   const forget = (field: AutoField) => { delete filledBy.current[field]; };
 
@@ -146,7 +146,15 @@ export default function SermonOutlinePanel() {
     }
     /* 협조문에도 '찬양:' 줄이 있으면 받아 둔다 — 주보와 겹치면 먼저 채워진 쪽이 남는다. */
     fillIfEmpty(setHymnText, hymnText, outline.hymnNumbers.map((n) => `${n}장`).join('\n'));
-    fillIfEmpty(setPraiseText, praiseText, outline.praiseSongs.join('\n'));
+    /* 찬양(PPT)은 출처가 협조문 하나뿐이라 협조문을 고치면 따라온다.
+       사람이 찬양 칸을 직접 손댔으면 그때부터는 건드리지 않는다. */
+    if (!praiseText.trim() || filledBy.current.praise === 'outline') {
+      const songs = outline.praiseSongs.join('\n');
+      if (songs) {
+        setPraiseText(songs);
+        filledBy.current.praise = 'outline';
+      }
+    }
   };
 
   /**
@@ -202,7 +210,10 @@ export default function SermonOutlinePanel() {
     /* 찬송가는 한 줄에 하나씩 — 찬양(PPT) 칸과 같은 규칙이라 눈으로 세기 쉽다 */
     put(setHymnText, hymnText, order.hymnNumbers.map((n) => `${n}장`).join('\n'),
       outline.hymnNumbers.map((n) => `${n}장`).join('\n'));
-    put(setPraiseText, praiseText, order.praiseSongs.join('\n'), outline.praiseSongs.join('\n'));
+    /* 찬양(PPT)은 협조문 아래 '찬양:' 줄에서만 온다 — 주보 순서표는 출처가 아니다.
+       주보의 '찬양과 경배' 같은 줄이 곡명으로 잡혀 협조문 값을 밀어내면 안 되고,
+       협조문은 예배 종류를 바꿔도 그대로이므로 여기서 다시 채울 일도 없다.
+       (parseServiceOrder 는 praiseSongs 를 계속 내주지만 이 화면은 쓰지 않는다) */
 
     /* 설교자는 선택지에 있으면 고르고, 없으면 직접기입으로 넘긴다.
        협조문이 채웠거나 아직 손대지 않은 경우에만 주보가 덮어쓴다. */
@@ -250,7 +261,7 @@ export default function SermonOutlinePanel() {
     if (order.sermonTitle) setSermonTitle(order.sermonTitle);
     if (order.scriptureRef) setScriptureRef(order.scriptureRef);
     if (order.hymnNumbers.length > 0) setHymnText(order.hymnNumbers.map((n) => `${n}장`).join('\n'));
-    if (order.praiseSongs.length > 0) setPraiseText(order.praiseSongs.join('\n'));
+    /* 찬양(PPT)은 협조문 전용이라 순서표를 고쳐도 건드리지 않는다 */
     if (order.preacher) {
       if (PREACHER_OPTIONS.includes(order.preacher)) {
         setPreacherSelect(order.preacher);
@@ -468,7 +479,7 @@ export default function SermonOutlinePanel() {
             <textarea
               className="hymn-input"
               value={praiseText}
-              onChange={(event) => setPraiseText(event.target.value)}
+              onChange={(event) => { setPraiseText(event.target.value); forget('praise'); }}
               placeholder={'주님 내 길 예비하시니\n나의 하나님'}
               rows={3}
               disabled={busy}
