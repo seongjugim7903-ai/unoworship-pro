@@ -7,6 +7,7 @@ import ChoirRequestPage from './choir/ChoirRequestPage';
 import SermonSection from './sermon-compose/SermonSection';
 import WorshipPrepPage from './worship/WorshipPrepPage';
 import AuthBadge from './AuthBadge';
+import AuthGate from './AuthGate';
 
 type View = 'home' | 'choir' | 'sermon' | 'worship';
 
@@ -56,9 +57,12 @@ export default function WorkspaceTabs() {
         <button className="feature-back" type="button" onClick={() => setView('home')}>← 홈</button>
         <span className="feature-title">{current?.label}</span>
       </header>
-      {view === 'choir' && <ChoirRequestPage />}
-      {view === 'sermon' && <SermonSection />}
-      {view === 'worship' && <WorshipPrepPage />}
+      {/* 입력 화면은 로그인·참여를 마친 사람만 — 홈과 연주용 악보 보기는 그대로 열려 있다 */}
+      <AuthGate>
+        {view === 'choir' && <ChoirRequestPage />}
+        {view === 'sermon' && <SermonSection />}
+        {view === 'worship' && <WorshipPrepPage />}
+      </AuthGate>
     </>
   );
 }
