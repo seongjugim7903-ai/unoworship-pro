@@ -237,13 +237,27 @@ export default function AdminPanel() {
         <p className="field-hint">
           <b>목회자</b>로 켜면 설교대지를 쓸 수 있습니다. 담임목사님과 부교역자를 켜 주세요 —
           각자 자기 설교대지를 쓰고 남의 것은 고치지 못합니다.
+          <br />
+          <b>관리자</b>는 한 명만 두지 마세요. 그분이 그만두거나 계정을 잃으면 아무도 코드를
+          발급하거나 팀을 만들 수 없습니다.
         </p>
         {members.length === 0 ? (
           <p className="field-hint">아직 참여자가 없습니다.</p>
         ) : members.map((member) => (
           <div className="code-row" key={member.userId}>
             <span className="code-team">{member.name}</span>
-            {member.role === 'admin' && <span className="field-hint">관리자</span>}
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy === `role:${member.userId}`}
+              onClick={() => run(`role:${member.userId}`, () => fetch('/api/membership/members', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: member.userId, role: member.role === 'admin' ? 'member' : 'admin' }),
+              }), member.role === 'admin' ? `${member.name} 관리자에서 내렸습니다` : `${member.name}을(를) 관리자로 세웠습니다`)}
+            >
+              {member.role === 'admin' ? '✓ 관리자' : '관리자로'}
+            </button>
             {member.teams.length > 0 && (
               <span className="field-hint">
                 {member.teams.map((team) => `${team.team}${team.role === 'leader' ? '(담당)' : ''}`).join(' · ')}

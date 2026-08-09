@@ -1,7 +1,11 @@
 // 교회 참여자 목록과 목회자 지정 — 관리자만.
 //
 // GET   → 참여자 목록 (이름·역할·목회자 여부·소속 팀)
-// PATCH → 목회자 표시 켜기·끄기  { userId, isPreacher }
+// PATCH → 목회자 표시 · 관리자 올리고 내리기  { userId, isPreacher?, role? }
+//
+// 관리자가 한 명뿐이면 그 사람이 그만두거나 카카오 계정을 잃었을 때 아무도 코드를
+// 발급하거나 팀을 만들 수 없다. 그래서 관리자를 더 세울 수 있어야 한다.
+// 다만 마지막 관리자는 스스로 내려올 수 없다 — 교회가 잠긴다.
 //
 // 이름은 profiles.full_name 을 쓴다. 카톡 닉네임은 🌸행복🌸 같은 것이 흔해서
 // 관리자가 누가 누구인지 알 수 없다 — 참여할 때 따로 받은 이유다.
@@ -17,7 +21,8 @@ export const runtime = 'nodejs';
 
 const PatchSchema = z.object({
   userId: z.string().trim().min(1),
-  isPreacher: z.boolean(),
+  isPreacher: z.boolean().optional(),
+  role: z.enum(['admin', 'member']).optional(),
 });
 
 function jsonError(message: string, status: number, code = 'MEMBERS_FAILED') {
@@ -87,9 +92,26 @@ export async function PATCH(request: Request) {
     if ('response' in auth) return auth.response;
 
     const body = PatchSchema.parse(await request.json());
+
+    if (body.role === 'member') {
+      /* 마지막 관리자를 내리면 교회가 잠긴다 — 코드도 팀도 아무도 못 만든다 */
+      const admins = await supabaseRest<Array<{ user_id: string }>>(
+        `/church_members?select=user_id&church_id=eq.${auth.churchId}&role=eq.admin`,
+        { method: 'GET' },
+      );
+      if (admins.length <= 1) {
+        return jsonError('관리자가 한 명뿐입니다. 다른 분을 먼저 관리자로 세워 주세요.', 400, 'LAST_ADMIN');
+      }
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (body.isPreacher !== undefined) patch.is_preacher = body.isPreacher;
+    if (body.role !== undefined) patch.role = body.role;
+    if (Object.keys(patch).length === 0) return jsonError('바꿀 값이 없습니다.', 400, 'NOTHING_TO_PATCH');
+
     await supabaseRest(
       `/church_members?church_id=eq.${auth.churchId}&user_id=eq.${body.userId}`,
-      { method: 'PATCH', body: JSON.stringify({ is_preacher: body.isPreacher }) },
+      { method: 'PATCH', body: JSON.stringify(patch) },
     );
     return NextResponse.json({ ok: true });
   } catch (error) {
