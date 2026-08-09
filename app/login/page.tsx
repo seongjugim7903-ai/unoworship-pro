@@ -46,6 +46,24 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#0f172a',
     marginBottom: '14px',
   },
+  /* 카카오 공식 색 — 노란 바탕에 검은 글씨. 다른 색을 쓰면 사용자가 못 알아본다 */
+  kakaoButton: {
+    width: '100%',
+    borderRadius: '10px',
+    border: 'none',
+    background: '#FEE500',
+    color: 'rgba(0,0,0,0.85)',
+    fontWeight: 700,
+    fontSize: '14px',
+    padding: '13px 0',
+    cursor: 'pointer',
+  },
+  divider: {
+    margin: '18px 0 10px',
+    color: '#94a3b8',
+    fontSize: '12px',
+    textAlign: 'center',
+  },
   button: {
     width: '100%',
     borderRadius: '10px',
@@ -112,6 +130,31 @@ function LoginInner() {
     return results.join(' · ');
   }
 
+  /* 카카오 로그인 — 대상이 찬양팀원·반주자라 이쪽이 주 경로다.
+     돌아올 곳은 우리 앱의 /auth/callback 이고, 거기서 세션 쿠키로 바꾼다. */
+  async function handleKakao() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      if (!supabase) {
+        setError('로그인 환경이 아직 설정되지 않았습니다. 관리자에게 문의하세요.');
+        return;
+      }
+      const target = redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/onboarding';
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'kakao',
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(target)}` },
+      });
+      if (oauthError) setError(`카카오 로그인을 시작하지 못했습니다. ${oauthError.message}`);
+      /* 성공하면 카카오로 넘어가므로 여기 아래는 실행되지 않는다 */
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '카카오 로그인을 시작하지 못했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
@@ -162,6 +205,17 @@ function LoginInner() {
             설정되지 않았습니다. Vercel 프로젝트 설정에서 등록해 주세요.
           </div>
         ) : (
+          <>
+            <button
+              type="button"
+              onClick={handleKakao}
+              disabled={isLoading}
+              style={{ ...styles.kakaoButton, opacity: isLoading ? 0.6 : 1 }}
+            >
+              카카오로 로그인
+            </button>
+            <p style={styles.divider}>또는 이메일로</p>
+
           <form onSubmit={handleSubmit}>
             <label htmlFor="email" style={styles.label}>이메일</label>
             <input
@@ -193,6 +247,7 @@ function LoginInner() {
               {isLoading ? '로그인 중...' : '로그인'}
             </button>
           </form>
+          </>
         )}
       </div>
     </div>
