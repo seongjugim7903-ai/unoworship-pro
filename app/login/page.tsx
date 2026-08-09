@@ -13,6 +13,7 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/authn/supabaseBrowser';
+import { KAKAO_SCOPES } from '../../lib/authn/kakaoScopes';
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
@@ -144,7 +145,10 @@ function LoginInner() {
       const target = redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/onboarding';
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'kakao',
-        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(target)}` },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(target)}`,
+          scopes: KAKAO_SCOPES,
+        },
       });
       if (oauthError) setError(`카카오 로그인을 시작하지 못했습니다. ${oauthError.message}`);
       /* 성공하면 카카오로 넘어가므로 여기 아래는 실행되지 않는다 */
