@@ -18,7 +18,7 @@ import { createClient } from '../../lib/authn/supabaseBrowser';
    (docs/features/auth-church-scope/context-notes.md) */
 const TEAMS = ['주일1부', '주일2부', '수요예배', '금요기도회'];
 
-type Status = 'checking' | 'ready' | 'saving' | 'done';
+type Status = 'checking' | 'need-login' | 'ready' | 'saving' | 'done';
 
 export default function OnboardingPage() {
   const [status, setStatus] = useState<Status>('checking');
@@ -39,7 +39,8 @@ export default function OnboardingPage() {
       }
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
-        window.location.href = '/login?redirectTo=/onboarding';
+        /* 로그인 화면으로 튕기지 않는다 — 여기가 하나뿐인 입구라 여기서 바로 누르게 한다 */
+        setStatus('need-login');
         return;
       }
       /* 카톡 닉네임을 첫 값으로 깔아 준다 — 그대로 쓰든 고치든 사용자가 정한다 */
@@ -50,6 +51,19 @@ export default function OnboardingPage() {
   }, []);
 
   const busy = status === 'saving' || status === 'checking';
+
+  const handleKakao = async () => {
+    const supabase = createClient();
+    if (!supabase) {
+      setError('로그인 환경이 아직 설정되지 않았습니다. 관리자에게 문의하세요.');
+      return;
+    }
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+    });
+    if (oauthError) setError(`카카오 로그인을 시작하지 못했습니다. ${oauthError.message}`);
+  };
 
   const handleJoin = async () => {
     if (busy) return;
@@ -81,6 +95,25 @@ export default function OnboardingPage() {
       setStatus('ready');
     }
   };
+
+  if (status === 'need-login') {
+    return (
+      <main className="site-shell">
+        <section className="panel">
+          <h2>로그인이 필요합니다</h2>
+          <p className="field-hint">
+            설교대지·준비찬양·헵시바는 교회 자료를 넣고 고치는 화면이라 로그인 뒤에 쓸 수 있습니다.
+            카카오로 로그인하시면 이어서 참여 코드를 넣게 됩니다.
+          </p>
+          {error && <p className="error-message">{error}</p>}
+          <button type="button" className="kakao-button" onClick={handleKakao}>카카오로 로그인</button>
+          <p className="field-hint" style={{ marginTop: 14 }}>
+            카카오를 쓰지 않으시면 <Link className="text-button" href="/login">이메일로 로그인</Link>
+          </p>
+        </section>
+      </main>
+    );
+  }
 
   if (status === 'done' && result) {
     return (
