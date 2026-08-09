@@ -64,3 +64,31 @@ create index if not exists worship_team_members_user_idx
 -- 접근은 서버(service role)만 한다. service role 은 RLS 를 통과하므로 정책은 두지 않는다.
 alter table public.invite_codes enable row level security;
 alter table public.worship_team_members enable row level security;
+
+-- 첫 코드를 심는다.
+--
+-- 참여는 코드가 있어야 하는데, 코드를 만드는 화면은 관리자만 쓸 수 있고
+-- 관리자는 '첫 참여자'다. 그대로 두면 아무도 들어올 수 없다.
+-- 그래서 이미 있는 교회마다 교회 참여 코드를 하나 심어 그 고리를 끊는다.
+--
+-- 코드 글자는 손으로 옮겨 적을 때 헷갈리는 것(0/O, 1/I/L)을 뺀 31자에서 고른다 —
+-- lib/authn/inviteCode.ts 의 CODE_ALPHABET 과 같은 규칙이다.
+insert into public.invite_codes (church_id, code, kind, max_uses)
+select
+  c.id,
+  (select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789',
+                            (floor(random() * 31) + 1)::int, 1), '')
+   from generate_series(1, 6)),
+  'church_join',
+  null                                   -- 여러 번 쓴다
+from public.churches c
+where not exists (
+  select 1 from public.invite_codes i
+  where i.church_id = c.id and i.kind = 'church_join' and i.revoked_at is null
+);
+
+-- 심은 코드를 확인한다. 이 결과의 code 를 교회 담당자에게 전달하면 된다.
+select c.name as 교회, i.code as 참여코드, i.kind as 종류
+from public.invite_codes i
+join public.churches c on c.id = i.church_id
+order by c.name;
