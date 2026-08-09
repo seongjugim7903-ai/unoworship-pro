@@ -27,15 +27,26 @@ export class InviteError extends Error {
 
 export interface Membership {
   churchRole: ChurchRole | null;
+  /** 설교대지를 쓸 수 있는 사람 — 팀이 아니라 사람에게 붙는 표시다 */
+  isPreacher: boolean;
   /** 팀 이름 → 그 팀에서의 역할 */
   teams: Record<string, TeamRole>;
 }
 
 /**
  * 그 팀의 곡·악보를 수정·삭제할 수 있는가.
- * 교회 관리자는 모든 팀, 팀장은 자기 팀만. 팀원은 보기만 한다.
+ * 교회 관리자는 모든 팀, 담당자는 자기 팀만. 팀원은 보기만 한다.
  */
 export function canEditTeam(membership: Membership, team: string): boolean {
   if (membership.churchRole === 'admin') return true;
   return membership.teams[team] === 'leader';
+}
+
+/**
+ * 설교대지를 쓸 수 있는가.
+ * 목회자로 등록된 사람과 교회 관리자다 — 관리자는 어디든 쓸 수 있다.
+ * 남의 설교대지를 고치는 것은 별개다(작성자 본인만).
+ */
+export function canWriteSermon(membership: Membership): boolean {
+  return membership.churchRole === 'admin' || membership.isPreacher;
 }

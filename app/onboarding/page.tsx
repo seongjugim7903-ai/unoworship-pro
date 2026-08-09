@@ -38,6 +38,18 @@ export default function OnboardingPage() {
         setStatus('need-login');
         return;
       }
+      /* 이미 교회에 참여한 사람에게 코드를 또 묻지 않는다.
+         로그아웃했다 다시 들어와도 참여는 그대로 남아 있다. */
+      try {
+        const me = await (await fetch('/api/membership/me')).json();
+        if (me?.churchRole) {
+          window.location.replace('/');
+          return;
+        }
+      } catch {
+        /* 확인이 안 되면 그냥 참여 화면을 보여 준다 — 이미 참여했으면 코드에서 걸린다 */
+      }
+
       /* 카톡 닉네임을 첫 값으로 깔아 준다 — 그대로 쓰든 고치든 사용자가 정한다 */
       const nickname = (data.user.user_metadata?.name ?? data.user.user_metadata?.full_name ?? '') as string;
       setName(nickname);
@@ -122,7 +134,7 @@ export default function OnboardingPage() {
               ? '이 교회의 첫 사용자라 관리자가 되었습니다. 팀장 코드를 만들어 각 팀장에게 전달해 주세요.'
               : result.teamRole === 'leader'
                 ? `${result.team} 담당으로 참여했습니다. 그 자료를 수정·삭제할 수 있습니다.`
-                : '교회에 참여했습니다. 자료는 보기만 되고, 맡으신 담당이 있으면 담당자용 코드를 받아 주세요.'}
+                : '교회에 참여했습니다. 자료는 보기만 됩니다. 담당을 맡으셨다면 담당자 코드를 따로 넣어 주세요.'}
           </p>
           <Link className="text-button" href="/">홈으로</Link>
         </section>
@@ -135,8 +147,8 @@ export default function OnboardingPage() {
       <section className="panel">
         <h2>교회 참여</h2>
         <p className="field-hint">
-          교회에서 받은 참여 코드를 넣어 주세요. 담당을 맡으시는 분은 담당자용 코드를 받으셨을 겁니다 —
-          어느 쪽이든 그대로 넣으시면 됩니다.
+          교회에서 받은 <b>교회 참여 코드</b>를 넣어 주세요. 처음 한 번만 넣으면 됩니다.
+          담당자 코드는 참여를 마친 뒤 따로 넣습니다.
         </p>
 
         <label>
@@ -151,7 +163,7 @@ export default function OnboardingPage() {
         </label>
 
         <label>
-          참여 코드
+          교회 참여 코드
           <input
             value={code}
             onChange={(event) => setCode(event.target.value.toUpperCase())}

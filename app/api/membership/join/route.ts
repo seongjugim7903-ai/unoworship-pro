@@ -19,6 +19,7 @@ import { SupabaseServerConfigError, supabaseRest } from '../../../../lib/supabas
 import { getSessionUserId } from '../../../../lib/authn/currentUser';
 import {
   InviteError,
+  loadMembership,
   findUsableInvite,
   isFirstMember,
   joinChurch,
@@ -31,7 +32,8 @@ export const runtime = 'nodejs';
 const BodySchema = z.object({
   code: z.string().trim().min(1, '참여 코드를 입력해 주세요.'),
   /* 카톡 닉네임은 관리에 못 쓴다 — 교회에서 부르는 이름을 한 번 받는다 */
-  name: z.string().trim().min(1, '이름을 입력해 주세요.').max(40),
+  /* 담당자 코드 경로에서는 이미 이름이 있으므로 비워 보낸다 */
+  name: z.string().trim().max(40).optional().default(''),
 });
 
 function jsonError(message: string, status: number, code = 'MEMBERSHIP_JOIN_FAILED') {
@@ -48,12 +50,24 @@ export async function POST(request: Request) {
     const body = BodySchema.parse(await request.json());
     const invite = await findUsableInvite(body.code);
 
-    /* 이름 먼저 — 참여가 실패해도 이름은 남는 편이 낫다(다시 묻지 않게) */
-    await supabaseRest(
-      '/profiles?on_conflict=id',
-      { method: 'POST', body: JSON.stringify({ id: userId, full_name: body.name, church_id: invite.church_id }) },
-      { prefer: 'resolution=merge-duplicates,return=minimal' },
-    );
+    /* 코드 두 종류를 구별해 안내한다 — 잘못 넣었을 때 무엇을 받아야 하는지 알려 준다 */
+    const already = await loadMembership(invite.church_id, userId);
+    if (invite.kind === 'church_join' && already.churchRole) {
+      return jsonError('이미 교회에 참여하셨습니다. 담당을 맡으셨다면 담당자 코드를 넣어 주세요.', 400, 'ALREADY_JOINED');
+    }
+    if (invite.kind === 'team_leader' && already.teams[invite.team ?? '']) {
+      return jsonError('이미 그 팀의 담당자입니다.', 400, 'ALREADY_LEADER');
+    }
+
+    /* 이름 먼저 — 참여가 실패해도 이름은 남는 편이 낫다(다시 묻지 않게).
+       담당자 코드 경로는 이름을 비워 보내므로 그때는 덮어쓰지 않는다. */
+    if (body.name) {
+      await supabaseRest(
+        '/profiles?on_conflict=id',
+        { method: 'POST', body: JSON.stringify({ id: userId, full_name: body.name, church_id: invite.church_id }) },
+        { prefer: 'resolution=merge-duplicates,return=minimal' },
+      );
+    }
 
     const first = await isFirstMember(invite.church_id);
     await joinChurch(invite.church_id, userId, first ? 'admin' : 'member');

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   canEditTeam,
+  canWriteSermon,
   generateInviteCode,
   normalizeInviteCode,
   type Membership,
@@ -45,7 +46,7 @@ describe('generateInviteCode', () => {
 
 describe('canEditTeam', () => {
   const make = (over: Partial<Membership> = {}): Membership => ({
-    churchRole: 'member', teams: {}, ...over,
+    churchRole: 'member', isPreacher: false, teams: {}, ...over,
   });
 
   it('교회 관리자는 모든 팀을 손댄다', () => {
@@ -66,5 +67,24 @@ describe('canEditTeam', () => {
 
   it('소속이 없으면 아무 것도 못 고친다', () => {
     expect(canEditTeam(make({ churchRole: null }), '주일1부')).toBe(false);
+  });
+});
+
+describe('canWriteSermon', () => {
+  const make = (over: Partial<Membership> = {}): Membership => ({
+    churchRole: 'member', isPreacher: false, teams: {}, ...over,
+  });
+
+  it('목회자로 등록된 사람은 쓸 수 있다', () => {
+    expect(canWriteSermon(make({ isPreacher: true }))).toBe(true);
+  });
+
+  it('교회 관리자는 표시와 무관하게 쓸 수 있다', () => {
+    expect(canWriteSermon(make({ churchRole: 'admin' }))).toBe(true);
+  });
+
+  it('그 외에는 못 쓴다 — 팀 담당이어도 설교대지는 별개다', () => {
+    expect(canWriteSermon(make())).toBe(false);
+    expect(canWriteSermon(make({ teams: { 주일1부: 'leader' } }))).toBe(false);
   });
 });

@@ -52,6 +52,7 @@ export default function AuthBadge() {
   return (
     <span className="auth-badge">
       {isAdmin && <a className="auth-badge-admin" href="/admin">코드 관리</a>}
+      <a className="auth-badge-admin" href="/onboarding/leader">담당자 코드</a>
       {name}
       <button
         type="button"

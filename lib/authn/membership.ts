@@ -101,8 +101,8 @@ export async function joinTeam(
 
 export async function loadMembership(churchId: string, userId: string): Promise<Membership> {
   const [members, teams] = await Promise.all([
-    supabaseRest<Array<{ role: Membership['churchRole'] }>>(
-      `/church_members?select=role&church_id=eq.${churchId}&user_id=eq.${userId}&limit=1`,
+    supabaseRest<Array<{ role: Membership['churchRole']; is_preacher: boolean | null }>>(
+      `/church_members?select=role,is_preacher&church_id=eq.${churchId}&user_id=eq.${userId}&limit=1`,
       { method: 'GET' },
     ),
     supabaseRest<Array<{ team: string; role: TeamRole }>>(
@@ -113,6 +113,7 @@ export async function loadMembership(churchId: string, userId: string): Promise<
 
   return {
     churchRole: members?.[0]?.role ?? null,
+    isPreacher: Boolean(members?.[0]?.is_preacher),
     teams: Object.fromEntries((teams ?? []).map((row) => [row.team, row.role])),
   };
 }
