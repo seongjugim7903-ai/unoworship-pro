@@ -19,7 +19,7 @@
 
 import { cache } from 'react';
 import { supabaseRest } from './supabase/server';
-import { getSessionUserId } from './authn/currentUser';
+import { getSessionUserId } from '../features/membership/currentUser';
 
 export interface ActiveChurch {
   id: string;

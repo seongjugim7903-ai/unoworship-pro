@@ -11,9 +11,9 @@
 
 import { NextResponse } from 'next/server';
 import { SupabaseServerConfigError, supabaseRest } from '../../../../lib/supabase/server';
-import { getSessionUserId } from '../../../../lib/authn/currentUser';
+import { getSessionUserId } from '../../../../features/membership/currentUser';
 import { getActiveChurchId } from '../../../../lib/churchScope';
-import { loadMembership } from '../../../../lib/authn/membership';
+import { loadMembership } from '../../../../features/membership/store';
 
 export const runtime = 'nodejs';
 

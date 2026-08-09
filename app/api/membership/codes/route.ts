@@ -10,9 +10,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { SupabaseServerConfigError, supabaseRest } from '../../../../lib/supabase/server';
-import { getSessionUserId } from '../../../../lib/authn/currentUser';
+import { getSessionUserId } from '../../../../features/membership/currentUser';
 import { getActiveChurchId } from '../../../../lib/churchScope';
-import { generateInviteCode, loadMembership } from '../../../../lib/authn/membership';
+import { generateInviteCode, loadMembership } from '../../../../features/membership/store';
 
 export const runtime = 'nodejs';
 

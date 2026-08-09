@@ -6,7 +6,7 @@ import {
 } from '../../../lib/supabase/server';
 import { getActiveChurchId } from '../../../lib/churchScope';
 import { toWeekStart } from '../../../lib/weekStart';
-import { requireLogin } from '../../../lib/authn/requireLogin';
+import { requireLogin } from '../../../features/membership/requireLogin';
 
 export const runtime = 'nodejs';
 

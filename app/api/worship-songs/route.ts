@@ -13,7 +13,7 @@ import {
   listLibrarySongs,
   upsertLibrarySong,
 } from '../../../lib/worship-prep/songLibrary';
-import { requireLogin } from '../../../lib/authn/requireLogin';
+import { requireLogin } from '../../../features/membership/requireLogin';
 
 export const runtime = 'nodejs';
 

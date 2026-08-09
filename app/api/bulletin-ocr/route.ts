@@ -3,7 +3,7 @@ import {
   BulletinExtractorConfigError,
   extractBulletinSections,
 } from '../../../lib/bulletin/extractBulletin';
-import { requireLogin } from '../../../lib/authn/requireLogin';
+import { requireLogin } from '../../../features/membership/requireLogin';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;

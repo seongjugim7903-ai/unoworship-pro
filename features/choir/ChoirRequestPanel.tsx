@@ -79,7 +79,7 @@ async function readApiResult(response: Response): Promise<ApiResult> {
   }
 }
 
-export default function ChoirRequestPage() {
+export default function ChoirRequestPanel() {
   const churchName = '';
   const [serviceType, setServiceType] = useState('주일낮예배');
   const [serviceDate, setServiceDate] = useState('');

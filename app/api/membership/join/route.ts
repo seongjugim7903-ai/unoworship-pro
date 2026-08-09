@@ -16,7 +16,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { SupabaseServerConfigError, supabaseRest } from '../../../../lib/supabase/server';
-import { getSessionUserId } from '../../../../lib/authn/currentUser';
+import { getSessionUserId } from '../../../../features/membership/currentUser';
 import {
   InviteError,
   loadMembership,
@@ -25,7 +25,7 @@ import {
   joinChurch,
   joinTeam,
   markInviteUsed,
-} from '../../../../lib/authn/membership';
+} from '../../../../features/membership/store';
 
 export const runtime = 'nodejs';
 

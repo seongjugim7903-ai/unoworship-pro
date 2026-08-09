@@ -13,7 +13,7 @@ import { getActiveChurchId } from '../../../../lib/churchScope';
 import { MAX_ITEMS_PER_PROGRAM, type SubNewsItem } from '../../../../lib/sermon-compose/subProgram';
 import { insertSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 import { splitNewsBlocks } from '../../../../lib/sermon-compose/churchNews';
-import { requireLogin } from '../../../../lib/authn/requireLogin';
+import { requireLogin } from '../../../../features/membership/requireLogin';
 
 export const runtime = 'nodejs';
 

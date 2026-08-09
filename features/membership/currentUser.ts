@@ -6,7 +6,7 @@ import 'server-only';
 // 현장 맥(UnoLive)의 읽기 호출이 살아 있어야 하고, "로그인 여부"는
 // 호출부가 판단할 일이지 여기서 막을 일이 아니다.
 
-import { createSessionClient, isAuthConfigured } from './supabaseAuth';
+import { createSessionClient, isAuthConfigured } from '../../lib/authn/supabaseAuth';
 
 export async function getSessionUserId(): Promise<string | null> {
   /* 환경변수가 없으면 로그인 자체가 구성되지 않은 배포다 */

@@ -108,7 +108,7 @@ function arrangementLabel(value: string, custom: string) {
   return ARRANGEMENTS.find((item) => item.value === value)?.label ?? value;
 }
 
-export default function WorshipPrepPage() {
+export default function WorshipPrepPanel() {
   /* 도래하는 정기예배를 기본값으로 잡는다(설교대지 페이지와 같은 규칙).
      렌더마다 시각이 흔들리지 않게 한 번만 계산한다. */
   const upcoming = useMemo(() => getUpcomingService(), []);

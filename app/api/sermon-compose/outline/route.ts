@@ -22,7 +22,7 @@ import { splitNewsBlocks } from '../../../../lib/sermon-compose/churchNews';
 import { replaceSubProgram, type SavedSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 import { parseSermonOutline } from '../../../../lib/sermon-compose/parseSermonOutline';
 import { PARSER_VERSION } from '../../../../lib/sermon-compose/types';
-import { requireLogin } from '../../../../lib/authn/requireLogin';
+import { requireLogin } from '../../../../features/membership/requireLogin';
 
 export const runtime = 'nodejs';
 

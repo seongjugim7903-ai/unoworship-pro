@@ -9,7 +9,7 @@ import {
   extractBulletinOrders,
 } from '../../../../lib/sermon-compose/bulletinExtract';
 import { AnthropicServiceError } from '../../../../lib/sermon-compose/anthropicError';
-import { requireLogin } from '../../../../lib/authn/requireLogin';
+import { requireLogin } from '../../../../features/membership/requireLogin';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;

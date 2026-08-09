@@ -9,7 +9,7 @@
 // '교회에서 부르는 이름'이다(profiles.full_name).
 
 import { useEffect, useState } from 'react';
-import { createClient } from '../lib/authn/supabaseBrowser';
+import { createClient } from '../../lib/authn/supabaseBrowser';
 
 export default function AuthBadge() {
   const [name, setName] = useState<string | null>(null);

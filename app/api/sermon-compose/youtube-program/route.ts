@@ -14,7 +14,7 @@ import {
 } from '../../../../lib/sermon-compose/subProgram';
 import { insertSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 import { extractYoutubeId } from '../../../../lib/sermon-compose/youtubeLink';
-import { requireLogin } from '../../../../lib/authn/requireLogin';
+import { requireLogin } from '../../../../features/membership/requireLogin';
 
 export const runtime = 'nodejs';
 

@@ -3,11 +3,11 @@
 // 랜딩 → 각 기능 진입. 탭 상시 노출을 없애 오조작을 줄인다.
 
 import { useState } from 'react';
-import ChoirRequestPage from './choir/ChoirRequestPage';
-import SermonSection from './sermon-compose/SermonSection';
-import WorshipPrepPage from './worship/WorshipPrepPage';
-import AuthBadge from './AuthBadge';
-import AuthGate from './AuthGate';
+import ChoirRequestPanel from '../features/choir/ChoirRequestPanel';
+import SermonSection from '../features/sermon-compose/SermonSection';
+import WorshipPrepPanel from '../features/worship-prep-ui/WorshipPrepPanel';
+import AuthBadge from '../features/membership/AuthBadge';
+import AuthGate from '../features/membership/AuthGate';
 
 type View = 'home' | 'choir' | 'sermon' | 'worship';
 
@@ -59,9 +59,9 @@ export default function WorkspaceTabs() {
       </header>
       {/* 입력 화면은 로그인·참여를 마친 사람만 — 홈과 연주용 악보 보기는 그대로 열려 있다 */}
       <AuthGate>
-        {view === 'choir' && <ChoirRequestPage />}
+        {view === 'choir' && <ChoirRequestPanel />}
         {view === 'sermon' && <SermonSection />}
-        {view === 'worship' && <WorshipPrepPage />}
+        {view === 'worship' && <WorshipPrepPanel />}
       </AuthGate>
     </>
   );

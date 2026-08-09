@@ -5,7 +5,7 @@ import {
   generateInviteCode,
   normalizeInviteCode,
   type Membership,
-} from '../lib/authn/inviteCode';
+} from '../features/membership/inviteCode';
 
 // 코드는 사람이 카톡으로 받아 손으로 옮겨 적는다. 그 과정에서 생기는 흔들림
 // (소문자, 하이픈, 공백)을 흘려보내는 것이 이 함수들의 일이다.

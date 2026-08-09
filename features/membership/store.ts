@@ -4,7 +4,7 @@ import 'server-only';
 //
 // 배경과 결정은 docs/features/auth-church-scope/context-notes.md 참조.
 
-import { supabaseRest } from '../supabase/server';
+import { supabaseRest } from '../../lib/supabase/server';
 import {
   InviteError,
   normalizeInviteCode,

@@ -17,7 +17,7 @@ import {
   type SubImageItem,
 } from '../../../../lib/sermon-compose/subProgram';
 import { insertSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
-import { requireLogin } from '../../../../lib/authn/requireLogin';
+import { requireLogin } from '../../../../features/membership/requireLogin';
 
 export const runtime = 'nodejs';
 

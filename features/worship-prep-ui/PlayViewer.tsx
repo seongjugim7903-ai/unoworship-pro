@@ -10,7 +10,7 @@
 //   · 한 예배에 여러 곡이다 → 셋 스트립으로 지금 곡과 '다음' 곡이 한눈에 들어오게 한다
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { croppedAspect, NO_CROP, readSheetPages, type SheetPage } from '../../../lib/worship-prep/sheetPages';
+import { croppedAspect, NO_CROP, readSheetPages, type SheetPage } from '../../lib/worship-prep/sheetPages';
 
 interface PrepSong {
   id: string;
