@@ -13,6 +13,7 @@ import { getActiveChurchId } from '../../../../lib/churchScope';
 import { MAX_ITEMS_PER_PROGRAM, type SubNewsItem } from '../../../../lib/sermon-compose/subProgram';
 import { insertSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 import { splitNewsBlocks } from '../../../../lib/sermon-compose/churchNews';
+import { requireLogin } from '../../../../lib/authn/requireLogin';
 
 export const runtime = 'nodejs';
 
@@ -28,6 +29,10 @@ function jsonError(message: string, status: number, code = 'SERMON_NEWS_PROGRAM_
 }
 
 export async function POST(request: Request) {
+  /* 쓰기는 로그인한 사람만 — 강제 여부는 UNOWORSHIP_REQUIRE_LOGIN 이 정한다 */
+  const denied = await requireLogin();
+  if (denied) return denied;
+
   try {
     const body = BodySchema.parse(await request.json());
 

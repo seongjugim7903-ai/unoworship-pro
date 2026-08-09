@@ -3,6 +3,7 @@ import {
   BulletinExtractorConfigError,
   extractBulletinSections,
 } from '../../../lib/bulletin/extractBulletin';
+import { requireLogin } from '../../../lib/authn/requireLogin';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -15,6 +16,10 @@ function jsonError(message: string, status: number, code = 'BULLETIN_OCR_FAILED'
 }
 
 export async function POST(request: Request) {
+  /* 쓰기는 로그인한 사람만 — 강제 여부는 UNOWORSHIP_REQUIRE_LOGIN 이 정한다 */
+  const denied = await requireLogin();
+  if (denied) return denied;
+
   try {
     const formData = await request.formData();
     const file = formData.get('image');

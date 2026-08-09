@@ -13,6 +13,7 @@ import {
   listLibrarySongs,
   upsertLibrarySong,
 } from '../../../lib/worship-prep/songLibrary';
+import { requireLogin } from '../../../lib/authn/requireLogin';
 
 export const runtime = 'nodejs';
 
@@ -61,6 +62,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  /* 쓰기는 로그인한 사람만 — 강제 여부는 UNOWORSHIP_REQUIRE_LOGIN 이 정한다 */
+  const denied = await requireLogin();
+  if (denied) return denied;
+
   try {
     const body = EditSchema.parse(await request.json());
     await upsertLibrarySong({
@@ -86,6 +91,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  /* 쓰기는 로그인한 사람만 — 강제 여부는 UNOWORSHIP_REQUIRE_LOGIN 이 정한다 */
+  const denied = await requireLogin();
+  if (denied) return denied;
+
   try {
     const id = new URL(request.url).searchParams.get('id')?.trim();
     if (!id) return jsonError('id가 없습니다.', 400, 'NO_ID');

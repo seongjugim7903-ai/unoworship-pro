@@ -16,6 +16,7 @@ import {
   listLibrarySheetPaths,
   upsertLibrarySong,
 } from '../../../lib/worship-prep/songLibrary';
+import { requireLogin } from '../../../lib/authn/requireLogin';
 
 export const runtime = 'nodejs';
 
@@ -141,6 +142,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  /* 쓰기는 로그인한 사람만 — 강제 여부는 UNOWORSHIP_REQUIRE_LOGIN 이 정한다 */
+  const denied = await requireLogin();
+  if (denied) return denied;
+
   try {
     const formData = await request.formData();
     const rawPayload = formData.get('payload');
