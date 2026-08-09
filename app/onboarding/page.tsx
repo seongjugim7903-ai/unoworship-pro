@@ -14,9 +14,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../lib/authn/supabaseBrowser';
 
-/* 화면의 팀 목록 — 아직 문자열이다. 교회마다 달라지면 데이터로 뺀다
-   (docs/features/auth-church-scope/context-notes.md) */
-const TEAMS = ['주일1부', '주일2부', '수요예배', '금요기도회'];
+/* 권한은 기능 단위로 나눈다 — 설교대지는 목회자·비서, 준비찬양은 찬양 인도자,
+   찬양대는 헵시바 담당이 맡는 것이 실제 모습이다.
+   준비찬양 안의 주일1부·2부·수요·금요는 자료를 나누는 분류이지 권한 단위가 아니다. */
+const TEAMS = ['설교대지', '준비찬양', '찬양대'];
 
 type Status = 'checking' | 'need-login' | 'ready' | 'saving' | 'done';
 
@@ -166,8 +167,8 @@ export default function OnboardingPage() {
         </label>
 
         <label>
-          찬양팀
-          <span className="field-hint">팀장 코드를 쓰시면 이 선택은 무시되고 코드가 정한 팀으로 들어갑니다.</span>
+          담당
+          <span className="field-hint">무엇을 맡으시는지 고르세요. 팀장 코드를 쓰시면 이 선택은 무시되고 코드가 정한 담당으로 들어갑니다.</span>
           <select value={team} onChange={(event) => setTeam(event.target.value)} disabled={busy}>
             {TEAMS.map((item) => <option key={item}>{item}</option>)}
           </select>

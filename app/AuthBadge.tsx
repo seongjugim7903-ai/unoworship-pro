@@ -13,6 +13,7 @@ import { createClient } from '../lib/authn/supabaseBrowser';
 
 export default function AuthBadge() {
   const [name, setName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -32,6 +33,11 @@ export default function AuthBadge() {
           .maybeSingle();
         const nickname = (data.user.user_metadata?.name ?? '') as string;
         setName(profile?.full_name || nickname || '참여자');
+        /* 관리자에게만 코드 발급 화면을 보여 준다 */
+        try {
+          const me = await (await fetch('/api/membership/me')).json();
+          setIsAdmin(me?.churchRole === 'admin');
+        } catch { /* 확인 실패는 무시 — 링크만 안 보일 뿐이다 */ }
       }
       setReady(true);
     })();
@@ -45,6 +51,7 @@ export default function AuthBadge() {
 
   return (
     <span className="auth-badge">
+      {isAdmin && <a className="auth-badge-admin" href="/admin">코드 관리</a>}
       {name}
       <button
         type="button"
