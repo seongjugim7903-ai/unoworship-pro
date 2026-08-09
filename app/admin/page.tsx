@@ -9,10 +9,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-/* 권한은 기능 단위로 나눈다 — 설교대지는 목회자·비서, 준비찬양은 찬양 인도자,
-   찬양대는 헵시바 담당이 맡는 것이 실제 모습이다.
-   준비찬양 안의 주일1부·2부·수요·금요는 자료를 나누는 분류이지 권한 단위가 아니다. */
-const TEAMS = ['설교대지', '준비찬양', '찬양대'];
+/* 권한은 팀과 작성자 둘로만 갈린다. 카테고리(설교대지·준비찬양·찬양대) 담당은 두지 않는다 —
+   교회 관리자와 역할이 겹쳐서 '누가 무엇을 할 수 있나'가 세 갈래가 된다.
+   설교대지는 아예 팀이 없다. 담임목사도 부교역자도 각자 자기 것을 쓰므로 작성자 본인이 기준이다.
+   교회마다 팀 이름이 다르므로 언젠가 데이터로 뺀다(두 번째 교회가 들어올 때). */
+const TEAMS = ['주일1부', '주일2부', '수요예배', '금요기도회', '헵시바'];
 
 interface Code {
   id: string;
@@ -124,10 +125,11 @@ export default function AdminPage() {
       </section>
 
       <section className="panel">
-        <h2>팀장 코드</h2>
+        <h2>담당자 코드</h2>
         <p className="field-hint">
-          팀마다 하나씩, <b>한 번만 쓸 수 있습니다.</b> 팀장에게 1:1로 보내세요 —
-          단톡방에 돌아도 먼저 쓴 사람 뒤로는 아무도 팀장이 될 수 없습니다.
+          팀마다 하나씩, <b>한 번만 쓸 수 있습니다.</b> 담당자에게 1:1로 보내세요 —
+          단톡방에 돌아도 먼저 쓴 사람 뒤로는 아무도 담당자가 될 수 없습니다.
+          설교대지는 각자 자기 것을 쓰므로 코드가 없습니다.
         </p>
         {TEAMS.map((team) => {
           const code = leaderOf(team);
@@ -139,7 +141,7 @@ export default function AdminPage() {
               {code && !used && (
                 <button type="button" className="text-button" onClick={() => copy(code.code)}>복사</button>
               )}
-              {used && <span className="field-hint">이미 사용됨 — 팀장이 정해졌습니다</span>}
+              {used && <span className="field-hint">이미 사용됨 — 담당자가 정해졌습니다</span>}
               <button
                 type="button"
                 className="text-button danger"
@@ -152,7 +154,7 @@ export default function AdminPage() {
           );
         })}
         <p className="field-hint">
-          팀장을 바꾸려면 <b>다시 만들기</b>로 새 코드를 뽑아 새 팀장에게 보내면 됩니다.
+          담당자를 바꾸려면 <b>다시 만들기</b>로 새 코드를 뽑아 새 담당자에게 보내면 됩니다.
         </p>
       </section>
 

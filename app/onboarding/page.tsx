@@ -14,18 +14,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../lib/authn/supabaseBrowser';
 
-/* 권한은 기능 단위로 나눈다 — 설교대지는 목회자·비서, 준비찬양은 찬양 인도자,
-   찬양대는 헵시바 담당이 맡는 것이 실제 모습이다.
-   준비찬양 안의 주일1부·2부·수요·금요는 자료를 나누는 분류이지 권한 단위가 아니다. */
-const TEAMS = ['설교대지', '준비찬양', '찬양대'];
-
 type Status = 'checking' | 'need-login' | 'ready' | 'saving' | 'done';
 
 export default function OnboardingPage() {
   const [status, setStatus] = useState<Status>('checking');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [team, setTeam] = useState(TEAMS[0]);
   const [error, setError] = useState('');
   const [result, setResult] = useState<{ churchRole: string; team: string | null; teamRole: string | null } | null>(null);
 
@@ -76,7 +70,7 @@ export default function OnboardingPage() {
       const response = await fetch('/api/membership/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, name, team }),
+        body: JSON.stringify({ code, name }),
       });
       const json = await response.json() as {
         ok?: boolean; message?: string;
@@ -127,8 +121,8 @@ export default function OnboardingPage() {
             {result.churchRole === 'admin'
               ? '이 교회의 첫 사용자라 관리자가 되었습니다. 팀장 코드를 만들어 각 팀장에게 전달해 주세요.'
               : result.teamRole === 'leader'
-                ? `${result.team} 팀장으로 참여했습니다. 곡과 악보를 수정·삭제할 수 있습니다.`
-                : `${result.team ?? '교회'} 팀원으로 참여했습니다. 곡과 악보는 보기만 됩니다.`}
+                ? `${result.team} 담당으로 참여했습니다. 그 자료를 수정·삭제할 수 있습니다.`
+                : '교회에 참여했습니다. 자료는 보기만 되고, 맡으신 담당이 있으면 담당자용 코드를 받아 주세요.'}
           </p>
           <Link className="text-button" href="/">홈으로</Link>
         </section>
@@ -141,7 +135,8 @@ export default function OnboardingPage() {
       <section className="panel">
         <h2>교회 참여</h2>
         <p className="field-hint">
-          교회에서 받은 참여 코드를 넣어 주세요. 팀장 코드를 받으셨다면 팀은 코드가 정합니다.
+          교회에서 받은 참여 코드를 넣어 주세요. 담당을 맡으시는 분은 담당자용 코드를 받으셨을 겁니다 —
+          어느 쪽이든 그대로 넣으시면 됩니다.
         </p>
 
         <label>
@@ -164,14 +159,6 @@ export default function OnboardingPage() {
             autoCapitalize="characters"
             disabled={busy}
           />
-        </label>
-
-        <label>
-          담당
-          <span className="field-hint">무엇을 맡으시는지 고르세요. 팀장 코드를 쓰시면 이 선택은 무시되고 코드가 정한 담당으로 들어갑니다.</span>
-          <select value={team} onChange={(event) => setTeam(event.target.value)} disabled={busy}>
-            {TEAMS.map((item) => <option key={item}>{item}</option>)}
-          </select>
         </label>
 
         {error && <p className="error-message">{error}</p>}

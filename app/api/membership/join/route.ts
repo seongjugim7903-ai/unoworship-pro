@@ -1,9 +1,12 @@
 // 참여 코드로 교회·팀에 들어간다.
 //
-// POST application/json — { code, name, team? }
+// POST application/json — { code, name }
 //
-//   church_join  코드  → 교회에 들어가고 team 을 골라 팀원이 된다
-//   team_leader  코드  → 그 코드에 적힌 팀의 팀장이 된다 (team 입력은 무시한다)
+//   church_join  코드  → 교회에 들어간다. 팀은 없다
+//   team_leader  코드  → 그 코드에 적힌 팀의 담당이 된다
+//
+// 팀원은 팀 소속을 갖지 않는다. 보기만 하므로 소속이 아무 역할을 하지 않는다 —
+// 팀 소속은 담당자에게만 생기고, 그것을 정하는 것은 담당자용 코드다.
 //
 // 그 교회 첫 사용자는 관리자가 된다 — 구독을 결제한 사람이 가장 먼저 들어온다.
 //
@@ -29,7 +32,6 @@ const BodySchema = z.object({
   code: z.string().trim().min(1, '참여 코드를 입력해 주세요.'),
   /* 카톡 닉네임은 관리에 못 쓴다 — 교회에서 부르는 이름을 한 번 받는다 */
   name: z.string().trim().min(1, '이름을 입력해 주세요.').max(40),
-  team: z.string().trim().max(40).optional().default(''),
 });
 
 function jsonError(message: string, status: number, code = 'MEMBERSHIP_JOIN_FAILED') {
@@ -60,14 +62,10 @@ export async function POST(request: Request) {
     let teamRole: 'leader' | 'member' | null = null;
 
     if (invite.kind === 'team_leader' && invite.team) {
-      /* 팀은 코드가 정한다 — 사용자가 고를 수 없다 */
+      /* 팀은 코드가 정한다 — 참여 화면에는 고르는 칸이 없다 */
       joinedTeam = invite.team;
       teamRole = 'leader';
       await joinTeam(invite.church_id, userId, invite.team, 'leader');
-    } else if (body.team) {
-      joinedTeam = body.team;
-      teamRole = 'member';
-      await joinTeam(invite.church_id, userId, body.team, 'member');
     }
 
     await markInviteUsed(invite);
