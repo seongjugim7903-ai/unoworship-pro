@@ -13,7 +13,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../lib/authn/supabaseBrowser';
-import { KAKAO_SCOPES } from '../../lib/authn/kakaoScopes';
 
 /* 화면의 팀 목록 — 아직 문자열이다. 교회마다 달라지면 데이터로 뺀다
    (docs/features/auth-church-scope/context-notes.md) */
@@ -63,7 +62,6 @@ export default function OnboardingPage() {
       provider: 'kakao',
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
-        scopes: KAKAO_SCOPES,
       },
     });
     if (oauthError) setError(`카카오 로그인을 시작하지 못했습니다. ${oauthError.message}`);

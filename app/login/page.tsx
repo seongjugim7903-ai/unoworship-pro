@@ -13,7 +13,6 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '../../lib/authn/supabaseBrowser';
-import { KAKAO_SCOPES } from '../../lib/authn/kakaoScopes';
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
@@ -147,7 +146,6 @@ function LoginInner() {
         provider: 'kakao',
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(target)}`,
-          scopes: KAKAO_SCOPES,
         },
       });
       if (oauthError) setError(`카카오 로그인을 시작하지 못했습니다. ${oauthError.message}`);
