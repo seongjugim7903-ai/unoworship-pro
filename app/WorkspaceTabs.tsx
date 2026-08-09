@@ -6,6 +6,7 @@ import { useState } from 'react';
 import ChoirRequestPage from './choir/ChoirRequestPage';
 import SermonSection from './sermon-compose/SermonSection';
 import WorshipPrepPage from './worship/WorshipPrepPage';
+import AuthBadge from './AuthBadge';
 
 type View = 'home' | 'choir' | 'sermon' | 'worship';
 
@@ -24,6 +25,7 @@ export default function WorkspaceTabs() {
         <div className="landing-bg" aria-hidden="true" />
         <header className="landing-head">
           <span className="landing-head-brand">ULJU COMMUNITY</span>
+          <AuthBadge />
         </header>
         <div className="landing-inner">
           <div className="landing-copy">
