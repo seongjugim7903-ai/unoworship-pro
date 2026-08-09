@@ -1,66 +1,85 @@
 'use client';
 
-// 교회 관리자 화면 — 참여 코드 발급과 전달.
+// 교회 관리자 화면 — 팀 만들기, 참여 코드, 목회자 지정.
+//
+// 팀 목록은 교회마다 다르다. 그래서 화면에 박아 두지 않고 관리자가 직접 만든다 —
+// 울주교회는 주일1부·2부·수요예배·금요기도회와 헵시바지만 다른 교회는 다르다.
 //
 // 코드는 카톡으로 전달된다. 그래서 화면의 일이 '만들기'보다 '복사하기'에 가깝다 —
-// 누르면 바로 복사되게 두고, 팀장 코드는 1회용이라는 것을 옆에 적어 둔다.
-//
-// 팀 목록은 아직 문자열이다(docs/features/auth-church-scope/context-notes.md).
+// 누르면 바로 복사되게 두고, 담당자 코드는 1회용이라는 것을 옆에 적어 둔다.
 
 import { useCallback, useEffect, useState } from 'react';
 
-/* 권한은 팀과 작성자 둘로만 갈린다. 카테고리(설교대지·준비찬양·찬양대) 담당은 두지 않는다 —
-   교회 관리자와 역할이 겹쳐서 '누가 무엇을 할 수 있나'가 세 갈래가 된다.
-   설교대지는 아예 팀이 없다. 담임목사도 부교역자도 각자 자기 것을 쓰므로 작성자 본인이 기준이다.
-   교회마다 팀 이름이 다르므로 언젠가 데이터로 뺀다(두 번째 교회가 들어올 때). */
-const TEAMS = ['주일1부', '주일2부', '수요예배', '금요기도회', '헵시바'];
+/* 카테고리는 화면을 나누는 이름이지 권한 축이 아니다.
+   설교대지는 팀이 없다 — 담임목사도 부교역자도 각자 자기 것을 쓴다. */
+const CATEGORIES = ['준비찬양', '찬양대'] as const;
+
+interface Team {
+  id: string;
+  category: string;
+  name: string;
+}
 
 interface Code {
   id: string;
   code: string;
   kind: 'church_join' | 'team_leader';
   team: string | null;
-  max_uses: number | null;
   used_count: number;
+}
+
+interface Member {
+  userId: string;
+  name: string;
+  role: string;
+  isPreacher: boolean;
+  teams: Array<{ team: string; role: string }>;
 }
 
 type Phase = 'checking' | 'ready' | 'denied';
 
 export default function AdminPanel() {
   const [phase, setPhase] = useState<Phase>('checking');
+  const [teams, setTeams] = useState<Team[]>([]);
   const [codes, setCodes] = useState<Code[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [newTeam, setNewTeam] = useState({ category: CATEGORIES[0] as string, name: '' });
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
 
   const load = useCallback(async () => {
-    const response = await fetch('/api/membership/codes');
-    const json = await response.json() as { ok?: boolean; codes?: Code[]; message?: string };
-    if (!response.ok || !json.ok) {
+    const [codeRes, teamRes, memberRes] = await Promise.all([
+      fetch('/api/membership/codes'),
+      fetch('/api/teams'),
+      fetch('/api/membership/members'),
+    ]);
+    const codeJson = await codeRes.json() as { ok?: boolean; codes?: Code[]; message?: string };
+    if (!codeRes.ok || !codeJson.ok) {
       setPhase('denied');
-      setMessage(json.message ?? '코드 목록을 불러오지 못했습니다.');
+      setMessage(codeJson.message ?? '관리자 정보를 불러오지 못했습니다.');
       return;
     }
-    setCodes(json.codes ?? []);
+    const teamJson = await teamRes.json() as { ok?: boolean; teams?: Team[] };
+    const memberJson = await memberRes.json() as { ok?: boolean; members?: Member[] };
+    setCodes(codeJson.codes ?? []);
+    setTeams(teamJson.teams ?? []);
+    setMembers(memberJson.members ?? []);
     setPhase('ready');
   }, []);
 
   useEffect(() => { void load(); }, [load]);
 
-  const issue = async (kind: 'team_leader' | 'church_join', team = '') => {
-    setBusy(`${kind}:${team}`);
+  const run = async (key: string, request: () => Promise<Response>, done: string) => {
+    setBusy(key);
     setMessage('');
     try {
-      const response = await fetch('/api/membership/codes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, team }),
-      });
-      const json = await response.json() as { ok?: boolean; code?: string; message?: string };
+      const response = await request();
+      const json = await response.json() as { ok?: boolean; message?: string; code?: string };
       if (!response.ok || !json.ok) {
-        setMessage(json.message ?? '코드를 발급하지 못했습니다.');
+        setMessage(json.message ?? '처리하지 못했습니다.');
         return;
       }
-      setMessage(`${team || '교회'} 코드를 새로 만들었습니다. 이전 코드는 더 이상 쓸 수 없습니다.`);
+      setMessage(json.code ? `${done} — ${json.code}` : done);
       await load();
     } finally {
       setBusy('');
@@ -100,7 +119,7 @@ export default function AdminPanel() {
         <h2>교회 참여 코드</h2>
         <p className="field-hint">
           모든 팀원이 이 코드 하나로 들어옵니다. 단톡방에 뿌리셔도 됩니다 —
-          관리자 자리는 이미 차 있어서 뒤에 들어오는 사람은 모두 팀원이 됩니다.
+          관리자 자리는 이미 차 있어서 뒤에 들어오는 사람은 모두 참여자가 됩니다.
         </p>
         <div className="code-row">
           <strong className="code-value">{churchCode?.code ?? '없음'}</strong>
@@ -113,49 +132,137 @@ export default function AdminPanel() {
           <button
             type="button"
             className="text-button danger"
-            disabled={busy === 'church_join:'}
-            onClick={() => issue('church_join')}
+            disabled={busy === 'church'}
+            onClick={() => run('church', () => fetch('/api/membership/codes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ kind: 'church_join' }),
+            }), '교회 참여 코드를 새로 만들었습니다. 이전 코드는 무효입니다')}
           >
             새로 만들기
           </button>
         </div>
+      </section>
+
+      <section className="panel">
+        <h2>팀</h2>
         <p className="field-hint">
-          새로 만들면 <b>이전 코드는 즉시 무효</b>가 됩니다. 이미 참여한 사람은 그대로입니다.
+          우리 교회에서 쓰는 이름으로 만드세요. 팀을 만들면 그 팀의 <b>담당자 코드</b>를 뽑을 수 있습니다.
+          설교대지는 팀이 없습니다 — 각자 자기 것을 쓰므로 아래 <b>목회자</b>로 지정합니다.
+        </p>
+
+        <div className="song-inline">
+          <label>
+            카테고리
+            <select
+              value={newTeam.category}
+              onChange={(event) => setNewTeam((prev) => ({ ...prev, category: event.target.value }))}
+            >
+              {CATEGORIES.map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </label>
+          <label>
+            팀 이름
+            <input
+              value={newTeam.name}
+              onChange={(event) => setNewTeam((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="예: 주일1부, 헵시바"
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={busy === 'team' || !newTeam.name.trim()}
+          onClick={() => run('team', () => fetch('/api/teams', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newTeam),
+          }), `${newTeam.name} 팀을 만들었습니다`).then(() => setNewTeam((prev) => ({ ...prev, name: '' })))}
+        >
+          팀 만들기
+        </button>
+
+        {teams.length === 0 ? (
+          <p className="field-hint" style={{ marginTop: 14 }}>아직 만든 팀이 없습니다.</p>
+        ) : (
+          <div style={{ marginTop: 14 }}>
+            {teams.map((team) => {
+              const code = leaderOf(team.name);
+              const used = code ? code.used_count > 0 : false;
+              return (
+                <div className="code-row" key={team.id}>
+                  <span className="code-team">{team.name}</span>
+                  <span className="field-hint">{team.category}</span>
+                  <strong className="code-value">{code?.code ?? '코드 없음'}</strong>
+                  {code && !used && (
+                    <button type="button" className="text-button" onClick={() => copy(code.code)}>복사</button>
+                  )}
+                  {used && <span className="field-hint">사용됨 — 담당자가 정해졌습니다</span>}
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy === `code:${team.name}`}
+                    onClick={() => run(`code:${team.name}`, () => fetch('/api/membership/codes', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ kind: 'team_leader', team: team.name }),
+                    }), `${team.name} 담당자 코드`)}
+                  >
+                    {code ? '담당자 코드 다시' : '담당자 코드 만들기'}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-button danger"
+                    disabled={busy === `archive:${team.id}`}
+                    onClick={() => run(`archive:${team.id}`,
+                      () => fetch(`/api/teams?id=${team.id}`, { method: 'DELETE' }),
+                      `${team.name} 팀을 정리했습니다`)}
+                  >
+                    정리
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="field-hint">
+          담당자를 바꾸려면 <b>담당자 코드 다시</b>로 새 코드를 뽑아 새 담당자에게 보내면 됩니다.
+          팀을 정리해도 그 팀 자료는 남습니다.
         </p>
       </section>
 
       <section className="panel">
-        <h2>담당자 코드</h2>
+        <h2>참여자</h2>
         <p className="field-hint">
-          팀마다 하나씩, <b>한 번만 쓸 수 있습니다.</b> 담당자에게 1:1로 보내세요 —
-          단톡방에 돌아도 먼저 쓴 사람 뒤로는 아무도 담당자가 될 수 없습니다.
-          설교대지는 각자 자기 것을 쓰므로 코드가 없습니다.
+          <b>목회자</b>로 켜면 설교대지를 쓸 수 있습니다. 담임목사님과 부교역자를 켜 주세요 —
+          각자 자기 설교대지를 쓰고 남의 것은 고치지 못합니다.
         </p>
-        {TEAMS.map((team) => {
-          const code = leaderOf(team);
-          const used = code ? code.used_count > 0 : false;
-          return (
-            <div className="code-row" key={team}>
-              <span className="code-team">{team}</span>
-              <strong className="code-value">{code?.code ?? '미발급'}</strong>
-              {code && !used && (
-                <button type="button" className="text-button" onClick={() => copy(code.code)}>복사</button>
-              )}
-              {used && <span className="field-hint">이미 사용됨 — 담당자가 정해졌습니다</span>}
-              <button
-                type="button"
-                className="text-button danger"
-                disabled={busy === `team_leader:${team}`}
-                onClick={() => issue('team_leader', team)}
-              >
-                {code ? '다시 만들기' : '만들기'}
-              </button>
-            </div>
-          );
-        })}
-        <p className="field-hint">
-          담당자를 바꾸려면 <b>다시 만들기</b>로 새 코드를 뽑아 새 담당자에게 보내면 됩니다.
-        </p>
+        {members.length === 0 ? (
+          <p className="field-hint">아직 참여자가 없습니다.</p>
+        ) : members.map((member) => (
+          <div className="code-row" key={member.userId}>
+            <span className="code-team">{member.name}</span>
+            {member.role === 'admin' && <span className="field-hint">관리자</span>}
+            {member.teams.length > 0 && (
+              <span className="field-hint">
+                {member.teams.map((team) => `${team.team}${team.role === 'leader' ? '(담당)' : ''}`).join(' · ')}
+              </span>
+            )}
+            <button
+              type="button"
+              className="text-button"
+              disabled={busy === `preacher:${member.userId}`}
+              onClick={() => run(`preacher:${member.userId}`, () => fetch('/api/membership/members', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: member.userId, isPreacher: !member.isPreacher }),
+              }), member.isPreacher ? `${member.name} 목회자 표시를 껐습니다` : `${member.name}을(를) 목회자로 지정했습니다`)}
+            >
+              {member.isPreacher ? '✓ 목회자' : '목회자로 지정'}
+            </button>
+          </div>
+        ))}
       </section>
 
       {message && <section className="panel"><p className="info-message">{message}</p></section>}
