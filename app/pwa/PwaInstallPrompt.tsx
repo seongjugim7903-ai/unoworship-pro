@@ -7,49 +7,18 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import {
-  detectEnvironment,
-  getInstallPrompt,
-  installSteps,
-  watchInstall,
-  type InstallEnvironment,
-} from '../../lib/pwaInstall';
+import { installSteps, useInstall } from '../../lib/pwaInstall';
 
 export default function PwaInstallPrompt() {
   const pathname = usePathname();
-  const [environment, setEnvironment] = useState<InstallEnvironment>('standalone');
-  const [canInstall, setCanInstall] = useState(false);
+  /* 초대 첫 화면과 같은 것을 쓴다 — lib/pwaInstall 의 useInstall */
+  const { environment, canInstall, message, setMessage, install } = useInstall();
   const [installRequested, setInstallRequested] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
-    setEnvironment(detectEnvironment());
     setInstallRequested(new URLSearchParams(window.location.search).get('install') === '1');
-
-    /* 서비스 워커 등록은 layout.tsx 의 인라인 스크립트로 옮겼다 — React 를 기다리면
-       설치 가능 판정이 그만큼 늦어진다. 설치 기회도 거기서 잡아 두고 여기서는 꺼내 본다 */
-    const sync = () => {
-      setCanInstall(Boolean(getInstallPrompt()));
-      if (!getInstallPrompt() && detectEnvironment() === 'standalone') setEnvironment('standalone');
-    };
-    sync();
-    return watchInstall(sync);
   }, []);
-
-  const handleInstall = async () => {
-    const prompt = getInstallPrompt();
-    if (!prompt) return;
-    try {
-      await prompt.prompt();
-      const choice = await prompt.userChoice;
-      window.__uljuInstall = null;
-      setCanInstall(false);
-      setMessage(choice.outcome === 'accepted' ? '설치를 시작했습니다.' : '설치를 취소했습니다.');
-    } catch {
-      setMessage('브라우저 메뉴에서 앱 설치를 눌러 주세요.');
-    }
-  };
 
   const handleOpenChrome = () => {
     const target = new URL(window.location.href);
@@ -90,7 +59,7 @@ export default function PwaInstallPrompt() {
         {isKakaoAndroid && <button type="button" onClick={handleOpenChrome}>Chrome에서 열기</button>}
         {isKakaoIOS && <button type="button" onClick={() => void handleCopyAddress()}>주소 복사</button>}
         {environment === 'browser' && canInstall && (
-          <button type="button" onClick={() => void handleInstall()}>앱 설치</button>
+          <button type="button" onClick={() => void install()}>앱 설치</button>
         )}
         <button
           type="button"

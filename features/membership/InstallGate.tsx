@@ -23,14 +23,13 @@
 //
 // 데스크톱에서는 띄우지 않는다 — 막으면 PC로 들어올 길이 없다. 판단은 부모가 한다.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   detectEnvironment,
   getInstallPrompt,
   installSteps,
   isAlreadyInstalled,
-  watchInstall,
-  type InstallEnvironment,
+  useInstall,
 } from '../../lib/pwaInstall';
 
 interface Props {
@@ -41,62 +40,27 @@ interface Props {
 }
 
 export default function InstallGate({ code, team, leaderName, churchName }: Props) {
-  const [environment, setEnvironment] = useState<InstallEnvironment>('browser');
-  const [canInstall, setCanInstall] = useState(false);
-  const [installed, setInstalled] = useState(false);
-  const [message, setMessage] = useState('');
-  /* 설치창을 닫으면 그 기회는 끝난다. 새로고침해야 브라우저가 다시 준다 */
-  const [cancelled, setCancelled] = useState(false);
+  /* 담당자 화면 위쪽 배너와 같은 것을 쓴다 — 갈라 두었더니 한쪽만 되는 일이 있었다 */
+  const { environment, canInstall, installed, cancelled, message, setMessage, install } = useInstall();
   /* 설치가 안 되는 폰에서 무엇이 막는지 보려고 — 주소에 ?debug=1 을 붙였을 때만 */
   const [diagnosis, setDiagnosis] = useState('');
-  const openInstaller = useCallback(async () => {
-    const prompt = getInstallPrompt();
-    if (!prompt) return;
-    try {
-      await prompt.prompt();
-      const choice = await prompt.userChoice;
-      /* 이 기회는 다 썼다 — 같은 이벤트로 두 번 열 수 없다 */
-      window.__uljuInstall = null;
-      setCanInstall(false);
-      if (choice.outcome === 'accepted') {
-        setMessage('설치했습니다. 홈 화면의 ULJU 아이콘으로 열어 주세요.');
-      } else {
-        setCancelled(true);
-        setMessage('설치를 취소하셨습니다. 설치해야 다음으로 넘어갑니다.');
-      }
-    } catch {
-      setMessage('설치창을 열지 못했습니다. 브라우저 메뉴에서 앱 설치를 눌러 주세요.');
-    }
-  }, []);
 
   useEffect(() => {
-    setEnvironment(detectEnvironment());
-
-    const sync = () => setCanInstall(Boolean(getInstallPrompt()));
-    sync();
-    const stop = watchInstall(sync);
-
-    /* 이미 설치한 사람에게는 설치 기회가 오지 않는다. 그때는 안내를 바꿔야 한다 */
-    void isAlreadyInstalled().then(setInstalled);
-
-    /* 설치가 안 될 때 원인을 눈으로 확인하는 통로. 브라우저 개발자도구를 못 여는
-       휴대폰에서 "무엇이 없어서 안 되는지"를 알아내려면 이것 말고 방법이 없다 */
-    if (new URLSearchParams(window.location.search).get('debug') === '1') {
-      void (async () => {
-        const workers = 'serviceWorker' in navigator
-          ? (await navigator.serviceWorker.getRegistrations()).length
-          : -1;
-        const controlled = Boolean(navigator.serviceWorker?.controller);
-        setDiagnosis([
-          `환경 ${detectEnvironment()}`,
-          `설치기회 ${getInstallPrompt() ? '있음' : '없음'}`,
-          `이미설치 ${await isAlreadyInstalled() ? '예' : '아니오'}`,
-          `SW ${workers}개${controlled ? '·제어중' : ''}`,
-        ].join(' / '));
-      })();
-    }
-    return stop;
-  }, []);
+    if (new URLSearchParams(window.location.search).get('debug') !== '1') return;
+    /* 휴대폰에서는 개발자도구를 못 여니 원인을 볼 방법이 이것뿐이다 */
+    void (async () => {
+      const workers = 'serviceWorker' in navigator
+        ? (await navigator.serviceWorker.getRegistrations()).length
+        : -1;
+      const controlled = Boolean(navigator.serviceWorker?.controller);
+      setDiagnosis([
+        `환경 ${detectEnvironment()}`,
+        `설치기회 ${getInstallPrompt() ? '있음' : '없음'}`,
+        `이미설치 ${await isAlreadyInstalled() ? '예' : '아니오'}`,
+        `SW ${workers}개${controlled ? '·제어중' : ''}`,
+      ].join(' / '));
+    })();
+  }, [canInstall]);
 
   /* 카카오 내장 브라우저에서 Chrome 으로 옮긴다. 주소는 그대로 들고 간다 */
   const openChrome = () => {
@@ -155,15 +119,11 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
           {environment === 'kakao-ios' && (
             <button type="button" className="gate-primary" onClick={() => void copyAddress()}>주소 복사하기</button>
           )}
-          {!inKakao && !alreadyHere && canInstall && (
-            <button type="button" className="gate-primary" onClick={() => void openInstaller()}>
-              앱 설치
-            </button>
-          )}
-          {/* 기회가 없을 때도 누를 것이 있어야 한다 — 새로고침하면 브라우저가 다시 준다 */}
-          {!inKakao && !alreadyHere && !canInstall && environment !== 'ios' && (
-            <button type="button" className="gate-primary" onClick={() => window.location.reload()}>
-              {cancelled ? '설치 다시 시도' : '설치창 불러오기'}
+          {/* 기회가 아직 없어도 버튼은 남긴다 — install() 이 새로고침으로 다시 받아 온다.
+              아이폰은 기회 자체가 없는 환경이라 안내만 남긴다 */}
+          {!inKakao && !alreadyHere && environment !== 'ios' && (
+            <button type="button" className="gate-primary" onClick={() => void install()}>
+              {canInstall ? '앱 설치' : cancelled ? '설치 다시 시도' : '설치창 불러오기'}
             </button>
           )}
           {!inKakao && !alreadyHere && !canInstall && (

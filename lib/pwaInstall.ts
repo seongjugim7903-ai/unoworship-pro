@@ -5,6 +5,8 @@
 // 카톡 안에서 링크를 누르면 카카오 내장 브라우저로 열린다. 거기서는 설치가 안 되므로
 // Chrome·Safari 로 옮겨야 한다 — 교회에서 링크를 단톡방으로 돌리므로 이 경우가 가장 흔하다.
 
+import { useCallback, useEffect, useState } from 'react';
+
 export type InstallEnvironment = 'browser' | 'ios' | 'kakao-android' | 'kakao-ios' | 'standalone';
 
 export function detectEnvironment(): InstallEnvironment {
@@ -93,4 +95,62 @@ export function installSteps(environment: InstallEnvironment, hasPrompt: boolean
       ? ['앱 설치 누르기', '설치 확인', '홈 화면에서 실행']
       : ['Chrome 메뉴 열기', '앱 설치 선택', '홈 화면에서 실행'];
   }
+}
+
+/**
+ * 설치 상태와 설치 동작 — 배너(`app/pwa/PwaInstallPrompt.tsx`)와 초대 첫 화면
+ * (`features/membership/InstallGate.tsx`)이 **똑같은 경로**를 쓰게 하려고 여기 모았다.
+ *
+ * 두 곳이 각자 구현하고 있었더니 담당자 화면의 배너에서는 설치가 되는데 초대 화면에서는
+ * 안 되는 상태가 생겼다. 원인을 찾는 데도 오래 걸렸다 — 갈라져 있으면 또 갈라진다.
+ *
+ * 기억할 것 두 가지.
+ *   설치 기회는 브라우저가 준다. 크롬은 사용자가 그 사이트를 좀 만져 본 뒤에야 준다 —
+ *   링크로 막 들어온 첫 화면에서는 잠깐 없을 수 있고, 오면 여기서 알아서 켜진다.
+ *   기회는 한 번 쓰면 사라진다. 그래서 자동으로 쓰지 않고 사용자가 누를 때만 쓴다.
+ */
+export function useInstall() {
+  const [environment, setEnvironment] = useState<InstallEnvironment>('standalone');
+  const [canInstall, setCanInstall] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    setEnvironment(detectEnvironment());
+    const sync = () => {
+      setCanInstall(Boolean(getInstallPrompt()));
+      setEnvironment(detectEnvironment());
+    };
+    sync();
+    void isAlreadyInstalled().then(setInstalled);
+    return watchInstall(sync);
+  }, []);
+
+  const install = useCallback(async () => {
+    const prompt = getInstallPrompt();
+    if (!prompt) {
+      /* 아직 기회가 없다. 새로고침하면 브라우저가 다시 판단한다 */
+      window.location.reload();
+      return;
+    }
+    try {
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      /* 같은 이벤트로 두 번 열 수 없다 */
+      window.__uljuInstall = null;
+      setCanInstall(false);
+      if (choice.outcome === 'accepted') {
+        setInstalled(true);
+        setMessage('설치했습니다. 홈 화면의 ULJU 아이콘으로 열어 주세요.');
+      } else {
+        setCancelled(true);
+        setMessage('설치를 취소하셨습니다. 설치해야 다음으로 넘어갑니다.');
+      }
+    } catch {
+      setMessage('설치창을 열지 못했습니다. 브라우저 메뉴(⋮)에서 앱 설치를 눌러 주세요.');
+    }
+  }, []);
+
+  return { environment, canInstall, installed, cancelled, message, setMessage, install };
 }
