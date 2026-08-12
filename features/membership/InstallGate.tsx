@@ -38,6 +38,8 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
   const [canInstall, setCanInstall] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [message, setMessage] = useState('');
+  /* 설치가 안 되는 폰에서 무엇이 막는지 보려고 — 주소에 ?debug=1 을 붙였을 때만 */
+  const [diagnosis, setDiagnosis] = useState('');
   /* 설치창은 기회당 한 번만 열 수 있다 — 자동으로 열어 봤는지 기억해 둔다 */
   const autoTried = useRef(false);
 
@@ -75,6 +77,23 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
 
     /* 이미 설치한 사람에게는 설치 기회가 오지 않는다. 그때는 안내를 바꿔야 한다 */
     void isAlreadyInstalled().then(setInstalled);
+
+    /* 설치가 안 될 때 원인을 눈으로 확인하는 통로. 브라우저 개발자도구를 못 여는
+       휴대폰에서 "무엇이 없어서 안 되는지"를 알아내려면 이것 말고 방법이 없다 */
+    if (new URLSearchParams(window.location.search).get('debug') === '1') {
+      void (async () => {
+        const workers = 'serviceWorker' in navigator
+          ? (await navigator.serviceWorker.getRegistrations()).length
+          : -1;
+        const controlled = Boolean(navigator.serviceWorker?.controller);
+        setDiagnosis([
+          `환경 ${detectEnvironment()}`,
+          `설치기회 ${getInstallPrompt() ? '있음' : '없음'}`,
+          `이미설치 ${await isAlreadyInstalled() ? '예' : '아니오'}`,
+          `SW ${workers}개${controlled ? '·제어중' : ''}`,
+        ].join(' / '));
+      })();
+    }
     return stop;
   }, [openInstaller]);
 
@@ -156,6 +175,8 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
         <p className="gate-fallback">
           설치한 앱이 참여 코드를 물으면 <code>{code}</code>
         </p>
+
+        {diagnosis && <p className="gate-fallback"><code>{diagnosis}</code></p>}
       </div>
     </main>
   );

@@ -47,7 +47,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               + `window.dispatchEvent(new Event('ulju:installable'));});`
               + `window.addEventListener('appinstalled',function(){`
               + `window.__uljuInstall=null;`
-              + `window.dispatchEvent(new Event('ulju:installed'));});})();`,
+              + `window.dispatchEvent(new Event('ulju:installed'));});`
+              /* 서비스 워커가 없으면 브라우저는 설치를 제안하지 않는다. 등록이 늦을수록
+                 설치 가능 판정도 늦어지므로 React 를 기다리지 않고 여기서 바로 건다.
+                 dev 에서는 걸지 않는다 — 옛 번들을 캐시에서 내주기 때문이다. */
+              + (process.env.NODE_ENV === 'production'
+                ? `if('serviceWorker' in navigator){`
+                  + `window.addEventListener('load',function(){`
+                  + `navigator.serviceWorker.register('/sw.js').catch(function(){});});}`
+                : '')
+              + `})();`,
           }}
         />
       </head>

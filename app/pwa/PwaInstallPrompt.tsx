@@ -3,9 +3,7 @@
 // 화면 위에 붙는 앱 설치 띠 — 이미 쓰고 있는 사람에게 권하는 자리다.
 //
 // 초대 링크(/join)에서는 띄우지 않는다. 거기는 설치 안내가 화면 전체를 차지하는
-// 자리라 같은 말이 두 번 나온다. 다만 이 컴포넌트는 계속 붙어 있어야 한다 —
-// 서비스 워커를 등록하는 곳이 여기이고, 그것이 없으면 브라우저가 설치 자체를
-// 제안하지 않는다. 그래서 화면만 감추고 동작은 남긴다.
+// 자리라 같은 말이 두 번 나온다.
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
@@ -29,14 +27,8 @@ export default function PwaInstallPrompt() {
     setEnvironment(detectEnvironment());
     setInstallRequested(new URLSearchParams(window.location.search).get('install') === '1');
 
-    /* dev에서는 SW 캐시가 stale 번들을 서빙하므로 프로덕션에서만 등록한다. */
-    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
-      void navigator.serviceWorker.register('/sw.js').catch((error) => {
-        console.warn('[pwa] service worker registration failed', error);
-      });
-    }
-
-    /* 설치 기회는 layout.tsx 의 인라인 스크립트가 잡아 둔다 — 여기서는 꺼내 본다 */
+    /* 서비스 워커 등록은 layout.tsx 의 인라인 스크립트로 옮겼다 — React 를 기다리면
+       설치 가능 판정이 그만큼 늦어진다. 설치 기회도 거기서 잡아 두고 여기서는 꺼내 본다 */
     const sync = () => {
       setCanInstall(Boolean(getInstallPrompt()));
       if (!getInstallPrompt() && detectEnvironment() === 'standalone') setEnvironment('standalone');
