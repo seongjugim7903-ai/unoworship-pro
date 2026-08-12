@@ -30,7 +30,26 @@ export interface InstallPromptEvent extends Event {
 declare global {
   interface Window {
     __uljuInstall?: InstallPromptEvent | null;
+    /** beforeinstallprompt 가 몇 번 왔는지 — 한 번도 안 왔는지를 구분하려고 센다 */
+    __uljuSeen?: number;
   }
+}
+
+/** 이 브라우저가 설치를 제안한 적이 있는가 (기회를 이미 써 버린 경우와 구분한다) */
+export function installEverOffered(): boolean {
+  return (window.__uljuSeen ?? 0) > 0;
+}
+
+/** 화면에 그대로 보여 줄 브라우저 이름 — 무엇이 막는지 물어볼 때 이것부터 필요하다 */
+export function browserName(): string {
+  const ua = navigator.userAgent;
+  if (/KAKAOTALK/i.test(ua)) return '카카오톡';
+  if (/SamsungBrowser/i.test(ua)) return '삼성인터넷';
+  if (/EdgA?/i.test(ua)) return 'Edge';
+  if (/FxiOS|Firefox/i.test(ua)) return 'Firefox';
+  if (/CriOS|Chrome/i.test(ua)) return 'Chrome';
+  if (/Safari/i.test(ua)) return 'Safari';
+  return '이 브라우저';
 }
 
 /**
@@ -152,20 +171,13 @@ export function useInstall() {
   const install = useCallback(async () => {
     const prompt = getInstallPrompt();
     if (!prompt) {
-      /* 브라우저가 아직 설치 기회를 주지 않았다. 크롬은 사이트를 좀 만져 본 뒤에야
-         주기 때문에 링크로 막 들어온 화면에서는 없을 수 있다 — 한 번은 새로고침해
-         다시 물어보고, 그래도 없으면 브라우저 메뉴로 안내한다.
-         새로고침을 되풀이하면 화면만 깜빡이므로 한 번으로 막는다. */
-      const RETRIED = 'ulju:install-retried';
-      if (!sessionStorage.getItem(RETRIED)) {
-        sessionStorage.setItem(RETRIED, '1');
-        window.location.reload();
-        return;
-      }
-      setMessage('브라우저 오른쪽 위 ⋮ 를 누르고 「앱 설치」를 선택해 주세요.');
+      /* 눌렀는데 아무 일도 안 일어나는 것이 제일 나쁘다. 몰래 새로고침하지 않고
+         왜 안 되는지를 그대로 말한다 — 기회가 아예 없었는지, 이미 썼는지를 나눈다. */
+      setMessage(installEverOffered()
+        ? `설치창을 이미 한 번 닫으셨습니다. ${browserName()} 오른쪽 위 ⋮ 를 누르고 「앱 설치」(또는 「홈 화면에 추가」)를 선택해 주세요.`
+        : `${browserName()}가 아직 설치창을 주지 않습니다. 오른쪽 위 ⋮ 를 누르고 「앱 설치」(또는 「홈 화면에 추가」)를 선택해 주세요.`);
       return;
     }
-    sessionStorage.removeItem('ulju:install-retried');
     try {
       await prompt.prompt();
       const choice = await prompt.userChoice;

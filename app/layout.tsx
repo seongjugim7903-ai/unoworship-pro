@@ -41,9 +41,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             설치 버튼이 영영 안 나타난다 — 여기서 받아 두고 컴포넌트가 꺼내 쓴다. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){window.__uljuInstall=null;`
+            __html: `(function(){window.__uljuInstall=null;window.__uljuSeen=0;`
               + `window.addEventListener('beforeinstallprompt',function(e){`
-              + `e.preventDefault();window.__uljuInstall=e;`
+              + `e.preventDefault();window.__uljuInstall=e;window.__uljuSeen++;`
               + `window.dispatchEvent(new Event('ulju:installable'));});`
               + `window.addEventListener('appinstalled',function(){`
               + `window.__uljuInstall=null;`

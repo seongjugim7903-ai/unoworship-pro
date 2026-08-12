@@ -10,7 +10,14 @@
 // 데스크톱에서는 띄우지 않는다 — 막으면 PC로 들어올 길이 없다. 판단은 부모가 한다.
 
 import { useEffect, useState } from 'react';
-import { detectEnvironment, getInstallPrompt, isAlreadyInstalled } from '../../lib/pwaInstall';
+import {
+  browserName,
+  detectEnvironment,
+  getInstallPrompt,
+  installEverOffered,
+  isAlreadyInstalled,
+  watchInstall,
+} from '../../lib/pwaInstall';
 
 interface Props {
   code: string;
@@ -25,18 +32,27 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('debug') !== '1') return;
-    /* 휴대폰에서는 개발자도구를 못 여니 원인을 볼 방법이 이것뿐이다 */
-    void (async () => {
+    /* 휴대폰에서는 개발자도구를 못 여니 원인을 볼 방법이 이것뿐이다.
+       설치 기회는 화면이 뜬 뒤 몇 초 있다 오기도 해서 한 번 찍고 끝내면 안 된다 —
+       기회가 오거나 설치가 끝날 때마다, 그리고 2초마다 다시 찍는다 */
+    let alive = true;
+    const snap = async () => {
       const workers = 'serviceWorker' in navigator
         ? (await navigator.serviceWorker.getRegistrations()).length
         : -1;
+      if (!alive) return;
       setDiagnosis([
-        `환경 ${detectEnvironment()}`,
-        `설치기회 ${getInstallPrompt() ? '있음' : '없음'}`,
+        browserName(),
+        detectEnvironment(),
+        `기회 ${getInstallPrompt() ? '있음' : installEverOffered() ? '썼음' : '없음'}`,
         `이미설치 ${await isAlreadyInstalled() ? '예' : '아니오'}`,
-        `SW ${workers}개${navigator.serviceWorker?.controller ? '·제어중' : ''}`,
+        `SW ${workers}${navigator.serviceWorker?.controller ? '·제어중' : ''}`,
       ].join(' / '));
-    })();
+    };
+    void snap();
+    const timer = setInterval(() => void snap(), 2000);
+    const stop = watchInstall(() => void snap());
+    return () => { alive = false; clearInterval(timer); stop(); };
   }, []);
 
   /* '교회으로' 가 되지 않게 조사까지 붙여 둔다 */

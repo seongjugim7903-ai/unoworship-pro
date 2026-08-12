@@ -47,7 +47,8 @@ export default function PwaInstallPrompt() {
         <ol className="pwa-install-steps">
           {steps.map((step, index) => <li key={step}><b>{index + 1}</b>{step}</li>)}
         </ol>
-        {message && <small>{message}</small>}
+        {/* 눌렀는데 아무 일도 없는 것처럼 보이면 안 된다 — 작은 회색이 아니라 눈에 띄게 */}
+        {message && <small className="pwa-install-message">{message}</small>}
       </div>
       <div className="pwa-install-actions">
         {/* 카카오 안에서는 설치가 안 된다. 브라우저로 옮기는 것까지 이 버튼이 한다 */}
