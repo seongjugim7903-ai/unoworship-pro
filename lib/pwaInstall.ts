@@ -64,6 +64,12 @@ export function getInstallPrompt(): InstallPromptEvent | null {
   return window.__uljuInstall ?? null;
 }
 
+/** 설치가 끝난 순간만 알려 준다. 정리 함수를 돌려준다 */
+export function watchInstalled(onInstalled: () => void): () => void {
+  window.addEventListener('ulju:installed', onInstalled);
+  return () => window.removeEventListener('ulju:installed', onInstalled);
+}
+
 /** 설치 기회가 생기거나 설치가 끝나면 알려 준다. 정리 함수를 돌려준다 */
 export function watchInstall(onChange: () => void): () => void {
   window.addEventListener('ulju:installable', onChange);
@@ -185,9 +191,8 @@ export function useInstall() {
     if (!prompt) {
       /* 눌렀는데 아무 일도 안 일어나는 것이 제일 나쁘다. 몰래 새로고침하지 않고
          왜 안 되는지를 그대로 말한다 — 기회가 아예 없었는지, 이미 썼는지를 나눈다. */
-      setMessage(installEverOffered()
-        ? `설치창을 이미 한 번 닫으셨습니다. ${browserName()} 오른쪽 위 ⋮ 를 누르고 「앱 설치」(또는 「홈 화면에 추가」)를 선택해 주세요.`
-        : `${browserName()}가 아직 설치창을 주지 않습니다. 오른쪽 위 ⋮ 를 누르고 「앱 설치」(또는 「홈 화면에 추가」)를 선택해 주세요.`);
+      setMessage(`앱 설치를 눌러서 설치가 안 되면 ${browserName()} 오른쪽 위 ⋮ 를 누르고 `
+        + `「앱 설치」(또는 「홈 화면에 추가」)를 선택해 주세요.`);
       return;
     }
     try {
@@ -204,7 +209,8 @@ export function useInstall() {
         setMessage('설치를 취소하셨습니다. 설치해야 다음으로 넘어갑니다.');
       }
     } catch {
-      setMessage('설치창을 열지 못했습니다. 브라우저 메뉴(⋮)에서 앱 설치를 눌러 주세요.');
+      setMessage(`앱 설치를 눌러서 설치가 안 되면 ${browserName()} 오른쪽 위 ⋮ 를 누르고 `
+        + `「앱 설치」(또는 「홈 화면에 추가」)를 선택해 주세요.`);
     }
   }, []);
 

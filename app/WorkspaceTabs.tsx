@@ -32,13 +32,23 @@ export default function WorkspaceTabs() {
 
   useEffect(() => {
     (async () => {
+      let allowed: Can;
       try {
         const me = await (await fetch('/api/membership/me')).json();
         /* 저장 환경이 없는 배포에서는 막지 않는다 — 화면이 통째로 비면 손쓸 방법이 없다 */
-        setCan(me?.unavailable ? { sermon: true, worship: true, choir: true } : (me?.can ?? { sermon: false, worship: false, choir: false }));
+        allowed = me?.unavailable
+          ? { sermon: true, worship: true, choir: true }
+          : (me?.can ?? { sermon: false, worship: false, choir: false });
       } catch {
-        setCan({ sermon: true, worship: true, choir: true });
+        allowed = { sermon: true, worship: true, choir: true };
       }
+      setCan(allowed);
+
+      /* 초대 링크로 막 들어온 팀원은 갈 곳이 한 군데뿐이다. 그럴 때는 고르게 하지 않고
+         바로 그 팀 화면으로 넣는다 — 버튼이 하나뿐인 목록을 보여 줄 이유가 없다.
+         홈으로 돌아오는 길은 화면 위 '← 홈'으로 그대로 남는다. */
+      const only = MENU.filter((item) => allowed[item.can]);
+      if (only.length === 1) setView(only[0].id);
     })();
   }, []);
 

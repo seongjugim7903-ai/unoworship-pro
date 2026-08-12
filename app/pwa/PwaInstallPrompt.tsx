@@ -13,7 +13,7 @@ import { installSteps, openInOutsideBrowser, useInstall } from '../../lib/pwaIns
 export default function PwaInstallPrompt() {
   const pathname = usePathname();
   /* 초대 첫 화면과 같은 것을 쓴다 — lib/pwaInstall 의 useInstall */
-  const { environment, canInstall, message, setMessage, install } = useInstall();
+  const { environment, canInstall, installed, message, setMessage, install } = useInstall();
   const [installRequested, setInstallRequested] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -32,7 +32,8 @@ export default function PwaInstallPrompt() {
 
   /* 초대 화면에서는 언제나 띄운다 — 여기가 설치를 끝내야 넘어가는 자리다 */
   const onInvite = Boolean(pathname?.startsWith('/join'));
-  if (environment === 'standalone' || dismissed) return null;
+  /* 설치를 마쳤으면 더 권할 것이 없다 — 로그인으로 넘어간 화면 위에 남아 있으면 방해다 */
+  if (environment === 'standalone' || dismissed || installed) return null;
   if (environment === 'browser' && !canInstall && !installRequested && !onInvite) return null;
 
   const isKakaoAndroid = environment === 'kakao-android';
@@ -51,8 +52,9 @@ export default function PwaInstallPrompt() {
         {message && <small className="pwa-install-message">{message}</small>}
       </div>
       <div className="pwa-install-actions">
-        {/* 카카오 안에서는 설치가 안 된다. 브라우저로 옮기는 것까지 이 버튼이 한다 */}
-        {isKakaoAndroid && <button type="button" onClick={openInOutsideBrowser}>앱 설치</button>}
+        {/* 카카오 안에서는 설치가 안 된다. 여기서 하는 일은 브라우저로 옮기는 것뿐이라
+            이름도 그대로 적는다 — '앱 설치'라고 적으면 눌러도 설치창이 안 떠 헷갈린다 */}
+        {isKakaoAndroid && <button type="button" onClick={openInOutsideBrowser}>크롬에서 열기</button>}
         {isKakaoIOS && <button type="button" onClick={() => void handleCopyAddress()}>주소 복사</button>}
         {/* 기회가 아직 없어도 버튼은 띄운다 — install() 이 새로고침으로 다시 물어보고,
             그래도 없으면 브라우저 메뉴로 안내한다. 누를 것이 없는 화면이 제일 나쁘다 */}

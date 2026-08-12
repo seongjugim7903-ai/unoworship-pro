@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../lib/authn/supabaseBrowser';
-import { detectEnvironment, isHandheld } from '../../lib/pwaInstall';
+import { detectEnvironment, isHandheld, watchInstalled } from '../../lib/pwaInstall';
 import InstallGate from './InstallGate';
 import { forgetInvite, rememberInvite } from './pendingInvite';
 
@@ -98,6 +98,14 @@ export default function InvitePanel({ code }: { code: string }) {
     })();
   }, [code]);
 
+  /* 설치가 끝나면 기다리지 않고 바로 로그인으로 보낸다 — 홈 화면 아이콘을 찾아
+     다시 들어오게 하면 거기서 절반이 떨어져 나간다. 앱은 이미 깔렸으니 다음부터
+     그 아이콘으로 열면 된다. */
+  useEffect(() => {
+    if (status !== 'gate') return;
+    return watchInstalled(() => setStatus('need-login'));
+  }, [status]);
+
   /* 2. 설치를 넘겼으면 로그인·이름·참여로 이어간다 */
   useEffect(() => {
     if (status !== 'need-login') return;
@@ -139,31 +147,15 @@ export default function InvitePanel({ code }: { code: string }) {
     return <main className="gate"><div className="gate-card"><p className="gate-lead">참여하는 중...</p></div></main>;
   }
 
-  if (status === 'gate') {
-    return (
-      <InstallGate
-        code={code}
-        team={preview?.team ?? null}
-        leaderName={preview?.leaderName ?? ''}
-        churchName={preview?.churchName ?? ''}
-      />
-    );
-  }
+  if (status === 'gate') return <InstallGate code={code} />;
 
   if (status === 'need-login') {
-    const invitedTo = preview?.team ? `${preview.team} 팀으로` : '교회로';
     return (
       <main className="gate">
         <div className="gate-card">
           <img className="gate-mark" src="/icons/ulju-icon-192.png" alt="" width={56} height={56} />
-          <p className="gate-eyebrow">{preview?.churchName || 'ULJU'}</p>
-          <h1 className="gate-title">
-            {preview?.leaderName ? <><b>{preview.leaderName}</b>님이 </> : null}
-            <b>{invitedTo}</b> 초대했습니다
-          </h1>
-          <p className="gate-lead">
-            카카오로 로그인하시면 바로 들어갑니다. 코드를 적으실 필요는 없습니다.
-          </p>
+          <h1 className="gate-title">로그인</h1>
+          <p className="gate-lead">카카오로 로그인하시면 바로 팀에 들어갑니다.</p>
           {error && <p className="gate-message is-error">{error}</p>}
           <div className="gate-actions">
             <button type="button" className="kakao-button" onClick={kakao}>카카오로 로그인</button>
