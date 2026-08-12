@@ -14,6 +14,7 @@ import { createClient } from '../../lib/authn/supabaseBrowser';
 export default function AuthBadge() {
   const [name, setName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLeader, setIsLeader] = useState(false);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export default function AuthBadge() {
         try {
           const me = await (await fetch('/api/membership/me')).json();
           setIsAdmin(me?.churchRole === 'admin');
+          setIsLeader(Object.values((me?.teams ?? {}) as Record<string, string>).includes('leader'));
         } catch { /* 확인 실패는 무시 — 링크만 안 보일 뿐이다 */ }
       }
       setReady(true);
@@ -52,7 +54,7 @@ export default function AuthBadge() {
   return (
     <span className="auth-badge">
       {isAdmin && <a className="auth-badge-admin" href="/admin">코드 관리</a>}
-      <a className="auth-badge-admin" href="/onboarding/leader">담당자 코드</a>
+      {isLeader && <a className="auth-badge-admin" href="/my">팀원 초대</a>}
       {name}
       <button
         type="button"

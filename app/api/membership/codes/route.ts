@@ -1,4 +1,10 @@
-// 참여 코드 발급·조회·회수 — 교회 관리자만.
+// 참여 코드 발급·조회·회수.
+//
+//   관리자   교회 코드 · 담당자 코드 · 모든 팀의 팀원 링크
+//   담당자   자기 팀의 팀원 링크만
+//
+// 팀원 링크를 담당자가 쥐는 이유 — 팀원을 부르는 것은 담당자의 일이다.
+// 관리자가 모든 팀의 팀원 링크까지 나눠 주면 사람이 바뀔 때마다 관리자를 거쳐야 한다.
 //
 // GET    → 이 교회의 살아 있는 코드 목록
 // POST   → 팀장 코드 발급 (같은 팀에 살아 있는 코드가 있으면 회수하고 새로 만든다)
@@ -25,30 +31,43 @@ function jsonError(message: string, status: number, code = 'CODES_FAILED') {
   return NextResponse.json({ ok: false, code, message }, { status });
 }
 
-/** 관리자만 쓴다 — 아니면 교회 id 를 돌려주지 않는다 */
-async function requireAdmin(): Promise<{ churchId: string } | { response: NextResponse }> {
+interface Caller { churchId: string; userId: string; isAdmin: boolean; teams: Record<string, string> }
+
+async function caller(): Promise<Caller | { response: NextResponse }> {
   const userId = await getSessionUserId();
   if (!userId) return { response: jsonError('로그인이 필요합니다.', 401, 'LOGIN_REQUIRED') };
-
   const churchId = await getActiveChurchId();
   const membership = await loadMembership(churchId, userId);
-  if (membership.churchRole !== 'admin') {
-    return { response: jsonError('교회 관리자만 코드를 다룰 수 있습니다.', 403, 'NOT_ADMIN') };
-  }
-  return { churchId };
+  return {
+    churchId,
+    userId,
+    isAdmin: membership.churchRole === 'admin',
+    teams: membership.teams,
+  };
+}
+
+async function requireAdmin(): Promise<{ churchId: string } | { response: NextResponse }> {
+  const who = await caller();
+  if ('response' in who) return who;
+  if (!who.isAdmin) return { response: jsonError('교회 관리자만 할 수 있습니다.', 403, 'NOT_ADMIN') };
+  return { churchId: who.churchId };
 }
 
 export async function GET() {
   try {
-    const auth = await requireAdmin();
-    if ('response' in auth) return auth.response;
+    const who = await caller();
+    if ('response' in who) return who.response;
 
-    const codes = await supabaseRest<Array<Record<string, unknown>>>(
+    const all = await supabaseRest<Array<{ kind: string; team: string | null }>>(
       `/invite_codes?select=id,code,kind,team,max_uses,used_count,created_at`
-        + `&church_id=eq.${auth.churchId}&revoked_at=is.null&order=kind.asc,team.asc`,
+        + `&church_id=eq.${who.churchId}&revoked_at=is.null&order=kind.asc,team.asc`,
       { method: 'GET' },
     );
-    return NextResponse.json({ ok: true, codes });
+    /* 담당자에게는 자기 팀의 팀원 링크만 보인다 — 교회 코드나 남의 팀 코드는 볼 일이 없다 */
+    const codes = who.isAdmin
+      ? all
+      : all.filter((row) => row.kind === 'team_join' && row.team && who.teams[row.team] === 'leader');
+    return NextResponse.json({ ok: true, codes, isAdmin: who.isAdmin });
   } catch (error) {
     if (error instanceof SupabaseServerConfigError) return jsonError(error.message, 503, error.code);
     console.error('[codes] list failed', error);
@@ -58,14 +77,21 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const auth = await requireAdmin();
-    if ('response' in auth) return auth.response;
+    const who = await caller();
+    if ('response' in who) return who.response;
 
     const body = IssueSchema.parse(await request.json());
     const needsTeam = body.kind === 'team_leader' || body.kind === 'team_join';
     if (needsTeam && !body.team) {
       return jsonError('팀을 골라 주세요.', 400, 'NO_TEAM');
     }
+
+    /* 담당자는 자기 팀의 팀원 링크만 만들 수 있다 */
+    const ownTeamJoin = body.kind === 'team_join' && who.teams[body.team] === 'leader';
+    if (!who.isAdmin && !ownTeamJoin) {
+      return jsonError('맡으신 팀의 팀원 링크만 만들 수 있습니다.', 403, 'NOT_ALLOWED');
+    }
+    const auth = { churchId: who.churchId };
 
     /* 같은 자리에 살아 있는 코드가 있으면 회수한다 — 부분 유니크 인덱스가 중복을 막고,
        회수해 두어야 '다시 발급'이 곧 '이전 것 무효화'가 된다 */

@@ -146,7 +146,16 @@ export default function InvitePanel({ code }: { code: string }) {
             ? `${result.team} ${result.teamRole === 'leader' ? '담당자로' : '팀원으로'} 들어왔습니다.`
             : '교회에 참여했습니다.'}
         </p>
-        <Link className="primary-button" href="/">시작하기</Link>
+        {result?.teamRole === 'leader' ? (
+          <>
+            <p className="field-hint">
+              이제 <b>팀원을 부르실 차례</b>입니다. 초대 링크를 복사해 팀 단톡방에 붙여넣으세요.
+            </p>
+            <Link className="primary-button" href="/my">팀원 초대 링크 받기</Link>
+          </>
+        ) : (
+          <Link className="primary-button" href="/">시작하기</Link>
+        )}
       </section>
     </main>
   );

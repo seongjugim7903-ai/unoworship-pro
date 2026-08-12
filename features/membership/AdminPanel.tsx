@@ -8,7 +8,7 @@
 // 코드는 카톡으로 전달된다. 그래서 화면의 일이 '만들기'보다 '복사하기'에 가깝다 —
 // 누르면 바로 복사되게 두고, 담당자 코드는 1회용이라는 것을 옆에 적어 둔다.
 
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { TEAM_CATEGORIES as CATEGORIES } from './teams';
 
@@ -149,11 +149,9 @@ export default function AdminPanel() {
       <section className="panel">
         <h2>팀</h2>
         <p className="field-hint">
-          우리 교회에서 쓰는 이름으로 만드세요. <b>링크 복사</b>를 눌러 카톡으로 보내면 됩니다 —
-          받은 사람은 링크를 누르고 카카오로 로그인하는 것으로 끝입니다. 코드를 적을 일이 없습니다.
+          우리 교회에서 쓰는 이름으로 만드세요. 관리자는 <b>담당자 링크만</b> 다룹니다 —
+          담당자에게 1:1로 보내면, 그분이 들어와서 <b>자기 팀원을 직접 부릅니다.</b>
           <br />
-          <b>팀원 링크</b>는 여러 번 쓰니 단톡방에 뿌리셔도 되고, <b>담당자 링크</b>는 한 번만
-          쓸 수 있으니 담당자에게만 1:1로 보내세요.
           설교대지는 팀이 없습니다 — 각자 자기 것을 쓰므로 아래 <b>목회자</b>로 지정합니다.
         </p>
 
@@ -196,86 +194,54 @@ export default function AdminPanel() {
             <div className="table-scroll">
               <table className="admin-table">
                 <thead>
-                  <tr>
-                    <th>팀</th><th>분류</th><th>구분</th><th>코드</th><th>동작</th><th></th>
-                  </tr>
+                  <tr><th>팀</th><th>분류</th><th>담당자 코드</th><th>동작</th><th></th></tr>
                 </thead>
                 <tbody>
                   {teams.map((team) => {
-                    const join = codeOf('team_join', team.name);
                     const leader = codeOf('team_leader', team.name);
-                    const leaderUsed = leader ? leader.used_count > 0 : false;
+                    const used = leader ? leader.used_count > 0 : false;
                     return (
-                      <Fragment key={team.id}>
-                        <tr>
-                          <th rowSpan={2} scope="rowgroup">{team.name}</th>
-                          <td rowSpan={2}>{team.category}</td>
-                          <td>
-                            팀원
-                            <em className="cell-note">링크만 보내면 됩니다 · 단톡방 가능</em>
-                          </td>
-                          <td><strong className="code-value">{join?.code ?? '없음'}</strong></td>
-                          <td className="cell-actions">
-                            {join && (
-                              <button type="button" className="text-button" onClick={() => copy(inviteLink(join.code), '초대 링크를')}>
-                                링크 복사
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="text-button"
-                              disabled={busy === `join:${team.name}`}
-                              onClick={() => run(`join:${team.name}`, () => fetch('/api/membership/codes', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ kind: 'team_join', team: team.name }),
-                              }), `${team.name} 팀원 코드`)}
-                            >
-                              {join ? '새 코드' : '코드 만들기'}
+                      <tr key={team.id}>
+                        <th scope="row">{team.name}</th>
+                        <td>{team.category}</td>
+                        <td>
+                          <strong className="code-value">{leader?.code ?? '없음'}</strong>
+                          <em className="cell-note">
+                            {used ? '사용됨 — 담당자가 정해졌습니다' : '한 번만 · 담당자에게 1:1'}
+                          </em>
+                        </td>
+                        <td className="cell-actions">
+                          {leader && !used && (
+                            <button type="button" className="text-button" onClick={() => copy(inviteLink(leader.code), '담당자 링크를')}>
+                              링크 복사
                             </button>
-                          </td>
-                          <td rowSpan={2}>
-                            <button
-                              type="button"
-                              className="text-button danger"
-                              disabled={busy === `archive:${team.id}`}
-                              onClick={() => run(`archive:${team.id}`,
-                                () => fetch(`/api/teams?id=${team.id}`, { method: 'DELETE' }),
-                                `${team.name} 팀을 접었습니다`)}
-                            >
-                              팀 접기
-                            </button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            담당자
-                            <em className="cell-note">
-                              {leaderUsed ? '사용됨 — 담당자 정해짐' : '링크 한 번만 · 1:1 전달'}
-                            </em>
-                          </td>
-                          <td><strong className="code-value">{leader?.code ?? '없음'}</strong></td>
-                          <td className="cell-actions">
-                            {leader && !leaderUsed && (
-                              <button type="button" className="text-button" onClick={() => copy(inviteLink(leader.code), '담당자 링크를')}>
-                                링크 복사
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="text-button"
-                              disabled={busy === `code:${team.name}`}
-                              onClick={() => run(`code:${team.name}`, () => fetch('/api/membership/codes', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ kind: 'team_leader', team: team.name }),
-                              }), `${team.name} 담당자 코드`)}
-                            >
-                              {leader ? '새 코드' : '코드 만들기'}
-                            </button>
-                          </td>
-                        </tr>
-                      </Fragment>
+                          )}
+                          <button
+                            type="button"
+                            className="text-button"
+                            disabled={busy === `code:${team.name}`}
+                            onClick={() => run(`code:${team.name}`, () => fetch('/api/membership/codes', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ kind: 'team_leader', team: team.name }),
+                            }), `${team.name} 담당자 코드`)}
+                          >
+                            {leader ? '새 코드' : '코드 만들기'}
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="text-button danger"
+                            disabled={busy === `archive:${team.id}`}
+                            onClick={() => run(`archive:${team.id}`,
+                              () => fetch(`/api/teams?id=${team.id}`, { method: 'DELETE' }),
+                              `${team.name} 팀을 접었습니다`)}
+                          >
+                            팀 접기
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -284,8 +250,8 @@ export default function AdminPanel() {
           </div>
         )}
         <p className="field-hint">
-          담당자를 바꾸려면 <b>담당자 코드 다시</b>로 새 코드를 뽑아 새 담당자에게 보내면 됩니다.
-          팀을 정리해도 그 팀 자료는 남습니다.
+          담당자를 바꾸려면 <b>새 코드</b>를 뽑아 새 담당자에게 보내면 됩니다.
+          팀을 접어도 그 팀 자료는 남습니다.
         </p>
       </section>
 

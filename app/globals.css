@@ -385,3 +385,4 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .cell-note { display: block; margin-top: 2px; color: #9aa5b6; font-size: 10px; font-style: normal; }
 .cell-actions { white-space: nowrap; }
 .cell-actions .text-button + .text-button { margin-left: 8px; }
+.invite-link { display: inline-block; max-width: 46vw; overflow: hidden; color: #46536b; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
