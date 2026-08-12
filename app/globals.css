@@ -374,3 +374,14 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .text-button.danger { color: #b4453c; }
 .auth-badge-admin { color: rgba(255,255,255,.82); font-size: 11px; font-weight: 700; text-decoration: none; }
 .auth-badge-admin:hover { color: #fff; text-decoration: underline; }
+
+/* 관리자 표 — 모바일에서는 가로로 스크롤한다. 줄바꿈으로 뒤엉키는 것보다 낫다 */
+.table-scroll { overflow-x: auto; margin-top: 14px; -webkit-overflow-scrolling: touch; }
+.admin-table { width: 100%; min-width: 460px; border-collapse: collapse; font-size: 12px; }
+.admin-table th, .admin-table td { padding: 9px 10px; border-bottom: 1px solid #eef1f6; text-align: left; vertical-align: middle; }
+.admin-table thead th { color: #8a96a9; font-size: 10px; font-weight: 800; letter-spacing: .04em; border-bottom: 1px solid #e2e8f0; }
+.admin-table tbody th { color: #263247; font-weight: 800; white-space: nowrap; }
+.admin-table td { color: #46536b; }
+.cell-note { display: block; margin-top: 2px; color: #9aa5b6; font-size: 10px; font-style: normal; }
+.cell-actions { white-space: nowrap; }
+.cell-actions .text-button + .text-button { margin-left: 8px; }

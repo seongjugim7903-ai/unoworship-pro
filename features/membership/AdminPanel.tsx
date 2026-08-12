@@ -8,7 +8,7 @@
 // 코드는 카톡으로 전달된다. 그래서 화면의 일이 '만들기'보다 '복사하기'에 가깝다 —
 // 누르면 바로 복사되게 두고, 담당자 코드는 1회용이라는 것을 옆에 적어 둔다.
 
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 
 import { TEAM_CATEGORIES as CATEGORIES } from './teams';
 
@@ -188,62 +188,88 @@ export default function AdminPanel() {
           <p className="field-hint" style={{ marginTop: 14 }}>아직 만든 팀이 없습니다.</p>
         ) : (
           <div style={{ marginTop: 14 }}>
-            {teams.map((team) => {
-              const join = codeOf('team_join', team.name);
-              const leader = codeOf('team_leader', team.name);
-              const leaderUsed = leader ? leader.used_count > 0 : false;
-              return (
-                <div className="code-row" key={team.id}>
-                  <span className="code-team">{team.name}</span>
-                  <span className="field-hint">{team.category}</span>
-
-                  <span className="field-hint">팀원</span>
-                  <strong className="code-value">{join?.code ?? '없음'}</strong>
-                  {join && <button type="button" className="text-button" onClick={() => copy(join.code)}>복사</button>}
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={busy === `join:${team.name}`}
-                    onClick={() => run(`join:${team.name}`, () => fetch('/api/membership/codes', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ kind: 'team_join', team: team.name }),
-                    }), `${team.name} 팀 코드`)}
-                  >
-                    {join ? '다시' : '만들기'}
-                  </button>
-
-                  <span className="field-hint">담당자</span>
-                  <strong className="code-value">{leader?.code ?? '없음'}</strong>
-                  {leader && !leaderUsed && (
-                    <button type="button" className="text-button" onClick={() => copy(leader.code)}>복사</button>
-                  )}
-                  {leaderUsed && <span className="field-hint">사용됨</span>}
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={busy === `code:${team.name}`}
-                    onClick={() => run(`code:${team.name}`, () => fetch('/api/membership/codes', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ kind: 'team_leader', team: team.name }),
-                    }), `${team.name} 담당자 코드`)}
-                  >
-                    {leader ? '다시' : '만들기'}
-                  </button>
-                  <button
-                    type="button"
-                    className="text-button danger"
-                    disabled={busy === `archive:${team.id}`}
-                    onClick={() => run(`archive:${team.id}`,
-                      () => fetch(`/api/teams?id=${team.id}`, { method: 'DELETE' }),
-                      `${team.name} 팀을 정리했습니다`)}
-                  >
-                    정리
-                  </button>
-                </div>
-              );
-            })}
+            <div className="table-scroll">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>팀</th><th>분류</th><th>구분</th><th>코드</th><th>동작</th><th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teams.map((team) => {
+                    const join = codeOf('team_join', team.name);
+                    const leader = codeOf('team_leader', team.name);
+                    const leaderUsed = leader ? leader.used_count > 0 : false;
+                    return (
+                      <Fragment key={team.id}>
+                        <tr>
+                          <th rowSpan={2} scope="rowgroup">{team.name}</th>
+                          <td rowSpan={2}>{team.category}</td>
+                          <td>
+                            팀원
+                            <em className="cell-note">여러 번 · 단톡방 가능</em>
+                          </td>
+                          <td><strong className="code-value">{join?.code ?? '없음'}</strong></td>
+                          <td className="cell-actions">
+                            {join && <button type="button" className="text-button" onClick={() => copy(join.code)}>복사</button>}
+                            <button
+                              type="button"
+                              className="text-button"
+                              disabled={busy === `join:${team.name}`}
+                              onClick={() => run(`join:${team.name}`, () => fetch('/api/membership/codes', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ kind: 'team_join', team: team.name }),
+                              }), `${team.name} 팀원 코드`)}
+                            >
+                              {join ? '새 코드' : '코드 만들기'}
+                            </button>
+                          </td>
+                          <td rowSpan={2}>
+                            <button
+                              type="button"
+                              className="text-button danger"
+                              disabled={busy === `archive:${team.id}`}
+                              onClick={() => run(`archive:${team.id}`,
+                                () => fetch(`/api/teams?id=${team.id}`, { method: 'DELETE' }),
+                                `${team.name} 팀을 접었습니다`)}
+                            >
+                              팀 접기
+                            </button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            담당자
+                            <em className="cell-note">
+                              {leaderUsed ? '사용됨 — 담당자 정해짐' : '한 번만 · 1:1 전달'}
+                            </em>
+                          </td>
+                          <td><strong className="code-value">{leader?.code ?? '없음'}</strong></td>
+                          <td className="cell-actions">
+                            {leader && !leaderUsed && (
+                              <button type="button" className="text-button" onClick={() => copy(leader.code)}>복사</button>
+                            )}
+                            <button
+                              type="button"
+                              className="text-button"
+                              disabled={busy === `code:${team.name}`}
+                              onClick={() => run(`code:${team.name}`, () => fetch('/api/membership/codes', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ kind: 'team_leader', team: team.name }),
+                              }), `${team.name} 담당자 코드`)}
+                            >
+                              {leader ? '새 코드' : '코드 만들기'}
+                            </button>
+                          </td>
+                        </tr>
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
         <p className="field-hint">
@@ -263,40 +289,55 @@ export default function AdminPanel() {
         </p>
         {members.length === 0 ? (
           <p className="field-hint">아직 참여자가 없습니다.</p>
-        ) : members.map((member) => (
-          <div className="code-row" key={member.userId}>
-            <span className="code-team">{member.name}</span>
-            <button
-              type="button"
-              className="text-button"
-              disabled={busy === `role:${member.userId}`}
-              onClick={() => run(`role:${member.userId}`, () => fetch('/api/membership/members', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: member.userId, role: member.role === 'admin' ? 'member' : 'admin' }),
-              }), member.role === 'admin' ? `${member.name} 관리자에서 내렸습니다` : `${member.name}을(를) 관리자로 세웠습니다`)}
-            >
-              {member.role === 'admin' ? '✓ 관리자' : '관리자로'}
-            </button>
-            {member.teams.length > 0 && (
-              <span className="field-hint">
-                {member.teams.map((team) => `${team.team}${team.role === 'leader' ? '(담당)' : ''}`).join(' · ')}
-              </span>
-            )}
-            <button
-              type="button"
-              className="text-button"
-              disabled={busy === `preacher:${member.userId}`}
-              onClick={() => run(`preacher:${member.userId}`, () => fetch('/api/membership/members', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: member.userId, isPreacher: !member.isPreacher }),
-              }), member.isPreacher ? `${member.name} 목회자 표시를 껐습니다` : `${member.name}을(를) 목회자로 지정했습니다`)}
-            >
-              {member.isPreacher ? '✓ 목회자' : '목회자로 지정'}
-            </button>
+        ) : (
+          <div className="table-scroll">
+            <table className="admin-table">
+              <thead>
+                <tr><th>이름</th><th>소속 팀</th><th>관리자</th><th>목회자</th></tr>
+              </thead>
+              <tbody>
+                {members.map((member) => (
+                  <tr key={member.userId}>
+                    <th scope="row">{member.name}</th>
+                    <td>
+                      {member.teams.length === 0
+                        ? '—'
+                        : member.teams.map((team) => `${team.team}${team.role === 'leader' ? '(담당)' : ''}`).join(' · ')}
+                    </td>
+                    <td className="cell-actions">
+                      <button
+                        type="button"
+                        className="text-button"
+                        disabled={busy === `role:${member.userId}`}
+                        onClick={() => run(`role:${member.userId}`, () => fetch('/api/membership/members', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ userId: member.userId, role: member.role === 'admin' ? 'member' : 'admin' }),
+                        }), member.role === 'admin' ? `${member.name} 관리자에서 내렸습니다` : `${member.name}을(를) 관리자로 세웠습니다`)}
+                      >
+                        {member.role === 'admin' ? '✓ 켜짐' : '켜기'}
+                      </button>
+                    </td>
+                    <td className="cell-actions">
+                      <button
+                        type="button"
+                        className="text-button"
+                        disabled={busy === `preacher:${member.userId}`}
+                        onClick={() => run(`preacher:${member.userId}`, () => fetch('/api/membership/members', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ userId: member.userId, isPreacher: !member.isPreacher }),
+                        }), member.isPreacher ? `${member.name} 목회자 표시를 껐습니다` : `${member.name}을(를) 목회자로 지정했습니다`)}
+                      >
+                        {member.isPreacher ? '✓ 켜짐' : '켜기'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
+        )}
       </section>
 
       {message && <section className="panel"><p className="info-message">{message}</p></section>}
