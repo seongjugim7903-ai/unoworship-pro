@@ -16,7 +16,10 @@
 // 그래서 자동으로 띄우지 않는다. 설치 기회(beforeinstallprompt)는 한 번 쓰면 사라지는데,
 // 사용자가 보지도 않은 창을 실수로 닫으면 그 기회가 날아가고 화면에는 누를 것이 없어진다.
 // 큰 버튼으로 두고 사용자가 누를 때 연다 — 그때가 브라우저도 허락하는 시점이다.
-// 취소했을 때는 새로고침으로 기회를 다시 받는다.
+//
+// 기회가 아직 없을 때도 누를 것을 남겨 둔다. 크롬은 설치창을 한 번 닫으면 한동안
+// 기회를 주지 않는데, 그때 안내 문구만 띄우면 화면이 막힌다. 새로고침하면 다시
+// 받으므로 '설치 다시 시도'로 둔다 — 아이폰은 애초에 기회가 없어 안내만 남긴다.
 //
 // 데스크톱에서는 띄우지 않는다 — 막으면 PC로 들어올 길이 없다. 판단은 부모가 한다.
 
@@ -152,21 +155,22 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
           {environment === 'kakao-ios' && (
             <button type="button" className="gate-primary" onClick={() => void copyAddress()}>주소 복사하기</button>
           )}
-          {!inKakao && canInstall && (
+          {!inKakao && !alreadyHere && canInstall && (
             <button type="button" className="gate-primary" onClick={() => void openInstaller()}>
               앱 설치
             </button>
           )}
-          {!inKakao && !canInstall && cancelled && (
+          {/* 기회가 없을 때도 누를 것이 있어야 한다 — 새로고침하면 브라우저가 다시 준다 */}
+          {!inKakao && !alreadyHere && !canInstall && environment !== 'ios' && (
             <button type="button" className="gate-primary" onClick={() => window.location.reload()}>
-              다시 설치하기
+              {cancelled ? '설치 다시 시도' : '설치창 불러오기'}
             </button>
           )}
-          {!inKakao && !canInstall && !cancelled && !installed && (
+          {!inKakao && !alreadyHere && !canInstall && (
             <p className="gate-manual">
               {environment === 'ios'
                 ? <>아래쪽 <b>공유 버튼</b>을 누르고 <b>홈 화면에 추가</b>를 눌러 주세요.</>
-                : <>브라우저 메뉴(⋮)를 열고 <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 눌러 주세요.</>}
+                : <>설치창이 안 뜨면 브라우저 오른쪽 위 <b>⋮</b> 메뉴에서 <b>앱 설치</b>를 눌러 주세요. 그래도 됩니다.</>}
             </p>
           )}
         </div>
