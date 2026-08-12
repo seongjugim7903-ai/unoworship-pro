@@ -75,3 +75,17 @@ export function canEditTeam(membership: Membership, team: string): boolean {
 export function canWriteSermon(membership: Membership): boolean {
   return membership.churchRole === 'admin' || membership.isPreacher;
 }
+
+/** 교회에 참여한 사람인가 — 게시판 보기·댓글은 참여자면 된다 */
+export function isChurchMember(membership: Membership): boolean {
+  return membership.churchRole !== null;
+}
+
+/**
+ * 게시판에 글을 쓸 수 있는가 — 팀장급 이상.
+ * 교회 관리자, 또는 어느 한 팀이라도 담당자(leader)인 사람이다.
+ */
+export function canPostBoard(membership: Membership): boolean {
+  if (membership.churchRole === 'admin') return true;
+  return Object.values(membership.teams).some((role) => role === 'leader');
+}

@@ -66,6 +66,9 @@ export async function GET() {
         /* 방송실·예배준비 — 그 팀에 든 사람만 화면이 보인다 */
         broadcast: inCategory('방송실'),
         prep: inCategory('예배준비'),
+        /* 게시판 — 참여자면 누구나 보고 댓글. 글쓰기는 팀장급 이상 */
+        board: membership.churchRole !== null,
+        postBoard: isAdmin || mine.some((team) => membership.teams[team] === 'leader'),
         /* 올리고 고치는 것은 담당자만 */
         editWorship: leadsCategory('준비찬양'),
         editChoir: leadsCategory('찬양대'),

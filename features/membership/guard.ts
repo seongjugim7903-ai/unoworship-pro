@@ -13,7 +13,7 @@ import { getSessionUserId } from './currentUser';
 import { getActiveChurchId } from '../../lib/churchScope';
 import { supabaseRest } from '../../lib/supabase/server';
 import { loadMembership } from './store';
-import { canEditTeam, canWriteSermon, type Membership } from './inviteCode';
+import { canEditTeam, canPostBoard, canWriteSermon, isChurchMember, type Membership } from './inviteCode';
 
 export interface Who {
   userId: string;
@@ -84,6 +84,26 @@ export async function requireCategoryEditor(category: string): Promise<NextRespo
     return deny(`${category} 담당자만 올리고 고칠 수 있습니다.`, 'NOT_TEAM_EDITOR');
   }
   return null;
+}
+
+/** 게시판에 글을 쓸 수 있는가 — 팀장급 이상(담당자·관리자). 되면 요청자를 돌려준다. */
+export async function requireBoardWriter(): Promise<Who | NextResponse> {
+  const caller = await who();
+  if (!caller) return deny('로그인이 필요합니다.', 'LOGIN_REQUIRED', 401);
+  if (!canPostBoard(caller.membership)) {
+    return deny('게시판 글쓰기는 팀 담당자 이상만 가능합니다.', 'NOT_BOARD_WRITER');
+  }
+  return caller;
+}
+
+/** 교회에 참여한 사람인가 — 게시판 보기·댓글. 되면 요청자를 돌려준다. */
+export async function requireMember(): Promise<Who | NextResponse> {
+  const caller = await who();
+  if (!caller) return deny('로그인이 필요합니다.', 'LOGIN_REQUIRED', 401);
+  if (!isChurchMember(caller.membership)) {
+    return deny('교회에 참여한 뒤 이용할 수 있습니다.', 'NOT_MEMBER');
+  }
+  return caller;
 }
 
 /** 설교대지를 쓸 수 있는가 — 목회자로 등록된 사람과 교회 관리자다 */

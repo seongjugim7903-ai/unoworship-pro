@@ -8,14 +8,16 @@ import SermonSection from '../features/sermon-compose/SermonSection';
 import WorshipPrepPanel from '../features/worship-prep-ui/WorshipPrepPanel';
 import BroadcastPanel from '../features/broadcast/BroadcastPanel';
 import ServicePrepPanel from '../features/service-prep/ServicePrepPanel';
+import BoardPanel from '../features/board/BoardPanel';
 import AuthBadge from '../features/membership/AuthBadge';
 import AuthGate from '../features/membership/AuthGate';
 
-type View = 'home' | 'choir' | 'sermon' | 'worship' | 'broadcast' | 'prep';
+type View = 'home' | 'choir' | 'sermon' | 'worship' | 'broadcast' | 'prep' | 'board';
 
 /* can 의 어느 값을 보는지까지 여기 적어 둔다 — 권한이 없는 기능은 버튼조차 안 보인다.
    초대받은 팀 말고는 들어갈 자리가 없어야 한다는 뜻이다. */
 const MENU: Array<{ id: Exclude<View, 'home'>; label: string; desc: string; can: keyof Can }> = [
+  { id: 'board', label: '게시판', desc: '전 팀 공유 · 공지 · 댓글', can: 'board' },
   { id: 'choir', label: '헵시바 선교단', desc: '찬양대 자막 · 카카오톡 공유', can: 'choir' },
   { id: 'sermon', label: '설교대지', desc: '설교 대지 · 주보 정리', can: 'sermon' },
   { id: 'worship', label: '준비찬양', desc: '팀별 찬양 준비 · 악보', can: 'worship' },
@@ -29,6 +31,7 @@ interface Can {
   choir: boolean;
   broadcast: boolean;
   prep: boolean;
+  board: boolean;
 }
 
 export default function WorkspaceTabs() {
@@ -43,10 +46,10 @@ export default function WorkspaceTabs() {
         const me = await (await fetch('/api/membership/me')).json();
         /* 저장 환경이 없는 배포에서는 막지 않는다 — 화면이 통째로 비면 손쓸 방법이 없다 */
         allowed = me?.unavailable
-          ? { sermon: true, worship: true, choir: true, broadcast: true, prep: true }
-          : (me?.can ?? { sermon: false, worship: false, choir: false, broadcast: false, prep: false });
+          ? { sermon: true, worship: true, choir: true, broadcast: true, prep: true, board: true }
+          : (me?.can ?? { sermon: false, worship: false, choir: false, broadcast: false, prep: false, board: false });
       } catch {
-        allowed = { sermon: true, worship: true, choir: true, broadcast: true, prep: true };
+        allowed = { sermon: true, worship: true, choir: true, broadcast: true, prep: true, board: true };
       }
       setCan(allowed);
 
@@ -109,6 +112,7 @@ export default function WorkspaceTabs() {
         {view === 'worship' && <WorshipPrepPanel />}
         {view === 'broadcast' && <BroadcastPanel />}
         {view === 'prep' && <ServicePrepPanel />}
+        {view === 'board' && <BoardPanel />}
       </AuthGate>
     </>
   );
