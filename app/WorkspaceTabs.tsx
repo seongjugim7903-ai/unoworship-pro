@@ -12,12 +12,13 @@ import BoardPanel from '../features/board/BoardPanel';
 import AuthBadge from '../features/membership/AuthBadge';
 import AuthGate from '../features/membership/AuthGate';
 
-type View = 'home' | 'choir' | 'sermon' | 'worship' | 'broadcast' | 'prep' | 'board';
+/* 게시판은 랜딩 목록에 없다 — 각 팀 화면 상단 타이틀 옆에서 모달로 연다.
+   자막협조·준비찬양 등을 하면서 바로 글을 쓰고 닫을 수 있게 하기 위함이다. */
+type View = 'home' | 'choir' | 'sermon' | 'worship' | 'broadcast' | 'prep';
 
 /* can 의 어느 값을 보는지까지 여기 적어 둔다 — 권한이 없는 기능은 버튼조차 안 보인다.
    초대받은 팀 말고는 들어갈 자리가 없어야 한다는 뜻이다. */
 const MENU: Array<{ id: Exclude<View, 'home'>; label: string; desc: string; can: keyof Can }> = [
-  { id: 'board', label: '게시판', desc: '전 팀 공유 · 공지 · 댓글', can: 'board' },
   { id: 'choir', label: '헵시바 선교단', desc: '찬양대 자막 · 카카오톡 공유', can: 'choir' },
   { id: 'sermon', label: '설교대지', desc: '설교 대지 · 주보 정리', can: 'sermon' },
   { id: 'worship', label: '준비찬양', desc: '팀별 찬양 준비 · 악보', can: 'worship' },
@@ -38,6 +39,8 @@ export default function WorkspaceTabs() {
   const [view, setView] = useState<View>('home');
   /* 확인 전에는 아무 것도 안 보여 준다 — 잠깐 보였다 사라지는 것이 더 헷갈린다 */
   const [can, setCan] = useState<Can | null>(null);
+  /* 게시판은 각 팀 화면 위에 모달로 얹는다 — 작업 중이던 화면을 잃지 않는다 */
+  const [boardOpen, setBoardOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -104,6 +107,9 @@ export default function WorkspaceTabs() {
       <header className="feature-topbar">
         <button className="feature-back" type="button" onClick={() => setView('home')}>← 홈</button>
         <span className="feature-title">{current?.label}</span>
+        {can?.board && (
+          <button className="feature-board" type="button" onClick={() => setBoardOpen(true)}>💬 게시판</button>
+        )}
       </header>
       {/* 입력 화면은 로그인·참여를 마친 사람만 — 홈과 연주용 악보 보기는 그대로 열려 있다 */}
       <AuthGate>
@@ -112,8 +118,22 @@ export default function WorkspaceTabs() {
         {view === 'worship' && <WorshipPrepPanel />}
         {view === 'broadcast' && <BroadcastPanel />}
         {view === 'prep' && <ServicePrepPanel />}
-        {view === 'board' && <BoardPanel />}
       </AuthGate>
+
+      {boardOpen && (
+        <div className="board-modal" role="dialog" aria-label="게시판">
+          <button className="board-modal-scrim" type="button" aria-label="닫기" onClick={() => setBoardOpen(false)} />
+          <div className="board-modal-sheet">
+            <header className="board-modal-head">
+              <strong>게시판</strong>
+              <button className="board-modal-close" type="button" aria-label="닫기" onClick={() => setBoardOpen(false)}>×</button>
+            </header>
+            <div className="board-modal-body">
+              <BoardPanel />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

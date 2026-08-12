@@ -58,6 +58,8 @@ button:disabled { cursor: not-allowed; }
 .feature-back { height: 34px; padding: 0 14px; border: 1px solid #dfe4ee; border-radius: 8px; color: #5543c0; background: #fff; font-size: 13px; font-weight: 800; }
 .feature-back:hover { border-color: #a69be8; }
 .feature-title { color: #46506a; font-size: 13px; font-weight: 800; }
+.feature-board { margin-left: auto; height: 34px; padding: 0 14px; border: 1px solid #d7dbee; border-radius: 8px; color: #5543c0; background: #f4f2ff; font-size: 13px; font-weight: 800; }
+.feature-board:hover { border-color: #b7aef0; background: #efeaff; }
 .feature-topbar + .site-shell { padding-top: 12px; }
 .site-shell { min-height: 100vh; max-width: 1260px; margin: 0 auto; padding: 36px 28px 28px; }
 .site-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
@@ -248,6 +250,16 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .board-comment-meta { margin: 0 0 3px; color: #8a96a9; font-size: 10px; }
 .board-comment-body { margin: 0; color: #34405a; font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 .board-comment-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+/* 게시판 모달 — 팀 화면 위에 얹는다 */
+.board-modal { position: fixed; inset: 0; z-index: 200; display: flex; justify-content: center; align-items: flex-end; }
+.board-modal-scrim { position: absolute; inset: 0; border: 0; padding: 0; background: rgba(15, 20, 40, .45); }
+.board-modal-sheet { position: relative; display: flex; flex-direction: column; width: 100%; max-width: 720px; height: 92vh; height: 92dvh; border-radius: 16px 16px 0 0; background: #f5f7fb; box-shadow: 0 -12px 40px rgba(15, 20, 40, .3); overflow: hidden; }
+.board-modal-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #e4e9f1; background: #fff; }
+.board-modal-head strong { color: #263247; font-size: 15px; }
+.board-modal-close { width: 34px; height: 34px; border: 1px solid #dfe4ee; border-radius: 8px; color: #6f7b8f; background: #fff; font-size: 20px; line-height: 1; }
+.board-modal-body { flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; }
+.board-modal-body .site-shell { min-height: 0; padding: 16px; }
+@media (min-width: 721px) { .board-modal { align-items: center; } .board-modal-sheet { height: 88vh; border-radius: 16px; } }
 .bulletin-ocr-row input[type=file] { margin-top: 8px; font-size: 12px; }
 .bulletin-ocr-row input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .page-footer { padding: 24px 0 0; color: #9ca7b8; font-size: 11px; text-align: center; }
