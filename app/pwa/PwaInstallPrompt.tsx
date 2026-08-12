@@ -30,11 +30,11 @@ export default function PwaInstallPrompt() {
     }
   };
 
-  if (environment === 'standalone' || dismissed) return null;
-  if (environment === 'browser' && !canInstall && !installRequested) return null;
-
-  /* 초대 화면에서는 닫지 못하게 한다 — 닫으면 설치할 방법이 화면에서 사라진다 */
+  /* 초대 화면에서는 언제나 띄운다 — 여기가 설치를 끝내야 넘어가는 자리다 */
   const onInvite = Boolean(pathname?.startsWith('/join'));
+  if (environment === 'standalone' || dismissed) return null;
+  if (environment === 'browser' && !canInstall && !installRequested && !onInvite) return null;
+
   const isKakaoAndroid = environment === 'kakao-android';
   const isKakaoIOS = environment === 'kakao-ios';
   const steps = installSteps(environment, canInstall);
@@ -53,7 +53,9 @@ export default function PwaInstallPrompt() {
         {/* 카카오 안에서는 설치가 안 된다. 브라우저로 옮기는 것까지 이 버튼이 한다 */}
         {isKakaoAndroid && <button type="button" onClick={openInOutsideBrowser}>앱 설치</button>}
         {isKakaoIOS && <button type="button" onClick={() => void handleCopyAddress()}>주소 복사</button>}
-        {environment === 'browser' && canInstall && (
+        {/* 기회가 아직 없어도 버튼은 띄운다 — install() 이 새로고침으로 다시 물어보고,
+            그래도 없으면 브라우저 메뉴로 안내한다. 누를 것이 없는 화면이 제일 나쁘다 */}
+        {environment === 'browser' && (
           <button type="button" onClick={() => void install()}>앱 설치</button>
         )}
         {!onInvite && (

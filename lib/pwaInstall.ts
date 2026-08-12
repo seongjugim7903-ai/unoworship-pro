@@ -5,7 +5,7 @@
 // 카톡 안에서 링크를 누르면 카카오 내장 브라우저로 열린다. 거기서는 설치가 안 되므로
 // Chrome·Safari 로 옮겨야 한다 — 교회에서 링크를 단톡방으로 돌리므로 이 경우가 가장 흔하다.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type InstallEnvironment = 'browser' | 'ios' | 'kakao-android' | 'kakao-ios' | 'standalone';
 
@@ -152,10 +152,20 @@ export function useInstall() {
   const install = useCallback(async () => {
     const prompt = getInstallPrompt();
     if (!prompt) {
-      /* 아직 기회가 없다. 새로고침하면 브라우저가 다시 판단한다 */
-      window.location.reload();
+      /* 브라우저가 아직 설치 기회를 주지 않았다. 크롬은 사이트를 좀 만져 본 뒤에야
+         주기 때문에 링크로 막 들어온 화면에서는 없을 수 있다 — 한 번은 새로고침해
+         다시 물어보고, 그래도 없으면 브라우저 메뉴로 안내한다.
+         새로고침을 되풀이하면 화면만 깜빡이므로 한 번으로 막는다. */
+      const RETRIED = 'ulju:install-retried';
+      if (!sessionStorage.getItem(RETRIED)) {
+        sessionStorage.setItem(RETRIED, '1');
+        window.location.reload();
+        return;
+      }
+      setMessage('브라우저 오른쪽 위 ⋮ 를 누르고 「앱 설치」를 선택해 주세요.');
       return;
     }
+    sessionStorage.removeItem('ulju:install-retried');
     try {
       await prompt.prompt();
       const choice = await prompt.userChoice;
@@ -173,6 +183,18 @@ export function useInstall() {
       setMessage('설치창을 열지 못했습니다. 브라우저 메뉴(⋮)에서 앱 설치를 눌러 주세요.');
     }
   }, []);
+
+  /* 카카오톡에서 '앱 설치'를 눌러 브라우저로 옮겨 온 직후다(install=1).
+     설치하겠다고 이미 누른 사람이므로 기회가 오는 대로 설치창을 열어 준다.
+     브라우저가 손짓을 요구하면 예외로 떨어지고 버튼은 그대로 남는다 —
+     아무 화면에서나 자동으로 열지 않는 이유가 그것이다. 기회는 한 번뿐이다. */
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (!canInstall || autoOpened.current) return;
+    if (new URLSearchParams(window.location.search).get('install') !== '1') return;
+    autoOpened.current = true;
+    void install();
+  }, [canInstall, install]);
 
   return { environment, canInstall, installed, cancelled, message, setMessage, install };
 }
