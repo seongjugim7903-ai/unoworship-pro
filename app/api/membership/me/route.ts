@@ -63,9 +63,13 @@ export async function GET() {
         /* 준비찬양·찬양대는 그 카테고리 팀에 든 사람만 */
         worship: inCategory('준비찬양'),
         choir: inCategory('찬양대'),
+        /* 방송실·예배준비 — 그 팀에 든 사람만 화면이 보인다 */
+        broadcast: inCategory('방송실'),
+        prep: inCategory('예배준비'),
         /* 올리고 고치는 것은 담당자만 */
         editWorship: leadsCategory('준비찬양'),
         editChoir: leadsCategory('찬양대'),
+        editPrep: leadsCategory('예배준비'),
       },
     });
   } catch (error) {
