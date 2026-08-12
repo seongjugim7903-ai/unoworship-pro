@@ -54,7 +54,7 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
         </h1>
         <p className="gate-lead">
           예배 중에 쓰는 화면이라 <b>앱으로 설치한 뒤에 시작합니다.</b>
-          {' '}위쪽 안내대로 설치하고 홈 화면의 ULJU 아이콘으로 열어 주세요.
+          {' '}위쪽 <b>앱 설치</b>를 누르고, 홈 화면에 생긴 ULJU 아이콘으로 열어 주세요.
         </p>
 
         {/* iOS 는 Safari 와 홈 화면 앱의 저장소가 갈릴 수 있어 코드가 안 넘어갈 수 있다.

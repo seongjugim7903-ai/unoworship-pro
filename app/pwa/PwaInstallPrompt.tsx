@@ -50,7 +50,8 @@ export default function PwaInstallPrompt() {
         {message && <small>{message}</small>}
       </div>
       <div className="pwa-install-actions">
-        {isKakaoAndroid && <button type="button" onClick={openInOutsideBrowser}>브라우저로 열기</button>}
+        {/* 카카오 안에서는 설치가 안 된다. 브라우저로 옮기는 것까지 이 버튼이 한다 */}
+        {isKakaoAndroid && <button type="button" onClick={openInOutsideBrowser}>앱 설치</button>}
         {isKakaoIOS && <button type="button" onClick={() => void handleCopyAddress()}>주소 복사</button>}
         {environment === 'browser' && canInstall && (
           <button type="button" onClick={() => void install()}>앱 설치</button>

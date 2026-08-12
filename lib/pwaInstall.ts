@@ -89,12 +89,17 @@ export function isHandheld(): boolean {
 /**
  * 카카오 내장 브라우저에서 바깥 브라우저로 옮긴다.
  *
+ * 사용자에게는 이것이 '앱 설치'다. 카카오톡 안에서는 어떤 브라우저도 앱을 설치할 수
+ * 없어서 옮기는 단계가 반드시 필요한데, 그것을 버튼 이름으로 드러내면 "왜 브라우저를
+ * 여느냐"가 된다. 옮긴 뒤 곧바로 설치 안내가 뜨도록 ?install=1 을 달고 간다.
+ *
  * 크롬을 못 박지 않는다 — 갤럭시는 삼성인터넷이 기본인 경우가 많고, 그때
  * package=com.android.chrome 을 넣으면 그냥 아무 일도 일어나지 않는다. 실제로 그랬다.
  * 기본 브라우저가 열리게 두고, 그마저 막히면 원래 주소로 떨어진다.
  */
 export function openInOutsideBrowser(): void {
   const target = new URL(window.location.href);
+  target.searchParams.set('install', '1');
   const fallback = encodeURIComponent(target.toString());
   window.location.href = `intent://${target.host}${target.pathname}${target.search}`
     + `#Intent;scheme=https;action=android.intent.action.VIEW;`
@@ -103,7 +108,9 @@ export function openInOutsideBrowser(): void {
 
 export function installSteps(environment: InstallEnvironment, hasPrompt: boolean): string[] {
   switch (environment) {
-    case 'kakao-android': return ['브라우저로 열기', '앱 설치 누르기', '홈 화면에서 실행'];
+    /* 카카오 안에서는 설치가 안 돼 브라우저로 옮겨야 한다. 그 단계는 '앱 설치' 버튼이
+       알아서 하므로 순서에는 사용자가 할 일만 적는다 */
+    case 'kakao-android': return ['앱 설치 누르기', '브라우저에서 설치 확인', '홈 화면에서 실행'];
     case 'kakao-ios': return ['카카오톡 메뉴 열기', 'Safari로 열기', '공유 > 홈 화면에 추가'];
     case 'ios': return ['Safari 공유 버튼', '홈 화면에 추가', '추가 확인'];
     default: return hasPrompt
