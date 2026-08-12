@@ -34,7 +34,15 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (OPEN_PATHS.some((open) => pathname === open || pathname.startsWith(`${open}/`))) {
-    return NextResponse.next();
+    const passed = NextResponse.next();
+    /* 초대 링크는 동적 라우트(/join/[code])라 Next 가 no-store 를 붙인다.
+       그런데 브라우저는 no-store 로 내려온 페이지에는 앱 설치를 제안하지 않는다 —
+       같은 폰에서 홈(/)에서는 설치창이 뜨는데 초대 화면에서만 안 뜨던 원인이 이것이었다.
+       내용은 여전히 매 요청 새로 만든다. 캐시에 담아 두지 말라는 표시만 뗀다. */
+    if (pathname.startsWith('/join')) {
+      passed.headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    }
+    return passed;
   }
 
   const hasSession = request.cookies.getAll().some((cookie) => SESSION_COOKIE.test(cookie.name));
