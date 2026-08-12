@@ -21,7 +21,7 @@ interface Team {
 interface Code {
   id: string;
   code: string;
-  kind: 'church_join' | 'team_leader';
+  kind: 'church_join' | 'team_join' | 'team_leader';
   team: string | null;
   used_count: number;
 }
@@ -109,15 +109,16 @@ export default function AdminPanel() {
   }
 
   const churchCode = codes.find((item) => item.kind === 'church_join');
-  const leaderOf = (team: string) => codes.find((item) => item.kind === 'team_leader' && item.team === team);
+  const codeOf = (kind: Code['kind'], team: string) =>
+    codes.find((item) => item.kind === kind && item.team === team);
 
   return (
     <main className="site-shell">
       <section className="panel">
         <h2>교회 참여 코드</h2>
         <p className="field-hint">
-          모든 팀원이 이 코드 하나로 들어옵니다. 단톡방에 뿌리셔도 됩니다 —
-          관리자 자리는 이미 차 있어서 뒤에 들어오는 사람은 모두 참여자가 됩니다.
+          <b>관리자용입니다.</b> 팀원과 담당자는 아래 <b>팀 코드</b>를 받으면 됩니다 —
+          팀 코드에 교회가 이미 담겨 있어서 코드를 두 번 넣을 일이 없습니다.
         </p>
         <div className="code-row">
           <strong className="code-value">{churchCode?.code ?? '없음'}</strong>
@@ -145,7 +146,9 @@ export default function AdminPanel() {
       <section className="panel">
         <h2>팀</h2>
         <p className="field-hint">
-          우리 교회에서 쓰는 이름으로 만드세요. 팀을 만들면 그 팀의 <b>담당자 코드</b>를 뽑을 수 있습니다.
+          우리 교회에서 쓰는 이름으로 만드세요. 팀마다 코드가 둘입니다 —
+          <b>팀원 코드</b>는 여러 번 쓰니 단톡방에 뿌리셔도 되고, <b>담당자 코드</b>는 한 번만
+          쓸 수 있으니 담당자에게만 1:1로 보내세요.
           설교대지는 팀이 없습니다 — 각자 자기 것을 쓰므로 아래 <b>목회자</b>로 지정합니다.
         </p>
 
@@ -186,17 +189,36 @@ export default function AdminPanel() {
         ) : (
           <div style={{ marginTop: 14 }}>
             {teams.map((team) => {
-              const code = leaderOf(team.name);
-              const used = code ? code.used_count > 0 : false;
+              const join = codeOf('team_join', team.name);
+              const leader = codeOf('team_leader', team.name);
+              const leaderUsed = leader ? leader.used_count > 0 : false;
               return (
                 <div className="code-row" key={team.id}>
                   <span className="code-team">{team.name}</span>
                   <span className="field-hint">{team.category}</span>
-                  <strong className="code-value">{code?.code ?? '코드 없음'}</strong>
-                  {code && !used && (
-                    <button type="button" className="text-button" onClick={() => copy(code.code)}>복사</button>
+
+                  <span className="field-hint">팀원</span>
+                  <strong className="code-value">{join?.code ?? '없음'}</strong>
+                  {join && <button type="button" className="text-button" onClick={() => copy(join.code)}>복사</button>}
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={busy === `join:${team.name}`}
+                    onClick={() => run(`join:${team.name}`, () => fetch('/api/membership/codes', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ kind: 'team_join', team: team.name }),
+                    }), `${team.name} 팀 코드`)}
+                  >
+                    {join ? '다시' : '만들기'}
+                  </button>
+
+                  <span className="field-hint">담당자</span>
+                  <strong className="code-value">{leader?.code ?? '없음'}</strong>
+                  {leader && !leaderUsed && (
+                    <button type="button" className="text-button" onClick={() => copy(leader.code)}>복사</button>
                   )}
-                  {used && <span className="field-hint">사용됨 — 담당자가 정해졌습니다</span>}
+                  {leaderUsed && <span className="field-hint">사용됨</span>}
                   <button
                     type="button"
                     className="text-button"
@@ -207,7 +229,7 @@ export default function AdminPanel() {
                       body: JSON.stringify({ kind: 'team_leader', team: team.name }),
                     }), `${team.name} 담당자 코드`)}
                   >
-                    {code ? '담당자 코드 다시' : '담당자 코드 만들기'}
+                    {leader ? '다시' : '만들기'}
                   </button>
                   <button
                     type="button"

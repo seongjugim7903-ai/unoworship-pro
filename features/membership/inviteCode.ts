@@ -1,7 +1,13 @@
 // 참여 코드와 권한 판정 — 순수 함수만. DB 를 모르므로 테스트가 쉽다.
 // DB 를 만지는 쪽은 membership.ts (서버 전용).
 
-export type InviteKind = 'church_join' | 'team_leader';
+/* church_join  교회 부트스트랩 — 구독할 때 관리자에게 한 번 준다
+   team_join    팀 코드. 여러 번 쓴다. 넣으면 교회 참여 + 그 팀 팀원
+   team_leader  담당자 코드. 1회용. 넣으면 교회 참여 + 그 팀 담당자
+
+   코드는 교회에 매여 있으므로 사용자는 하나만 넣으면 된다 —
+   교회 코드와 팀 코드를 둘 다 받아 적게 하면 번거롭기만 하다. */
+export type InviteKind = 'church_join' | 'team_join' | 'team_leader';
 export type TeamRole = 'leader' | 'member';
 export type ChurchRole = 'admin' | 'crew' | 'member';
 

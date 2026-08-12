@@ -17,7 +17,7 @@ import { generateInviteCode, loadMembership } from '../../../../features/members
 export const runtime = 'nodejs';
 
 const IssueSchema = z.object({
-  kind: z.enum(['team_leader', 'church_join']),
+  kind: z.enum(['team_leader', 'team_join', 'church_join']),
   team: z.string().trim().max(40).optional().default(''),
 });
 
@@ -62,14 +62,15 @@ export async function POST(request: Request) {
     if ('response' in auth) return auth.response;
 
     const body = IssueSchema.parse(await request.json());
-    if (body.kind === 'team_leader' && !body.team) {
+    const needsTeam = body.kind === 'team_leader' || body.kind === 'team_join';
+    if (needsTeam && !body.team) {
       return jsonError('팀을 골라 주세요.', 400, 'NO_TEAM');
     }
 
     /* 같은 자리에 살아 있는 코드가 있으면 회수한다 — 부분 유니크 인덱스가 중복을 막고,
        회수해 두어야 '다시 발급'이 곧 '이전 것 무효화'가 된다 */
-    const scope = body.kind === 'team_leader'
-      ? `&kind=eq.team_leader&team=eq.${encodeURIComponent(body.team)}`
+    const scope = needsTeam
+      ? `&kind=eq.${body.kind}&team=eq.${encodeURIComponent(body.team)}`
       : '&kind=eq.church_join';
     await supabaseRest(
       `/invite_codes?church_id=eq.${auth.churchId}&revoked_at=is.null${scope}`,
@@ -85,8 +86,9 @@ export async function POST(request: Request) {
           church_id: auth.churchId,
           code,
           kind: body.kind,
-          team: body.kind === 'team_leader' ? body.team : null,
-          /* 팀장 자리는 한 번만 열린다 — 코드가 단톡방에 돌아도 사고가 나지 않는 이유다 */
+          team: needsTeam ? body.team : null,
+          /* 담당자 자리만 한 번 열린다 — 코드가 단톡방에 돌아도 사고가 나지 않는 이유다.
+             팀 코드는 팀원 모두가 쓰므로 제한하지 않는다. */
           max_uses: body.kind === 'team_leader' ? 1 : null,
         }),
       },

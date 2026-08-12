@@ -2,8 +2,11 @@
 //
 // POST application/json — { code, name }
 //
-//   church_join  코드  → 교회에 들어간다. 팀은 없다
-//   team_leader  코드  → 그 코드에 적힌 팀의 담당이 된다
+//   church_join  코드  → 교회에 들어간다 (관리자 부트스트랩)
+//   team_join    코드  → 교회 참여 + 그 팀 팀원. 여러 번 쓴다
+//   team_leader  코드  → 교회 참여 + 그 팀 담당자. 1회용
+//
+// 코드가 교회에 매여 있으므로 사용자는 하나만 넣으면 된다.
 //
 // 팀원은 팀 소속을 갖지 않는다. 보기만 하므로 소속이 아무 역할을 하지 않는다 —
 // 팀 소속은 담당자에게만 생기고, 그것을 정하는 것은 담당자용 코드다.
@@ -55,8 +58,11 @@ export async function POST(request: Request) {
     if (invite.kind === 'church_join' && already.churchRole) {
       return jsonError('이미 교회에 참여하셨습니다. 담당을 맡으셨다면 담당자 코드를 넣어 주세요.', 400, 'ALREADY_JOINED');
     }
-    if (invite.kind === 'team_leader' && already.teams[invite.team ?? '']) {
+    if (invite.kind === 'team_leader' && already.teams[invite.team ?? ''] === 'leader') {
       return jsonError('이미 그 팀의 담당자입니다.', 400, 'ALREADY_LEADER');
+    }
+    if (invite.kind === 'team_join' && already.teams[invite.team ?? '']) {
+      return jsonError('이미 그 팀에 들어와 계십니다.', 400, 'ALREADY_IN_TEAM');
     }
 
     /* 이름 먼저 — 참여가 실패해도 이름은 남는 편이 낫다(다시 묻지 않게).
@@ -75,11 +81,11 @@ export async function POST(request: Request) {
     let joinedTeam = '';
     let teamRole: 'leader' | 'member' | null = null;
 
-    if (invite.kind === 'team_leader' && invite.team) {
+    if (invite.team && (invite.kind === 'team_leader' || invite.kind === 'team_join')) {
       /* 팀은 코드가 정한다 — 참여 화면에는 고르는 칸이 없다 */
       joinedTeam = invite.team;
-      teamRole = 'leader';
-      await joinTeam(invite.church_id, userId, invite.team, 'leader');
+      teamRole = invite.kind === 'team_leader' ? 'leader' : 'member';
+      await joinTeam(invite.church_id, userId, invite.team, teamRole);
     }
 
     await markInviteUsed(invite);

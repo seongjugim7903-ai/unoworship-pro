@@ -134,7 +134,7 @@ export default function JoinPanel() {
               ? '이 교회의 첫 사용자라 관리자가 되었습니다. 팀장 코드를 만들어 각 팀장에게 전달해 주세요.'
               : result.teamRole === 'leader'
                 ? `${result.team} 담당으로 참여했습니다. 그 자료를 수정·삭제할 수 있습니다.`
-                : '교회에 참여했습니다. 자료는 보기만 됩니다. 담당을 맡으셨다면 담당자 코드를 따로 넣어 주세요.'}
+                : `${result.team ? `${result.team} 팀에 ` : '교회에 '}참여했습니다.`}
           </p>
           <Link className="text-button" href="/">홈으로</Link>
         </section>
@@ -147,8 +147,8 @@ export default function JoinPanel() {
       <section className="panel">
         <h2>교회 참여</h2>
         <p className="field-hint">
-          교회에서 받은 <b>교회 참여 코드</b>를 넣어 주세요. 처음 한 번만 넣으면 됩니다.
-          담당자 코드는 참여를 마친 뒤 따로 넣습니다.
+          받으신 <b>코드</b>를 그대로 넣어 주세요. 팀 코드든 담당자 코드든 상관없습니다 —
+          코드에 교회와 팀이 담겨 있어서 한 번만 넣으면 됩니다.
         </p>
 
         <label>
@@ -163,7 +163,7 @@ export default function JoinPanel() {
         </label>
 
         <label>
-          교회 참여 코드
+          참여 코드
           <input
             value={code}
             onChange={(event) => setCode(event.target.value.toUpperCase())}
