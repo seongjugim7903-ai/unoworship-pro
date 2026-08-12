@@ -36,12 +36,16 @@
 - 준비찬양 → 곡마다 PPT 변환본 프로그램. 없는 곡은 브라우저 검색 후 자동감지
 - 예배 당일 컴포저를 열면 도래하는 정기예배가 자동으로 올라옴
 - 연주용 악보 보기 — 아이패드 전체화면, 발 페달, 여백 자동 잘라내기
-- **카카오 로그인 · 교회 참여 코드** (오늘 완료, 첫 로그인 성공 확인)
+- **카카오 로그인 · 교회 참여** (오늘 완료, 첫 로그인 성공 확인)
+- **초대 링크** — 팀원은 링크만 누르면 들어옵니다. 코드를 적을 일이 없습니다
 
 ### 다음에 할 것
 
-[auth-church-scope/checklist.md](./features/auth-church-scope/checklist.md) 를 보세요.
-가장 앞에 있는 것은 **마이그레이션 2개 적용**과 **관리자 화면 마무리**입니다.
+**권한 검사를 자료 저장에 붙이는 일**이 다음입니다. 지금은 담당자든 아니든 저장이 됩니다 —
+판정 함수(`canEditTeam` · `canWriteSermon`)는 있는데 아무 데서도 부르지 않습니다.
+
+그다음이 [팀 페이지](./features/team-workspace/context-notes.md)입니다.
+자세한 목록은 [auth-church-scope/checklist.md](./features/auth-church-scope/checklist.md).
 
 ---
 
@@ -54,6 +58,7 @@
 |---|---|
 | 로그인 · 교회 · 팀 권한 | [auth-church-scope/context-notes.md](./features/auth-church-scope/context-notes.md) · [checklist](./features/auth-church-scope/checklist.md) |
 | 준비찬양 라이브러리 · 악보 | [worship-prep-library/context-notes.md](./features/worship-prep-library/context-notes.md) · [checklist](./features/worship-prep-library/checklist.md) |
+| 팀 페이지 (아직 안 만듦) | [team-workspace/context-notes.md](./features/team-workspace/context-notes.md) |
 
 현장 맥(UnoLive) 쪽 문서는 그 저장소의 `docs/features/` 아래에 있습니다.
 

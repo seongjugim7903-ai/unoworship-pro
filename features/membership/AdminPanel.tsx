@@ -84,12 +84,15 @@ export default function AdminPanel() {
     }
   };
 
-  const copy = async (code: string) => {
+  /* 팀원은 코드를 적지 않는다 — 카톡방 링크처럼 눌러서 들어온다 */
+  const inviteLink = (code: string) => `${window.location.origin}/join/${code}`;
+
+  const copy = async (text: string, what: string) => {
     try {
-      await navigator.clipboard.writeText(code);
-      setMessage(`${code} 복사했습니다. 카톡으로 보내세요.`);
+      await navigator.clipboard.writeText(text);
+      setMessage(`${what} 복사했습니다. 카톡으로 보내세요.`);
     } catch {
-      setMessage('복사하지 못했습니다. 코드를 직접 적어 주세요.');
+      setMessage('복사하지 못했습니다. 길게 눌러 직접 복사해 주세요.');
     }
   };
 
@@ -124,7 +127,7 @@ export default function AdminPanel() {
           <strong className="code-value">{churchCode?.code ?? '없음'}</strong>
           {churchCode && (
             <>
-              <button type="button" className="text-button" onClick={() => copy(churchCode.code)}>복사</button>
+              <button type="button" className="text-button" onClick={() => copy(churchCode.code, '교회 코드를')}>복사</button>
               <span className="field-hint">{churchCode.used_count}명 사용</span>
             </>
           )}
@@ -146,8 +149,10 @@ export default function AdminPanel() {
       <section className="panel">
         <h2>팀</h2>
         <p className="field-hint">
-          우리 교회에서 쓰는 이름으로 만드세요. 팀마다 코드가 둘입니다 —
-          <b>팀원 코드</b>는 여러 번 쓰니 단톡방에 뿌리셔도 되고, <b>담당자 코드</b>는 한 번만
+          우리 교회에서 쓰는 이름으로 만드세요. <b>링크 복사</b>를 눌러 카톡으로 보내면 됩니다 —
+          받은 사람은 링크를 누르고 카카오로 로그인하는 것으로 끝입니다. 코드를 적을 일이 없습니다.
+          <br />
+          <b>팀원 링크</b>는 여러 번 쓰니 단톡방에 뿌리셔도 되고, <b>담당자 링크</b>는 한 번만
           쓸 수 있으니 담당자에게만 1:1로 보내세요.
           설교대지는 팀이 없습니다 — 각자 자기 것을 쓰므로 아래 <b>목회자</b>로 지정합니다.
         </p>
@@ -207,11 +212,15 @@ export default function AdminPanel() {
                           <td rowSpan={2}>{team.category}</td>
                           <td>
                             팀원
-                            <em className="cell-note">여러 번 · 단톡방 가능</em>
+                            <em className="cell-note">링크만 보내면 됩니다 · 단톡방 가능</em>
                           </td>
                           <td><strong className="code-value">{join?.code ?? '없음'}</strong></td>
                           <td className="cell-actions">
-                            {join && <button type="button" className="text-button" onClick={() => copy(join.code)}>복사</button>}
+                            {join && (
+                              <button type="button" className="text-button" onClick={() => copy(inviteLink(join.code), '초대 링크를')}>
+                                링크 복사
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="text-button"
@@ -242,13 +251,15 @@ export default function AdminPanel() {
                           <td>
                             담당자
                             <em className="cell-note">
-                              {leaderUsed ? '사용됨 — 담당자 정해짐' : '한 번만 · 1:1 전달'}
+                              {leaderUsed ? '사용됨 — 담당자 정해짐' : '링크 한 번만 · 1:1 전달'}
                             </em>
                           </td>
                           <td><strong className="code-value">{leader?.code ?? '없음'}</strong></td>
                           <td className="cell-actions">
                             {leader && !leaderUsed && (
-                              <button type="button" className="text-button" onClick={() => copy(leader.code)}>복사</button>
+                              <button type="button" className="text-button" onClick={() => copy(inviteLink(leader.code), '담당자 링크를')}>
+                                링크 복사
+                              </button>
                             )}
                             <button
                               type="button"

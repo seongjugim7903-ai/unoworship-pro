@@ -18,6 +18,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 const OPEN_PATHS = [
   '/login',
   '/onboarding',
+  /* 초대 링크 — 로그인 전에 눌러 들어오는 자리라 열어 둬야 한다 */
+  '/join',
   '/auth',
   '/api',
   '/icons',
