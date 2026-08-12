@@ -1,13 +1,14 @@
 'use client';
 
-// 화면 위에 붙는 앱 설치 띠 — 이미 쓰고 있는 사람에게 권하는 자리다.
+// 화면 위에 붙는 앱 설치 띠.
 //
-// 초대 링크(/join)에서는 띄우지 않는다. 거기는 설치 안내가 화면 전체를 차지하는
-// 자리라 같은 말이 두 번 나온다.
+// 초대 링크(/join)에서도 이것을 쓴다. 초대 화면이 설치 안내를 따로 가지고 있었더니
+// 담당자 화면에서는 설치가 되는데 초대 화면에서는 안 되는 일이 있었다.
+// 되는 것 하나만 남긴다 — 초대 화면은 '누가 부르는지'만 말하고 설치는 여기가 맡는다.
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { installSteps, useInstall } from '../../lib/pwaInstall';
+import { installSteps, openInOutsideBrowser, useInstall } from '../../lib/pwaInstall';
 
 export default function PwaInstallPrompt() {
   const pathname = usePathname();
@@ -20,13 +21,6 @@ export default function PwaInstallPrompt() {
     setInstallRequested(new URLSearchParams(window.location.search).get('install') === '1');
   }, []);
 
-  const handleOpenChrome = () => {
-    const target = new URL(window.location.href);
-    target.searchParams.set('install', '1');
-    const fallback = encodeURIComponent(target.toString());
-    window.location.href = `intent://${target.host}${target.pathname}${target.search}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${fallback};end`;
-  };
-
   const handleCopyAddress = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -36,11 +30,11 @@ export default function PwaInstallPrompt() {
     }
   };
 
-  /* 초대 화면은 자기 설치 안내를 가지고 있다 — 등록만 하고 화면에서는 빠진다 */
-  if (pathname?.startsWith('/join')) return null;
   if (environment === 'standalone' || dismissed) return null;
   if (environment === 'browser' && !canInstall && !installRequested) return null;
 
+  /* 초대 화면에서는 닫지 못하게 한다 — 닫으면 설치할 방법이 화면에서 사라진다 */
+  const onInvite = Boolean(pathname?.startsWith('/join'));
   const isKakaoAndroid = environment === 'kakao-android';
   const isKakaoIOS = environment === 'kakao-ios';
   const steps = installSteps(environment, canInstall);
@@ -56,20 +50,22 @@ export default function PwaInstallPrompt() {
         {message && <small>{message}</small>}
       </div>
       <div className="pwa-install-actions">
-        {isKakaoAndroid && <button type="button" onClick={handleOpenChrome}>Chrome에서 열기</button>}
+        {isKakaoAndroid && <button type="button" onClick={openInOutsideBrowser}>브라우저로 열기</button>}
         {isKakaoIOS && <button type="button" onClick={() => void handleCopyAddress()}>주소 복사</button>}
         {environment === 'browser' && canInstall && (
           <button type="button" onClick={() => void install()}>앱 설치</button>
         )}
-        <button
-          type="button"
-          className="pwa-install-close"
-          aria-label="설치 안내 닫기"
-          title="닫기"
-          onClick={() => setDismissed(true)}
-        >
-          ×
-        </button>
+        {!onInvite && (
+          <button
+            type="button"
+            className="pwa-install-close"
+            aria-label="설치 안내 닫기"
+            title="닫기"
+            onClick={() => setDismissed(true)}
+          >
+            ×
+          </button>
+        )}
       </div>
     </aside>
   );

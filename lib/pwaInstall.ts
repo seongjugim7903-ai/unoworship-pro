@@ -86,9 +86,24 @@ export function isHandheld(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
+/**
+ * 카카오 내장 브라우저에서 바깥 브라우저로 옮긴다.
+ *
+ * 크롬을 못 박지 않는다 — 갤럭시는 삼성인터넷이 기본인 경우가 많고, 그때
+ * package=com.android.chrome 을 넣으면 그냥 아무 일도 일어나지 않는다. 실제로 그랬다.
+ * 기본 브라우저가 열리게 두고, 그마저 막히면 원래 주소로 떨어진다.
+ */
+export function openInOutsideBrowser(): void {
+  const target = new URL(window.location.href);
+  const fallback = encodeURIComponent(target.toString());
+  window.location.href = `intent://${target.host}${target.pathname}${target.search}`
+    + `#Intent;scheme=https;action=android.intent.action.VIEW;`
+    + `S.browser_fallback_url=${fallback};end`;
+}
+
 export function installSteps(environment: InstallEnvironment, hasPrompt: boolean): string[] {
   switch (environment) {
-    case 'kakao-android': return ['Chrome에서 열기', '앱 설치 누르기', '홈 화면에서 실행'];
+    case 'kakao-android': return ['브라우저로 열기', '앱 설치 누르기', '홈 화면에서 실행'];
     case 'kakao-ios': return ['카카오톡 메뉴 열기', 'Safari로 열기', '공유 > 홈 화면에 추가'];
     case 'ios': return ['Safari 공유 버튼', '홈 화면에 추가', '추가 확인'];
     default: return hasPrompt

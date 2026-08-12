@@ -403,7 +403,8 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 /* ── 초대 링크 첫 화면 (설치 안내 · 로그인) ────────────────────────────────
    대부분 카톡 단톡방에서 휴대폰으로 연다. 카드 하나만 화면 가운데 두고
    그 안에서 끝나게 한다 — 스크롤 없이 한 눈에 들어와야 한다. */
-.gate { display: flex; align-items: center; justify-content: center; min-height: 100dvh; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); background: #f4f5f9; }
+/* 위쪽에 설치 배너가 붙으므로 가운데 정렬하지 않는다 — 정렬하면 카드가 화면 밖으로 밀린다 */
+.gate { display: flex; align-items: flex-start; justify-content: center; min-height: 100dvh; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); background: #f4f5f9; }
 .gate-card { width: 100%; max-width: 380px; padding: 28px 22px 22px; border-radius: 18px; background: #fff; box-shadow: 0 1px 2px rgba(21,26,40,.05), 0 12px 32px rgba(21,26,40,.08); text-align: center; }
 .gate-mark { display: block; margin: 0 auto 14px; border-radius: 14px; }
 .gate-eyebrow { margin: 0 0 6px; color: #8b93a7; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
