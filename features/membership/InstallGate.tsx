@@ -6,7 +6,9 @@
 // 설치를 안 하면 예배 때마다 주소를 찾아 들어가야 한다. 그래서 로그인보다 먼저
 // 설치를 끝내게 하고, 끝나기 전에는 이 화면만 보인다.
 //
-// 지금 어디까지 왔는지를 세 단계로 보여 준다. 브라우저를 옮기면 2단계가 켜지고,
+// 세 단계는 '남은 일'이지 '진행률'이 아니다 — installSteps 가 환경마다 배열을 통째로
+// 갈아끼우기 때문에, 카카오 브라우저든 크롬이든 언제나 첫 항목이 지금 할 일이다.
+// 브라우저를 옮기면 목록 자체가 바뀌어 진행된 것이 드러난다.
 // 설치가 끝나 앱으로 열리면 이 화면 자체가 사라진다(그때는 부모가 안 그린다).
 //
 // 데스크톱에서는 띄우지 않는다 — 막으면 PC로 들어올 길이 없다. 판단은 부모가 한다.
@@ -24,11 +26,6 @@ interface Props {
   team: string | null;
   leaderName: string;
   churchName: string;
-}
-
-/** 지금 몇 번째 단계인가 — 카카오 안이면 아직 1단계, 브라우저로 옮겼으면 2단계 */
-function currentStep(environment: InstallEnvironment): number {
-  return environment === 'kakao-android' || environment === 'kakao-ios' ? 0 : 1;
 }
 
 export default function InstallGate({ code, team, leaderName, churchName }: Props) {
@@ -75,8 +72,8 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
   };
 
   const steps = installSteps(environment, Boolean(installPrompt));
-  const step = currentStep(environment);
-  const invitedTo = team ? `${team} 팀` : '교회';
+  /* '교회으로' 가 되지 않게 조사까지 붙여 둔다 */
+  const invitedTo = team ? `${team} 팀으로` : '교회로';
 
   return (
     <main className="gate">
@@ -86,7 +83,7 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
         <p className="gate-eyebrow">{churchName || 'ULJU'}</p>
         <h1 className="gate-title">
           {leaderName ? <><b>{leaderName}</b>님이 </> : null}
-          <b>{invitedTo}</b>으로 초대했습니다
+          <b>{invitedTo}</b> 초대했습니다
         </h1>
         <p className="gate-lead">
           아래 순서대로 <b>한 번만</b> 하시면 다음부터는 앱처럼 바로 열립니다.
@@ -94,8 +91,8 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
 
         <ol className="gate-steps">
           {steps.map((label, index) => (
-            <li key={label} className={index < step ? 'is-done' : index === step ? 'is-now' : ''}>
-              <b>{index < step ? '✓' : index + 1}</b>
+            <li key={label} className={index === 0 ? 'is-now' : ''}>
+              <b>{index + 1}</b>
               <span>{label}</span>
             </li>
           ))}

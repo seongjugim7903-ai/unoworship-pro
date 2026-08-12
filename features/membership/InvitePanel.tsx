@@ -77,9 +77,16 @@ export default function InvitePanel({ code }: { code: string }) {
       let live: Preview | null = null;
       let dead = '';
       try {
-        const json = await (await fetch(`/api/membership/invite?code=${encodeURIComponent(code)}`)).json();
-        if (json?.ok) live = { team: json.team ?? null, leaderName: json.leaderName ?? '', churchName: json.churchName ?? '' };
-        else dead = json?.message ?? '';
+        const response = await fetch(`/api/membership/invite?code=${encodeURIComponent(code)}`);
+        const json = await response.json();
+        if (json?.ok) {
+          live = { team: json.team ?? null, leaderName: json.leaderName ?? '', churchName: json.churchName ?? '' };
+        } else if (response.status === 404) {
+          /* 초대 자체가 잘못됐다 — 없거나, 회수됐거나, 이미 쓴 코드다.
+             서버가 잠깐 아픈 것(5xx)은 여기 넣지 않는다. 그때는 안내를 계속 보여 주고
+             참여 단계에서 다시 판단하게 둔다 — 멀쩡한 초대를 막아 버리면 안 된다 */
+          dead = json?.message ?? '';
+        }
       } catch { /* 확인 실패는 통과시킨다 — 뒤의 참여 단계가 다시 판단한다 */ }
 
       setPreview(live);
@@ -144,7 +151,7 @@ export default function InvitePanel({ code }: { code: string }) {
   }
 
   if (status === 'need-login') {
-    const invitedTo = preview?.team ? `${preview.team} 팀` : '교회';
+    const invitedTo = preview?.team ? `${preview.team} 팀으로` : '교회로';
     return (
       <main className="gate">
         <div className="gate-card">
@@ -152,7 +159,7 @@ export default function InvitePanel({ code }: { code: string }) {
           <p className="gate-eyebrow">{preview?.churchName || 'ULJU'}</p>
           <h1 className="gate-title">
             {preview?.leaderName ? <><b>{preview.leaderName}</b>님이 </> : null}
-            <b>{invitedTo}</b>으로 초대했습니다
+            <b>{invitedTo}</b> 초대했습니다
           </h1>
           <p className="gate-lead">
             카카오로 로그인하시면 바로 들어갑니다. 코드를 적으실 필요는 없습니다.
