@@ -38,6 +38,8 @@ export default function InvitePanel({ code }: { code: string }) {
         setStatus('error');
         return;
       }
+      /* 담당자는 할 일이 남아 있다(앱 설치·팀원 초대). 안내 화면을 거치지 않고 바로 보낸다 */
+      if (json.teamRole === 'leader') { window.location.replace('/my'); return; }
       setResult({ team: json.team ?? null, teamRole: json.teamRole ?? null });
       setStatus('done');
     } catch {

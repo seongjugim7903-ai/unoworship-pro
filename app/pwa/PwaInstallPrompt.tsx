@@ -1,27 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { detectEnvironment, installSteps, type InstallEnvironment } from '../../lib/pwaInstall';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-}
-
-type InstallEnvironment = 'browser' | 'ios' | 'kakao-android' | 'kakao-ios' | 'standalone';
-
-function detectEnvironment(): InstallEnvironment {
-  const userAgent = navigator.userAgent;
-  const standalone = window.matchMedia('(display-mode: standalone)').matches
-    || Boolean((navigator as Navigator & { standalone?: boolean }).standalone);
-
-  if (standalone) return 'standalone';
-
-  const isKakao = /KAKAOTALK/i.test(userAgent);
-  const isIOS = /iPhone|iPad|iPod/i.test(userAgent);
-  if (isKakao && isIOS) return 'kakao-ios';
-  if (isKakao) return 'kakao-android';
-  if (isIOS) return 'ios';
-  return 'browser';
 }
 
 export default function PwaInstallPrompt() {
@@ -89,24 +73,15 @@ export default function PwaInstallPrompt() {
 
   const isKakaoAndroid = environment === 'kakao-android';
   const isKakaoIOS = environment === 'kakao-ios';
-  const isIOS = environment === 'ios';
-  const installSteps = isKakaoAndroid
-    ? ['Chrome에서 열기', '앱 설치 누르기', '홈 화면에서 실행']
-    : isKakaoIOS
-      ? ['카카오톡 메뉴 열기', 'Safari로 열기', '공유 > 홈 화면에 추가']
-      : isIOS
-        ? ['Safari 공유 버튼', '홈 화면에 추가', '추가 확인']
-        : installPrompt
-          ? ['앱 설치 누르기', '설치 확인', '홈 화면에서 실행']
-          : ['Chrome 메뉴 열기', '앱 설치 선택', '홈 화면에서 실행'];
+  const steps = installSteps(environment, Boolean(installPrompt));
 
   return (
-    <aside className="pwa-install-banner" aria-label="헵시바 앱 설치">
+    <aside className="pwa-install-banner" aria-label="ULJU 앱 설치">
       <div className="pwa-install-copy">
-        <strong>Hephzibah 앱으로 사용</strong>
+        <strong>ULJU 앱으로 사용</strong>
         <span>아래 순서대로 한 번만 설치하면 다음부터 앱처럼 바로 열립니다.</span>
         <ol className="pwa-install-steps">
-          {installSteps.map((step, index) => <li key={step}><b>{index + 1}</b>{step}</li>)}
+          {steps.map((step, index) => <li key={step}><b>{index + 1}</b>{step}</li>)}
         </ol>
         {message && <small>{message}</small>}
       </div>

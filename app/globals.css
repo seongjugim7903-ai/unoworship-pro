@@ -386,3 +386,12 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .cell-actions { white-space: nowrap; }
 .cell-actions .text-button + .text-button { margin-left: 8px; }
 .invite-link { display: inline-block; max-width: 46vw; overflow: hidden; color: #46536b; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+
+/* 팀 홈 — 담당자가 순서대로 따라가는 화면 */
+.install-steps { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.install-steps li { display: flex; align-items: center; gap: 9px; color: #46536b; font-size: 12px; }
+.install-steps b { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 99px; background: #6754d9; color: #fff; font-size: 10px; }
+.invite-block { margin-top: 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fbfcff; }
+.invite-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.invite-head strong { font-size: 13px; font-weight: 800; color: #263247; }
+.invite-link-box { margin: 0 0 10px; padding: 9px 10px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #46536b; font-size: 11px; word-break: break-all; user-select: all; }
