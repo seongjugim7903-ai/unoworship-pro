@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '../../lib/authn/supabaseBrowser';
+import { readPendingInvite } from './pendingInvite';
 
 type Status = 'checking' | 'need-login' | 'ready' | 'saving' | 'done';
 
@@ -26,6 +27,14 @@ export default function JoinPanel() {
   /* 로그인하지 않았으면 여기 있을 이유가 없다 */
   useEffect(() => {
     (async () => {
+      /* 설치하고 앱으로 처음 들어오면 여기로 떨어진다 — 홈 화면 아이콘은 start_url 로
+         열려 초대 주소를 잃기 때문이다. 적어 둔 코드가 있으면 그 초대로 되돌린다 */
+      const pending = readPendingInvite();
+      if (pending) {
+        window.location.replace(`/join/${encodeURIComponent(pending)}`);
+        return;
+      }
+
       const supabase = createClient();
       if (!supabase) {
         setError('로그인 환경이 아직 설정되지 않았습니다. 관리자에게 문의하세요.');

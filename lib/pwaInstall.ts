@@ -20,6 +20,17 @@ export function detectEnvironment(): InstallEnvironment {
   return isIOS ? 'ios' : 'browser';
 }
 
+/**
+ * 손에 들고 쓰는 기기인가.
+ *
+ * 설치를 요구하고 막는 화면은 여기서만 띄운다 — 데스크톱에서 막으면 담당자가 PC로
+ * 들어올 길이 없어진다. 설치하는 방법도 모바일과 다르다.
+ */
+export function isHandheld(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export function installSteps(environment: InstallEnvironment, hasPrompt: boolean): string[] {
   switch (environment) {
     case 'kakao-android': return ['Chrome에서 열기', '앱 설치 누르기', '홈 화면에서 실행'];

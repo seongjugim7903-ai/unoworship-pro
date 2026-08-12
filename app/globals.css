@@ -399,3 +399,43 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .invite-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .invite-actions > button { flex: 1 1 150px; height: 44px; margin: 0; }
 .landing-empty { margin: 0; padding: 16px; border-radius: 10px; background: rgba(255,255,255,.14); color: rgba(255,255,255,.86); font-size: 12px; line-height: 1.6; backdrop-filter: blur(6px); }
+
+/* ── 초대 링크 첫 화면 (설치 안내 · 로그인) ────────────────────────────────
+   대부분 카톡 단톡방에서 휴대폰으로 연다. 카드 하나만 화면 가운데 두고
+   그 안에서 끝나게 한다 — 스크롤 없이 한 눈에 들어와야 한다. */
+.gate { display: flex; align-items: center; justify-content: center; min-height: 100dvh; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); background: #f4f5f9; }
+.gate-card { width: 100%; max-width: 380px; padding: 28px 22px 22px; border-radius: 18px; background: #fff; box-shadow: 0 1px 2px rgba(21,26,40,.05), 0 12px 32px rgba(21,26,40,.08); text-align: center; }
+.gate-mark { display: block; margin: 0 auto 14px; border-radius: 14px; }
+.gate-eyebrow { margin: 0 0 6px; color: #8b93a7; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.gate-title { margin: 0 0 10px; color: #161b28; font-size: 20px; font-weight: 700; line-height: 1.4; letter-spacing: -.02em; word-break: keep-all; }
+.gate-title b { font-weight: 800; color: #5745c8; }
+.gate-lead { margin: 0 0 20px; color: #626b7e; font-size: 13px; line-height: 1.65; word-break: keep-all; }
+.gate-lead b { color: #3d4658; font-weight: 700; }
+
+/* 지금 몇 번째인지가 한눈에 보여야 한다 — 끝난 것은 흐리게, 지금 것만 진하게 */
+.gate-steps { display: grid; gap: 2px; margin: 0 0 20px; padding: 6px; list-style: none; border-radius: 12px; background: #f6f7fb; text-align: left; }
+.gate-steps li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 9px; color: #99a1b3; font-size: 13px; font-weight: 600; }
+.gate-steps li b { display: grid; place-items: center; flex: none; width: 21px; height: 21px; border-radius: 99px; background: #e2e5ee; color: #fff; font-size: 11px; font-weight: 800; }
+.gate-steps li.is-now { background: #fff; color: #1d2433; box-shadow: 0 1px 2px rgba(21,26,40,.06); }
+.gate-steps li.is-now b { background: #6754d9; }
+.gate-steps li.is-done { color: #8e96a8; }
+.gate-steps li.is-done b { background: #b9c0d0; }
+
+.gate-actions { display: grid; gap: 8px; }
+.gate-actions .kakao-button { width: 100%; height: 50px; }
+.gate-primary { display: grid; place-items: center; width: 100%; height: 50px; border: 0; border-radius: 11px; background: #6754d9; color: #fff; font-size: 14px; font-weight: 800; text-decoration: none; cursor: pointer; transition: .15s; }
+.gate-primary:hover { background: #5745c8; }
+.gate-primary:disabled { opacity: .4; cursor: default; }
+.gate-manual { margin: 0; padding: 13px 14px; border-radius: 11px; background: #f6f7fb; color: #626b7e; font-size: 12.5px; line-height: 1.6; word-break: keep-all; }
+.gate-manual b { color: #3d4658; font-weight: 800; }
+
+.gate-field { display: block; margin: 0 0 16px; text-align: left; }
+.gate-field span { display: block; margin-bottom: 6px; color: #3d4658; font-size: 12px; font-weight: 700; }
+.gate-field input { width: 100%; height: 48px; padding: 0 13px; border: 1px solid #dfe3ec; border-radius: 11px; background: #fff; color: #161b28; font-size: 15px; }
+.gate-field input:focus { border-color: #6754d9; outline: 2px solid rgba(103,84,217,.16); }
+
+.gate-message { margin: 14px 0 0; color: #626b7e; font-size: 12.5px; line-height: 1.6; word-break: keep-all; }
+.gate-message.is-error { color: #c24455; }
+.gate-fallback { margin: 18px 0 0; color: #99a1b3; font-size: 11.5px; line-height: 1.6; }
+.gate-fallback code { padding: 2px 7px; border-radius: 5px; background: #f0f1f6; color: #5745c8; font-size: 12px; font-weight: 800; user-select: all; }
+.gate-fallback a { color: #6754d9; font-weight: 700; text-decoration: underline; }
