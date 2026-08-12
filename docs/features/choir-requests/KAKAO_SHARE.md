@@ -17,16 +17,26 @@
 
 구현 파일: `app/choir/ChoirRequestPage.tsx` (`handleKakaoShare`)
 
-## 공식 카카오 SDK 공유 (보류 중)
+## 공식 카카오 SDK 공유 — 자막에는 안 쓰고, 초대 링크에는 쓴다
 
-`lib/kakaoShare.ts`에 카카오 공식 JS SDK(v2.8.1) `Kakao.Share.sendDefault` 연동이
-구현되어 있지만 현재는 사용하지 않는다. SDK 공유창은 이미지 파일 첨부가 아니라
-**썸네일 카드 1장 + 링크**를 보내는 구조라, "대화방에 자막 이미지 전체 첨부"라는
-목적에는 파일 공유가 더 맞다는 판단(2026-07-20).
+`lib/kakaoShare.ts`의 `Kakao.Share.sendDefault`(SDK v2.8.1) 공유창은 이미지 파일 첨부가
+아니라 **카드 1장 + 링크**를 보내는 구조다. 그래서 갈린다.
 
-나중에 "링크로 알리기" 같은 용도가 생기면 다시 연결한다. 그때 필요한 사전 설정:
+| 무엇 | 어떻게 | 왜 |
+|---|---|---|
+| 찬양대 자막 이미지 | OS 파일 공유창 | 대화방에 이미지 **전체**가 첨부돼야 한다 (2026-07-20 결정) |
+| 팀원 초대 링크 | **SDK 공유창** (`shareInviteLinkToKakao`) | 보낼 것이 링크 한 줄뿐이다 |
 
-1. [Kakao Developers](https://developers.kakao.com) 앱의 **JavaScript 키**
+2026-07-20에 "나중에 링크로 알리기 용도가 생기면 다시 연결한다"고 적어 둔 그 용도가
+왔다 — 담당자가 팀원을 부르는 초대 링크다(`features/membership/LeaderHomePanel.tsx`).
+
+### 사전 설정 — 안 하면 버튼이 아예 안 보인다
+
+`isKakaoShareConfigured()` 가 거짓이면 버튼을 숨긴다. 눌러도 안 되는 버튼을 두는 것보다
+낫다. 대신 **키를 넣기 전에는 담당자 화면에 카톡 버튼이 없다.**
+
+1. [Kakao Developers](https://developers.kakao.com) 앱(`uljucommunity` 890593) → **앱 키 > JavaScript 키**
 2. **플랫폼 > Web** 사이트 도메인 등록 (`https://unoworship-pro-eight.vercel.app`, `http://localhost:3100`)
 3. **제품 설정 > 카카오톡 공유** 활성화
-4. Vercel 환경변수 `NEXT_PUBLIC_KAKAO_JS_KEY` 등록
+4. Vercel 환경변수 `NEXT_PUBLIC_KAKAO_JS_KEY` 등록 후 **재배포** —
+   `NEXT_PUBLIC_` 값은 빌드할 때 코드에 박히므로 환경변수만 넣고 두면 반영되지 않는다

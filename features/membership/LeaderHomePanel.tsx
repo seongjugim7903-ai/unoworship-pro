@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { detectEnvironment, installSteps, type InstallEnvironment } from '../../lib/pwaInstall';
+import { isKakaoShareConfigured, shareInviteLinkToKakao } from '../../lib/kakaoShare';
 import { isValidInviteSlug, normalizeInviteCode } from './inviteCode';
 
 interface Code {
@@ -200,6 +201,17 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
     }
   };
 
+  /* 카카오 공유창을 연다. 대화방을 고르면 링크 카드가 그대로 올라간다 —
+     복사해서 붙여넣는 것보다 한 단계 적다. 실패하면 옆의 복사 버튼이 남아 있다. */
+  const sendKakao = async (url: string) => {
+    try {
+      await shareInviteLinkToKakao({ team: team.name, linkUrl: url });
+    } catch (error) {
+      console.error('[invite] kakao share failed', error);
+      onMessage('카카오톡 공유창을 열지 못했습니다. 초대 링크 복사를 써 주세요.');
+    }
+  };
+
   const save = async () => {
     setBusy(true);
     onMessage('');
@@ -233,9 +245,16 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
       {link && !editing && (
         <>
           <p className="invite-link-box">{link}</p>
-          <button type="button" className="primary-button" onClick={() => copy(link)}>
-            초대 링크 복사
-          </button>
+          <div className="invite-actions">
+            {isKakaoShareConfigured() && (
+              <button type="button" className="kakao-button" onClick={() => void sendKakao(link)}>
+                카카오톡으로 보내기
+              </button>
+            )}
+            <button type="button" className="primary-button" onClick={() => copy(link)}>
+              초대 링크 복사
+            </button>
+          </div>
           <button type="button" className="text-button" onClick={() => setEditing(true)}>
             주소 바꾸기
           </button>

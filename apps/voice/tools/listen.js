@@ -44,6 +44,13 @@ const detector = new Detector({
 // 어휘 힌트 — 66권 이름을 주입해 STT 의 책이름 인식률을 올린다 (PLAN 12절 contextualStrings)
 const hints = Object.values(BOOK_ALIASES).flat();
 
+// ── 받아쓰기 기록 파일 ──────────────────────────────────────────────────
+// 감지 결과와 별개로 STT 원문 전체를 남긴다. 검출률·오인식을 사후에 대조하려면
+// "무엇을 어떻게 받아 적었는지"가 있어야 한다.
+const transcriptPath = path.join(ROOT, 'logs', `transcript-${config.service?.date ?? 'unknown'}.txt`);
+fs.mkdirSync(path.dirname(transcriptPath), { recursive: true });
+fs.writeFileSync(transcriptPath, `# ${config.service?._service_설명 ?? ''}\n# 시작 ${new Date().toISOString()}\n\n`);
+
 // ── 상태 ────────────────────────────────────────────────────────────────
 let readyAt = 0;              // 'ready' 수신 벽시계
 const detections = [];        // {display, action, sttMs, totalMs}
@@ -83,6 +90,15 @@ stt.on('error', (m) => {
 
 stt.on('result', (m) => {
   if (!m.text || m.text === lastFedText) return;
+  // [FEATURE: TRANSCRIPT] 받아쓰기 점검용 — 인식 원문을 시간과 함께 파일로 남긴다.
+  //   부분결과는 앞 내용을 포함해 자라나므로, 직전보다 길어진 만큼만(증분) 기록해
+  //   같은 문장이 수십 번 반복 저장되는 것을 막는다.
+  if (m.text.startsWith(lastFedText)) {
+    const added = m.text.slice(lastFedText.length).trim();
+    if (added) fs.appendFileSync(transcriptPath, `[${m.audioEnd.toFixed(1)}s] ${added}\n`);
+  } else {
+    fs.appendFileSync(transcriptPath, `[${m.audioEnd.toFixed(1)}s] ${m.text}\n`);
+  }
   lastFedText = m.text;
 
   const t0 = performance.now();
@@ -119,7 +135,8 @@ function summary() {
     console.log(`  지연        평균 ${fmt(avg)} · 중앙값 ${fmt(p50)} · 최대 ${fmt(totals[totals.length - 1])}`);
     console.log(`  목표(≤600ms) ${avg <= 600 ? '✅ 달성' : '⚠️ 초과'}`);
   }
-  console.log(`  로그        ${stt.outPath}`);
+  console.log(`  받아쓰기    ${transcriptPath}`);
+  console.log(`  원본 로그   ${stt.outPath}`);
   console.log('════════════════════════════════════════════════════════');
 }
 

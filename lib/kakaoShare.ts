@@ -68,6 +68,25 @@ function loadKakaoSdk(): Promise<KakaoSdk> {
   return sdkPromise;
 }
 
+/**
+ * 팀원 초대 링크를 카카오 공유창으로 보낸다.
+ *
+ * 링크 한 줄만 보내는 자리라 SDK 공유가 정확히 맞는다 — 담당자가 대화방을 고르면
+ * 카드가 그대로 올라가고, 받은 사람은 눌러서 로그인만 하면 된다.
+ * 복사해서 붙여넣는 것보다 한 단계 적다.
+ */
+export async function shareInviteLinkToKakao(input: { team: string; linkUrl: string }) {
+  const kakao = await loadKakaoSdk();
+  const link = { mobileWebUrl: input.linkUrl, webUrl: input.linkUrl };
+
+  kakao.Share.sendDefault({
+    objectType: 'text',
+    text: `${input.team} 초대\n아래 링크를 누르고 카카오로 로그인하면 참여됩니다.`,
+    link,
+    buttons: [{ title: `${input.team} 참여하기`, link }],
+  });
+}
+
 export interface ChoirKakaoShareInput {
   songTitle: string;
   serviceType: string;
