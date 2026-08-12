@@ -11,12 +11,16 @@
 // 브라우저를 옮기면 목록 자체가 바뀌어 진행된 것이 드러난다.
 // 설치가 끝나 앱으로 열리면 이 화면 자체가 사라진다(그때는 부모가 안 그린다).
 //
-// 설치창은 브라우저가 열어 준다. 웹이 혼자 설치할 수는 없다 — 기회가 오면 곧바로
-// 띄워 보고, 브라우저가 "사용자가 직접 눌러야 한다"고 막으면 버튼으로 남긴다.
+// 설치창은 브라우저가 열어 준다. 웹이 혼자 설치할 수는 없다.
+//
+// 그래서 자동으로 띄우지 않는다. 설치 기회(beforeinstallprompt)는 한 번 쓰면 사라지는데,
+// 사용자가 보지도 않은 창을 실수로 닫으면 그 기회가 날아가고 화면에는 누를 것이 없어진다.
+// 큰 버튼으로 두고 사용자가 누를 때 연다 — 그때가 브라우저도 허락하는 시점이다.
+// 취소했을 때는 새로고침으로 기회를 다시 받는다.
 //
 // 데스크톱에서는 띄우지 않는다 — 막으면 PC로 들어올 길이 없다. 판단은 부모가 한다.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   detectEnvironment,
   getInstallPrompt,
@@ -38,40 +42,34 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
   const [canInstall, setCanInstall] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [message, setMessage] = useState('');
+  /* 설치창을 닫으면 그 기회는 끝난다. 새로고침해야 브라우저가 다시 준다 */
+  const [cancelled, setCancelled] = useState(false);
   /* 설치가 안 되는 폰에서 무엇이 막는지 보려고 — 주소에 ?debug=1 을 붙였을 때만 */
   const [diagnosis, setDiagnosis] = useState('');
-  /* 설치창은 기회당 한 번만 열 수 있다 — 자동으로 열어 봤는지 기억해 둔다 */
-  const autoTried = useRef(false);
-
-  const openInstaller = useCallback(async (auto: boolean) => {
+  const openInstaller = useCallback(async () => {
     const prompt = getInstallPrompt();
     if (!prompt) return;
     try {
       await prompt.prompt();
       const choice = await prompt.userChoice;
+      /* 이 기회는 다 썼다 — 같은 이벤트로 두 번 열 수 없다 */
       window.__uljuInstall = null;
       setCanInstall(false);
-      setMessage(choice.outcome === 'accepted'
-        ? '설치했습니다. 홈 화면의 ULJU 아이콘으로 열어 주세요.'
-        : '설치를 취소하셨습니다. 설치해야 다음으로 넘어갑니다.');
+      if (choice.outcome === 'accepted') {
+        setMessage('설치했습니다. 홈 화면의 ULJU 아이콘으로 열어 주세요.');
+      } else {
+        setCancelled(true);
+        setMessage('설치를 취소하셨습니다. 설치해야 다음으로 넘어갑니다.');
+      }
     } catch {
-      /* 브라우저가 "사용자가 직접 눌러야 한다"고 막은 것이다. 버튼을 그대로 둔다 */
-      if (!auto) setMessage('설치창을 열지 못했습니다. 브라우저 메뉴에서 앱 설치를 눌러 주세요.');
+      setMessage('설치창을 열지 못했습니다. 브라우저 메뉴에서 앱 설치를 눌러 주세요.');
     }
   }, []);
 
   useEffect(() => {
     setEnvironment(detectEnvironment());
 
-    const sync = () => {
-      const prompt = getInstallPrompt();
-      setCanInstall(Boolean(prompt));
-      /* 기회가 오면 바로 띄워 본다. 막히면 아래 버튼이 그대로 남는다 */
-      if (prompt && !autoTried.current) {
-        autoTried.current = true;
-        void openInstaller(true);
-      }
-    };
+    const sync = () => setCanInstall(Boolean(getInstallPrompt()));
     sync();
     const stop = watchInstall(sync);
 
@@ -95,7 +93,7 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
       })();
     }
     return stop;
-  }, [openInstaller]);
+  }, []);
 
   /* 카카오 내장 브라우저에서 Chrome 으로 옮긴다. 주소는 그대로 들고 간다 */
   const openChrome = () => {
@@ -155,11 +153,16 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
             <button type="button" className="gate-primary" onClick={() => void copyAddress()}>주소 복사하기</button>
           )}
           {!inKakao && canInstall && (
-            <button type="button" className="gate-primary" onClick={() => void openInstaller(false)}>
+            <button type="button" className="gate-primary" onClick={() => void openInstaller()}>
               앱 설치
             </button>
           )}
-          {!inKakao && !canInstall && !installed && (
+          {!inKakao && !canInstall && cancelled && (
+            <button type="button" className="gate-primary" onClick={() => window.location.reload()}>
+              다시 설치하기
+            </button>
+          )}
+          {!inKakao && !canInstall && !cancelled && !installed && (
             <p className="gate-manual">
               {environment === 'ios'
                 ? <>아래쪽 <b>공유 버튼</b>을 누르고 <b>홈 화면에 추가</b>를 눌러 주세요.</>
