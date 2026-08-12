@@ -14,6 +14,16 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#6754d9',
     lang: 'ko-KR',
     categories: ['productivity', 'utilities'],
+    /* 자기 자신을 가리킨다 — navigator.getInstalledRelatedApps() 로 "이미 설치돼
+       있는지"를 물어보기 위한 것이다. 이미 설치했으면 Chrome 이 설치 기회를 주지
+       않는데, 그때 설치 안내만 띄우면 초대받은 사람이 할 수 있는 일이 없어진다. */
+    related_applications: [
+      {
+        platform: 'webapp',
+        url: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://unoworship-pro-eight.vercel.app'}/manifest.webmanifest`,
+      },
+    ],
+    prefer_related_applications: false,
     icons: [
       {
         src: '/icons/ulju-icon-192.png',

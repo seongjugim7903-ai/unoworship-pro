@@ -1,16 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { detectEnvironment, installSteps, type InstallEnvironment } from '../../lib/pwaInstall';
+// 화면 위에 붙는 앱 설치 띠 — 이미 쓰고 있는 사람에게 권하는 자리다.
+//
+// 초대 링크(/join)에서는 띄우지 않는다. 거기는 설치 안내가 화면 전체를 차지하는
+// 자리라 같은 말이 두 번 나온다. 다만 이 컴포넌트는 계속 붙어 있어야 한다 —
+// 서비스 워커를 등록하는 곳이 여기이고, 그것이 없으면 브라우저가 설치 자체를
+// 제안하지 않는다. 그래서 화면만 감추고 동작은 남긴다.
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-}
+import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import {
+  detectEnvironment,
+  getInstallPrompt,
+  installSteps,
+  watchInstall,
+  type InstallEnvironment,
+} from '../../lib/pwaInstall';
 
 export default function PwaInstallPrompt() {
+  const pathname = usePathname();
   const [environment, setEnvironment] = useState<InstallEnvironment>('standalone');
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [canInstall, setCanInstall] = useState(false);
   const [installRequested, setInstallRequested] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [message, setMessage] = useState('');
@@ -26,30 +36,27 @@ export default function PwaInstallPrompt() {
       });
     }
 
-    const handleBeforeInstall = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-      setEnvironment('browser');
+    /* 설치 기회는 layout.tsx 의 인라인 스크립트가 잡아 둔다 — 여기서는 꺼내 본다 */
+    const sync = () => {
+      setCanInstall(Boolean(getInstallPrompt()));
+      if (!getInstallPrompt() && detectEnvironment() === 'standalone') setEnvironment('standalone');
     };
-    const handleInstalled = () => {
-      setInstallPrompt(null);
-      setEnvironment('standalone');
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    window.addEventListener('appinstalled', handleInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-      window.removeEventListener('appinstalled', handleInstalled);
-    };
+    sync();
+    return watchInstall(sync);
   }, []);
 
   const handleInstall = async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    setInstallPrompt(null);
-    setMessage(choice.outcome === 'accepted' ? '설치를 시작했습니다.' : '설치를 취소했습니다.');
+    const prompt = getInstallPrompt();
+    if (!prompt) return;
+    try {
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      window.__uljuInstall = null;
+      setCanInstall(false);
+      setMessage(choice.outcome === 'accepted' ? '설치를 시작했습니다.' : '설치를 취소했습니다.');
+    } catch {
+      setMessage('브라우저 메뉴에서 앱 설치를 눌러 주세요.');
+    }
   };
 
   const handleOpenChrome = () => {
@@ -68,12 +75,14 @@ export default function PwaInstallPrompt() {
     }
   };
 
+  /* 초대 화면은 자기 설치 안내를 가지고 있다 — 등록만 하고 화면에서는 빠진다 */
+  if (pathname?.startsWith('/join')) return null;
   if (environment === 'standalone' || dismissed) return null;
-  if (environment === 'browser' && !installPrompt && !installRequested) return null;
+  if (environment === 'browser' && !canInstall && !installRequested) return null;
 
   const isKakaoAndroid = environment === 'kakao-android';
   const isKakaoIOS = environment === 'kakao-ios';
-  const steps = installSteps(environment, Boolean(installPrompt));
+  const steps = installSteps(environment, canInstall);
 
   return (
     <aside className="pwa-install-banner" aria-label="ULJU 앱 설치">
@@ -88,7 +97,7 @@ export default function PwaInstallPrompt() {
       <div className="pwa-install-actions">
         {isKakaoAndroid && <button type="button" onClick={handleOpenChrome}>Chrome에서 열기</button>}
         {isKakaoIOS && <button type="button" onClick={() => void handleCopyAddress()}>주소 복사</button>}
-        {environment === 'browser' && installPrompt && (
+        {environment === 'browser' && canInstall && (
           <button type="button" onClick={() => void handleInstall()}>앱 설치</button>
         )}
         <button

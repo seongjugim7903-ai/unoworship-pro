@@ -34,6 +34,23 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko">
+      <head>
+        {/* 설치 기회를 놓치지 않으려고 React 보다 먼저 잡아 둔다.
+            Chrome 은 beforeinstallprompt 를 페이지가 뜨자마자 한 번 쏘고 만다.
+            useEffect 로 리스너를 붙이면 하이드레이션 전에 이미 지나가 버려서
+            설치 버튼이 영영 안 나타난다 — 여기서 받아 두고 컴포넌트가 꺼내 쓴다. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){window.__uljuInstall=null;`
+              + `window.addEventListener('beforeinstallprompt',function(e){`
+              + `e.preventDefault();window.__uljuInstall=e;`
+              + `window.dispatchEvent(new Event('ulju:installable'));});`
+              + `window.addEventListener('appinstalled',function(){`
+              + `window.__uljuInstall=null;`
+              + `window.dispatchEvent(new Event('ulju:installed'));});})();`,
+          }}
+        />
+      </head>
       <body>
         <PwaInstallPrompt />
         {children}

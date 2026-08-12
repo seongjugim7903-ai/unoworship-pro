@@ -11,15 +11,20 @@
 // 브라우저를 옮기면 목록 자체가 바뀌어 진행된 것이 드러난다.
 // 설치가 끝나 앱으로 열리면 이 화면 자체가 사라진다(그때는 부모가 안 그린다).
 //
+// 설치창은 브라우저가 열어 준다. 웹이 혼자 설치할 수는 없다 — 기회가 오면 곧바로
+// 띄워 보고, 브라우저가 "사용자가 직접 눌러야 한다"고 막으면 버튼으로 남긴다.
+//
 // 데스크톱에서는 띄우지 않는다 — 막으면 PC로 들어올 길이 없다. 판단은 부모가 한다.
 
-import { useEffect, useState } from 'react';
-import { detectEnvironment, installSteps, type InstallEnvironment } from '../../lib/pwaInstall';
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
-}
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  detectEnvironment,
+  getInstallPrompt,
+  installSteps,
+  isAlreadyInstalled,
+  watchInstall,
+  type InstallEnvironment,
+} from '../../lib/pwaInstall';
 
 interface Props {
   code: string;
@@ -30,19 +35,48 @@ interface Props {
 
 export default function InstallGate({ code, team, leaderName, churchName }: Props) {
   const [environment, setEnvironment] = useState<InstallEnvironment>('browser');
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [canInstall, setCanInstall] = useState(false);
+  const [installed, setInstalled] = useState(false);
   const [message, setMessage] = useState('');
+  /* 설치창은 기회당 한 번만 열 수 있다 — 자동으로 열어 봤는지 기억해 둔다 */
+  const autoTried = useRef(false);
+
+  const openInstaller = useCallback(async (auto: boolean) => {
+    const prompt = getInstallPrompt();
+    if (!prompt) return;
+    try {
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      window.__uljuInstall = null;
+      setCanInstall(false);
+      setMessage(choice.outcome === 'accepted'
+        ? '설치했습니다. 홈 화면의 ULJU 아이콘으로 열어 주세요.'
+        : '설치를 취소하셨습니다. 설치해야 다음으로 넘어갑니다.');
+    } catch {
+      /* 브라우저가 "사용자가 직접 눌러야 한다"고 막은 것이다. 버튼을 그대로 둔다 */
+      if (!auto) setMessage('설치창을 열지 못했습니다. 브라우저 메뉴에서 앱 설치를 눌러 주세요.');
+    }
+  }, []);
 
   useEffect(() => {
     setEnvironment(detectEnvironment());
 
-    const handleBeforeInstall = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
+    const sync = () => {
+      const prompt = getInstallPrompt();
+      setCanInstall(Boolean(prompt));
+      /* 기회가 오면 바로 띄워 본다. 막히면 아래 버튼이 그대로 남는다 */
+      if (prompt && !autoTried.current) {
+        autoTried.current = true;
+        void openInstaller(true);
+      }
     };
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
-  }, []);
+    sync();
+    const stop = watchInstall(sync);
+
+    /* 이미 설치한 사람에게는 설치 기회가 오지 않는다. 그때는 안내를 바꿔야 한다 */
+    void isAlreadyInstalled().then(setInstalled);
+    return stop;
+  }, [openInstaller]);
 
   /* 카카오 내장 브라우저에서 Chrome 으로 옮긴다. 주소는 그대로 들고 간다 */
   const openChrome = () => {
@@ -61,17 +95,11 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
     }
   };
 
-  const install = async () => {
-    if (!installPrompt) return;
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    setInstallPrompt(null);
-    setMessage(choice.outcome === 'accepted'
-      ? '설치했습니다. 홈 화면의 ULJU 아이콘으로 열어 주세요.'
-      : '설치를 취소하셨습니다. 설치해야 다음으로 넘어갑니다.');
-  };
-
-  const steps = installSteps(environment, Boolean(installPrompt));
+  const inKakao = environment === 'kakao-android' || environment === 'kakao-ios';
+  const alreadyHere = installed && !inKakao;
+  const steps = alreadyHere
+    ? ['홈 화면에서 ULJU 열기', '초대가 그대로 이어집니다']
+    : installSteps(environment, canInstall);
   /* '교회으로' 가 되지 않게 조사까지 붙여 둔다 */
   const invitedTo = team ? `${team} 팀으로` : '교회로';
 
@@ -86,7 +114,9 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
           <b>{invitedTo}</b> 초대했습니다
         </h1>
         <p className="gate-lead">
-          아래 순서대로 <b>한 번만</b> 하시면 다음부터는 앱처럼 바로 열립니다.
+          {alreadyHere
+            ? <>이 휴대폰에 <b>ULJU 앱이 이미 있습니다.</b> 홈 화면 아이콘으로 열면 이 초대가 이어집니다.</>
+            : <>아래 순서대로 <b>한 번만</b> 하시면 다음부터는 앱처럼 바로 열립니다.</>}
         </p>
 
         <ol className="gate-steps">
@@ -105,17 +135,16 @@ export default function InstallGate({ code, team, leaderName, churchName }: Prop
           {environment === 'kakao-ios' && (
             <button type="button" className="gate-primary" onClick={() => void copyAddress()}>주소 복사하기</button>
           )}
-          {environment === 'browser' && installPrompt && (
-            <button type="button" className="gate-primary" onClick={() => void install()}>앱 설치</button>
+          {!inKakao && canInstall && (
+            <button type="button" className="gate-primary" onClick={() => void openInstaller(false)}>
+              앱 설치
+            </button>
           )}
-          {environment === 'browser' && !installPrompt && (
+          {!inKakao && !canInstall && !installed && (
             <p className="gate-manual">
-              브라우저 메뉴(⋮)를 열고 <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 눌러 주세요.
-            </p>
-          )}
-          {environment === 'ios' && (
-            <p className="gate-manual">
-              아래쪽 <b>공유 버튼</b>을 누르고 <b>홈 화면에 추가</b>를 눌러 주세요.
+              {environment === 'ios'
+                ? <>아래쪽 <b>공유 버튼</b>을 누르고 <b>홈 화면에 추가</b>를 눌러 주세요.</>
+                : <>브라우저 메뉴(⋮)를 열고 <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 눌러 주세요.</>}
             </p>
           )}
         </div>
