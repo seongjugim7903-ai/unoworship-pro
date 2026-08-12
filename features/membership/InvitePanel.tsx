@@ -94,6 +94,13 @@ export default function InvitePanel({ code }: { code: string }) {
           </p>
           {error && <p className="error-message">{error}</p>}
           <button type="button" className="kakao-button" onClick={kakao}>카카오로 로그인</button>
+          {/* 카톡을 안 쓰는 분과 테스트 계정을 위한 통로 — 돌아올 곳은 이 링크다 */}
+          <p className="field-hint" style={{ marginTop: 14 }}>
+            카카오를 쓰지 않으시면{' '}
+            <Link className="text-button" href={`/login?redirectTo=/join/${encodeURIComponent(code)}`}>
+              이메일로 로그인
+            </Link>
+          </p>
         </section>
       </main>
     );
