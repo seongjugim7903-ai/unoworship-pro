@@ -6,6 +6,6 @@
 // 팀 '이름'은 교회마다 다르므로 관리자가 직접 만든다(worship_teams).
 // 카테고리만 제품이 정한다.
 
-export const TEAM_CATEGORIES = ['준비찬양', '찬양대'] as const;
+export const TEAM_CATEGORIES = ['준비찬양', '찬양대', '방송실', '예배준비'] as const;
 
 export type TeamCategory = (typeof TEAM_CATEGORIES)[number];
