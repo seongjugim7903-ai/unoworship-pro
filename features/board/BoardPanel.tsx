@@ -1,12 +1,12 @@
 'use client';
 
 // 전 팀 공유 게시판 — 보기·댓글은 모두, 글쓰기는 팀장급 이상.
-//   예배준비(새신자·긴급·준비항목)를 카테고리로 담는다.
+//   카테고리는 서버가 준다: 고정(공지사항·일반·새신자·긴급·준비항목) + 내 팀 이름.
+//   팀 이름 카테고리에 올린 글은 그 팀만 본다. 내 글/관리자는 수정할 수 있다.
 
 import { useCallback, useEffect, useState } from 'react';
 
-const CATEGORIES = ['일반', '새신자', '긴급', '준비항목'] as const;
-type Category = (typeof CATEGORIES)[number];
+const FALLBACK_CATEGORIES = ['공지사항', '일반', '새신자', '긴급', '준비항목'];
 
 interface Post {
   id: string;
@@ -17,6 +17,7 @@ interface Post {
   body: string;
   pinned: boolean;
   comment_count: number;
+  mine?: boolean;
 }
 interface Comment {
   id: string;
@@ -31,15 +32,23 @@ function when(iso: string) {
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+/* 카테고리 색은 고정 분류에만 준다 — 팀 이름은 기본 회색으로 나온다 */
+const FIXED = new Set(FALLBACK_CATEGORIES);
+function catClass(category: string) {
+  return FIXED.has(category) ? `cat-${category}` : 'cat-team';
+}
+
 export default function BoardPanel() {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES);
   const [canPost, setCanPost] = useState(false);
-  const [filter, setFilter] = useState<'' | Category>('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [filter, setFilter] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
 
   const [composeOpen, setComposeOpen] = useState(false);
-  const [draft, setDraft] = useState({ category: '일반' as Category, title: '', body: '' });
+  const [draft, setDraft] = useState({ category: '일반', title: '', body: '' });
   const [posting, setPosting] = useState(false);
 
   const [openId, setOpenId] = useState<string | null>(null);
@@ -47,15 +56,24 @@ export default function BoardPanel() {
   const [commentBody, setCommentBody] = useState('');
   const [commenting, setCommenting] = useState(false);
 
-  const loadPosts = useCallback(async (category: '' | Category) => {
+  /* 수정 중인 글 — 열린 글 안에서 제목/내용/분류를 바로 고친다 */
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState({ category: '일반', title: '', body: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const loadPosts = useCallback(async (category: string) => {
     setStatus('loading');
     try {
       const query = category ? `?category=${encodeURIComponent(category)}` : '';
       const res = await fetch(`/api/board${query}`);
-      const json = await res.json() as { ok?: boolean; posts?: Post[]; canPost?: boolean; message?: string };
+      const json = await res.json() as {
+        ok?: boolean; posts?: Post[]; canPost?: boolean; isAdmin?: boolean; categories?: string[]; message?: string;
+      };
       if (!res.ok || !json.ok) throw new Error(json.message ?? '게시글을 불러오지 못했습니다.');
       setPosts(json.posts ?? []);
       setCanPost(Boolean(json.canPost));
+      setIsAdmin(Boolean(json.isAdmin));
+      if (json.categories?.length) setCategories(json.categories);
       setStatus('done');
     } catch (error) {
       setStatus('error');
@@ -77,6 +95,7 @@ export default function BoardPanel() {
   const toggleOpen = (postId: string) => {
     if (openId === postId) { setOpenId(null); return; }
     setOpenId(postId);
+    setEditId(null);
     setCommentBody('');
     void loadComments(postId);
   };
@@ -100,6 +119,33 @@ export default function BoardPanel() {
       setMessage(error instanceof Error ? error.message : '글을 저장하지 못했습니다.');
     } finally {
       setPosting(false);
+    }
+  };
+
+  const startEdit = (post: Post) => {
+    setEditId(post.id);
+    setEditDraft({ category: post.category, title: post.title, body: post.body });
+    setMessage('');
+  };
+
+  const submitEdit = async (postId: string) => {
+    if (!editDraft.title.trim() || savingEdit) return;
+    setSavingEdit(true);
+    setMessage('');
+    try {
+      const res = await fetch('/api/board', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: postId, ...editDraft }),
+      });
+      const json = await res.json() as { ok?: boolean; message?: string };
+      if (!res.ok || !json.ok) throw new Error(json.message ?? '글을 수정하지 못했습니다.');
+      setEditId(null);
+      await loadPosts(filter);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '글을 수정하지 못했습니다.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -129,7 +175,7 @@ export default function BoardPanel() {
       <section className="panel search-panel">
         <div className="board-filter">
           <button type="button" className={`board-chip ${filter === '' ? 'active' : ''}`} onClick={() => setFilter('')}>전체</button>
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <button key={c} type="button" className={`board-chip ${filter === c ? 'active' : ''}`} onClick={() => setFilter(c)}>{c}</button>
           ))}
           {canPost && (
@@ -143,8 +189,8 @@ export default function BoardPanel() {
           <div className="board-compose">
             <div className="field-grid two-columns">
               <label>분류
-                <select value={draft.category} onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value as Category }))}>
-                  {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                <select value={draft.category} onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}>
+                  {categories.map((c) => <option key={c}>{c}</option>)}
                 </select>
               </label>
               <label>제목
@@ -173,7 +219,7 @@ export default function BoardPanel() {
           <button type="button" className="board-post-head" onClick={() => toggleOpen(post.id)}>
             <div className="board-post-title">
               {post.pinned && <span className="board-pin">고정</span>}
-              <span className={`board-cat cat-${post.category}`}>{post.category}</span>
+              <span className={`board-cat ${catClass(post.category)}`}>{post.category}</span>
               <strong>{post.title}</strong>
             </div>
             <span className="board-post-meta">{post.author_name || '익명'} · {when(post.created_at)} · 💬 {post.comment_count}</span>
@@ -181,7 +227,39 @@ export default function BoardPanel() {
 
           {openId === post.id && (
             <div className="board-post-body">
-              {post.body && <pre className="bc-pre">{post.body}</pre>}
+              {editId === post.id ? (
+                <div className="board-compose">
+                  <div className="field-grid two-columns">
+                    <label>분류
+                      <select value={editDraft.category} onChange={(e) => setEditDraft((d) => ({ ...d, category: e.target.value }))}>
+                        {categories.map((c) => <option key={c}>{c}</option>)}
+                      </select>
+                    </label>
+                    <label>제목
+                      <input value={editDraft.title} onChange={(e) => setEditDraft((d) => ({ ...d, title: e.target.value }))} placeholder="제목" />
+                    </label>
+                  </div>
+                  <label>내용
+                    <textarea value={editDraft.body} onChange={(e) => setEditDraft((d) => ({ ...d, body: e.target.value }))} rows={5} />
+                  </label>
+                  <div className="board-edit-actions">
+                    <button type="button" className="primary-button" onClick={() => void submitEdit(post.id)} disabled={!editDraft.title.trim() || savingEdit}>
+                      {savingEdit ? '저장 중...' : '저장'}
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => setEditId(null)}>취소</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {post.body && <pre className="bc-pre">{post.body}</pre>}
+                  {(post.mine || isAdmin) && (
+                    <div className="board-edit-actions">
+                      <button type="button" className="secondary-button" onClick={() => startEdit(post)}>✏️ 수정</button>
+                    </div>
+                  )}
+                </>
+              )}
+
               <div className="board-comments">
                 {comments.map((c) => (
                   <div className="board-comment" key={c.id}>

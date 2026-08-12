@@ -242,6 +242,9 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .board-cat.cat-새신자 { color: #106747; background: #e5f8ef; }
 .board-cat.cat-긴급 { color: #a73545; background: #fff0f2; }
 .board-cat.cat-준비항목 { color: #8a5a00; background: #fff6e6; }
+.board-cat.cat-공지사항 { color: #b23a00; background: #ffece0; }
+.board-cat.cat-team { color: #3457a8; background: #e8eeff; }
+.board-edit-actions { display: flex; gap: 8px; margin-top: 10px; }
 .board-pin { padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 800; color: #fff; background: #6754d9; }
 .board-post-meta { color: #8a96a9; font-size: 11px; }
 .board-post-body { padding: 0 16px 16px; }
