@@ -22,7 +22,8 @@ function useIsMobile() {
 }
 
 const SERVICE_TYPES = ['주일낮예배', '주일오후예배', '수요예배', '금요기도회', '월삭감사예배'];
-const TEAMS = ['주일1부', '주일2부', '수요예배', '금요기도회'];
+/* 팀은 교회마다 다르므로 서버에서 받는다. 초대받지 않은 팀은 목록에 없다 —
+   자기 팀 것만 보여 화면을 단순하게 하는 장치다(features/membership 참조). */
 const DRAFT_KEY = 'unoworship-pro:worship-prep-draft:v1';
 
 type Arrangement = 'full' | 'chorus_only' | 'chorus_first' | 'custom';
@@ -114,7 +115,8 @@ export default function WorshipPrepPanel() {
   const upcoming = useMemo(() => getUpcomingService(), []);
   const [serviceType, setServiceType] = useState<string>(upcoming.serviceType);
   const [serviceDate, setServiceDate] = useState(upcoming.serviceDate);
-  const [team, setTeam] = useState('주일1부');
+  const [team, setTeam] = useState('');
+  const [myTeams, setMyTeams] = useState<string[]>([]);
   const [songs, setSongs] = useState<SongRow[]>([newRow()]);
   const [draftReady, setDraftReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
@@ -127,6 +129,29 @@ export default function WorshipPrepPanel() {
   /* 검색 결과의 악보 썸네일을 눌렀을 때 크게 볼 곡.
      데스크톱은 '저장 곡' 자리에 펼치고, 모바일은 전체 화면으로 띄운다. */
   const [sheetPreview, setSheetPreview] = useState<LibrarySong | null>(null);
+
+  /* 내가 든 준비찬양 팀만 고를 수 있다. 초대받지 않은 팀은 목록에 없다 */
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await (await fetch('/api/membership/me')).json();
+        const categories = (me?.teamCategories ?? {}) as Record<string, string>;
+        const mine = Object.entries(categories)
+          .filter(([, category]) => category === '준비찬양')
+          .map(([name]) => name);
+        /* 관리자는 모든 준비찬양 팀을 본다 */
+        const list = me?.churchRole === 'admin'
+          ? ((await (await fetch('/api/teams')).json())?.teams ?? [])
+            .filter((t: { category: string }) => t.category === '준비찬양')
+            .map((t: { name: string }) => t.name)
+          : mine;
+        setMyTeams(list);
+        setTeam((prev) => (prev && list.includes(prev) ? prev : (list[0] ?? '')));
+      } catch {
+        setMyTeams([]);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     try {
@@ -514,7 +539,7 @@ export default function WorshipPrepPanel() {
               ))}
             </div>
           )}
-          <label>찬양팀<select value={team} onChange={(event) => setTeam(event.target.value)}>{TEAMS.map((name) => <option key={name}>{name}</option>)}</select></label>
+          <label>찬양팀<select value={team} onChange={(event) => setTeam(event.target.value)}>{myTeams.map((name) => <option key={name}>{name}</option>)}</select></label>
 
           {isMobile ? (
             <>

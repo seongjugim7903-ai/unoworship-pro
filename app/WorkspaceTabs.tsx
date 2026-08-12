@@ -2,7 +2,7 @@
 
 // 랜딩 → 각 기능 진입. 탭 상시 노출을 없애 오조작을 줄인다.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ChoirRequestPanel from '../features/choir/ChoirRequestPanel';
 import SermonSection from '../features/sermon-compose/SermonSection';
 import WorshipPrepPanel from '../features/worship-prep-ui/WorshipPrepPanel';
@@ -11,14 +11,38 @@ import AuthGate from '../features/membership/AuthGate';
 
 type View = 'home' | 'choir' | 'sermon' | 'worship';
 
-const MENU: Array<{ id: Exclude<View, 'home'>; label: string; desc: string }> = [
-  { id: 'choir', label: '헵시바 선교단', desc: '찬양대 자막 · 카카오톡 공유' },
-  { id: 'sermon', label: '설교대지', desc: '설교 대지 · 주보 정리' },
-  { id: 'worship', label: '준비찬양', desc: '팀별 찬양 준비 · 악보' },
+/* can 의 어느 값을 보는지까지 여기 적어 둔다 — 권한이 없는 기능은 버튼조차 안 보인다.
+   초대받은 팀 말고는 들어갈 자리가 없어야 한다는 뜻이다. */
+const MENU: Array<{ id: Exclude<View, 'home'>; label: string; desc: string; can: keyof Can }> = [
+  { id: 'choir', label: '헵시바 선교단', desc: '찬양대 자막 · 카카오톡 공유', can: 'choir' },
+  { id: 'sermon', label: '설교대지', desc: '설교 대지 · 주보 정리', can: 'sermon' },
+  { id: 'worship', label: '준비찬양', desc: '팀별 찬양 준비 · 악보', can: 'worship' },
 ];
+
+interface Can {
+  sermon: boolean;
+  worship: boolean;
+  choir: boolean;
+}
 
 export default function WorkspaceTabs() {
   const [view, setView] = useState<View>('home');
+  /* 확인 전에는 아무 것도 안 보여 준다 — 잠깐 보였다 사라지는 것이 더 헷갈린다 */
+  const [can, setCan] = useState<Can | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await (await fetch('/api/membership/me')).json();
+        /* 저장 환경이 없는 배포에서는 막지 않는다 — 화면이 통째로 비면 손쓸 방법이 없다 */
+        setCan(me?.unavailable ? { sermon: true, worship: true, choir: true } : (me?.can ?? { sermon: false, worship: false, choir: false }));
+      } catch {
+        setCan({ sermon: true, worship: true, choir: true });
+      }
+    })();
+  }, []);
+
+  const menu = can ? MENU.filter((item) => can[item.can]) : [];
 
   if (view === 'home') {
     return (
@@ -37,12 +61,17 @@ export default function WorkspaceTabs() {
             </blockquote>
           </div>
           <nav className="landing-menu" aria-label="기능 선택">
-            {MENU.map((item) => (
+            {menu.map((item) => (
               <button key={item.id} type="button" className="landing-btn" onClick={() => setView(item.id)}>
                 <strong>{item.label}</strong>
                 <span>{item.desc}</span>
               </button>
             ))}
+            {can && menu.length === 0 && (
+              <p className="landing-empty">
+                아직 들어갈 수 있는 곳이 없습니다. 담당자에게 초대 링크를 받아 주세요.
+              </p>
+            )}
           </nav>
         </div>
       </main>

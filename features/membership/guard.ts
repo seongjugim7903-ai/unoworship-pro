@@ -11,6 +11,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import { getSessionUserId } from './currentUser';
 import { getActiveChurchId } from '../../lib/churchScope';
+import { supabaseRest } from '../../lib/supabase/server';
 import { loadMembership } from './store';
 import { canEditTeam, canWriteSermon, type Membership } from './inviteCode';
 
@@ -51,6 +52,36 @@ export async function requireTeamEditor(team: string): Promise<NextResponse | nu
       `${team} 담당자만 고칠 수 있습니다. 교회 관리자나 담당자에게 말씀해 주세요.`,
       'NOT_TEAM_EDITOR',
     );
+  }
+  return null;
+}
+
+/**
+ * 그 카테고리(준비찬양·찬양대)의 담당자인가.
+ *
+ * 찬양대 자막 요청처럼 자료가 팀 이름을 들고 있지 않은 경우에 쓴다 —
+ * 그 카테고리 팀 중 하나라도 맡고 있으면 통과시킨다.
+ */
+export async function requireCategoryEditor(category: string): Promise<NextResponse | null> {
+  const caller = await who();
+  if (!caller) return deny('로그인이 필요합니다.', 'LOGIN_REQUIRED', 401);
+  if (caller.membership.churchRole === 'admin') return null;
+
+  const mine = Object.entries(caller.membership.teams)
+    .filter(([, role]) => role === 'leader')
+    .map(([team]) => team);
+  if (mine.length === 0) {
+    return deny(`${category} 담당자만 올리고 고칠 수 있습니다.`, 'NOT_TEAM_EDITOR');
+  }
+
+  const rows = await supabaseRest<Array<{ name: string }>>(
+    `/worship_teams?select=name&church_id=eq.${caller.churchId}&category=eq.${encodeURIComponent(category)}`
+      + `&archived_at=is.null`,
+    { method: 'GET' },
+  ).catch(() => []);
+  const inCategory = new Set(rows.map((row) => row.name));
+  if (!mine.some((team) => inCategory.has(team))) {
+    return deny(`${category} 담당자만 올리고 고칠 수 있습니다.`, 'NOT_TEAM_EDITOR');
   }
   return null;
 }

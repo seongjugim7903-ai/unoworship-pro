@@ -395,3 +395,4 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .invite-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .invite-head strong { font-size: 13px; font-weight: 800; color: #263247; }
 .invite-link-box { margin: 0 0 10px; padding: 9px 10px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #46536b; font-size: 11px; word-break: break-all; user-select: all; }
+.landing-empty { margin: 0; padding: 16px; border-radius: 10px; background: rgba(255,255,255,.14); color: rgba(255,255,255,.86); font-size: 12px; line-height: 1.6; backdrop-filter: blur(6px); }

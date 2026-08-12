@@ -11,6 +11,7 @@ import {
 } from '../../../lib/supabase/server';
 import { getActiveChurchId } from '../../../lib/churchScope';
 import { requireLogin } from '../../../features/membership/requireLogin';
+import { requireCategoryEditor } from '../../../features/membership/guard';
 
 export const runtime = 'nodejs';
 
@@ -133,6 +134,10 @@ export async function DELETE(request: Request) {
   /* 쓰기는 로그인한 사람만 — 강제 여부는 UNOWORSHIP_REQUIRE_LOGIN 이 정한다 */
   const denied = await requireLogin();
   if (denied) return denied;
+
+  /* 자막 요청은 찬양대 담당자만 올린다 — 자료가 팀 이름을 들고 있지 않아 카테고리로 본다 */
+  const notEditor = await requireCategoryEditor('찬양대');
+  if (notEditor) return notEditor;
 
   try {
     const url = new URL(request.url);
