@@ -216,6 +216,15 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 @media (max-width: 600px) { .setlist-preview li { cursor: pointer; } }
 .search-panel .search-body { margin-top: 12px; }
 .no-sheet { flex: 0 0 auto; color: #b0b8c6; font-size: 11px; }
+/* 방송실 대시보드 */
+.bc-section { margin-bottom: 16px; }
+.bc-body { margin-bottom: 14px; }
+.bc-title { margin: 0 0 8px; color: #263247; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.bc-subtitle { margin: 4px 0 8px; color: #6754d9; font-size: 12px; font-weight: 800; }
+.bc-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.bc-meta span { padding: 5px 9px; border-radius: 4px; color: #55627a; background: #f3f5f9; font-size: 12px; }
+.bc-pre { margin: 0; padding: 12px 14px; border: 1px solid #e6ebf3; border-radius: 6px; background: #fbfcff; color: #34405a; font-family: inherit; font-size: 13px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; }
+.bc-team { margin-top: 10px; }
 .bulletin-ocr-row input[type=file] { margin-top: 8px; font-size: 12px; }
 .bulletin-ocr-row input[type=file]::file-selector-button { margin-right: 10px; height: 34px; padding: 0 12px; border: 1px solid #d7deea; border-radius: 6px; color: #5543c0; background: #f6f4ff; font-size: 12px; font-weight: 800; cursor: pointer; }
 .page-footer { padding: 24px 0 0; color: #9ca7b8; font-size: 11px; text-align: center; }
