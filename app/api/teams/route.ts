@@ -15,11 +15,12 @@ import { SupabaseServerConfigError, supabaseRest } from '../../../lib/supabase/s
 import { getSessionUserId } from '../../../features/membership/currentUser';
 import { getActiveChurchId } from '../../../lib/churchScope';
 import { joinTeam, loadMembership } from '../../../features/membership/store';
+import { TEAM_CATEGORIES } from '../../../features/membership/teams';
 
 export const runtime = 'nodejs';
 
-export const TEAM_CATEGORIES = ['준비찬양', '찬양대'] as const;
-
+/* 라우트 파일은 Next.js 가 정한 것(runtime · GET · POST …)만 내보낼 수 있다.
+   상수를 여기서 내보내면 빌드가 깨진다 — 목록은 features/membership 이 갖는다. */
 const CreateSchema = z.object({
   category: z.enum(TEAM_CATEGORIES),
   name: z.string().trim().min(1, '팀 이름을 적어 주세요.').max(30),

@@ -10,9 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-/* 카테고리는 화면을 나누는 이름이지 권한 축이 아니다.
-   설교대지는 팀이 없다 — 담임목사도 부교역자도 각자 자기 것을 쓴다. */
-const CATEGORIES = ['준비찬양', '찬양대'] as const;
+import { TEAM_CATEGORIES as CATEGORIES } from './teams';
 
 interface Team {
   id: string;

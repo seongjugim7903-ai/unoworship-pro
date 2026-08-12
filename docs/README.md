@@ -74,8 +74,13 @@
 **모든 파일 첫 줄에 한국어 한 줄 주석**을 답니다. 그 파일이 무엇을 하는 파일인지
 바로 알 수 있어야 합니다.
 
-**검증하고 커밋합니다.** `npx tsc --noEmit` · `npm test` · `npx eslint` 셋을 돌립니다.
-화면 변화는 브라우저로 직접 확인합니다.
+**검증하고 커밋합니다.** `npx tsc --noEmit` · `npm test` · `npx eslint` · **`npx next build`** 넷을
+돌립니다. 화면 변화는 브라우저로 직접 확인합니다.
+
+**`next build` 를 빼면 안 됩니다.** 라우트 파일(`app/api/**/route.ts`)은 Next.js 가 정한
+것(`runtime` · `GET` · `POST` …)만 내보낼 수 있는데, 거기에 상수를 하나 내보내면
+`tsc` 도 `eslint` 도 통과하고 **`next build` 에서만 걸립니다.** 실제로 그렇게 빌드가 깨져
+새 API 가 배포되지 않은 채 옛 배포본이 서빙된 적이 있습니다(2026-08-09).
 
 **커밋 하나에 한 가지 변경**입니다. 커밋 메시지에 **무엇을 왜 바꿨는지** 적습니다.
 
@@ -92,7 +97,7 @@ cd /Users/kimseongju/unogstack/projects/unoworship-pro && npx next dev -p 3100
 검증
 
 ```bash
-cd /Users/kimseongju/unogstack/projects/unoworship-pro && npx tsc --noEmit && npm test && npx eslint app lib tests
+cd /Users/kimseongju/unogstack/projects/unoworship-pro && npx tsc --noEmit && npm test && npx eslint app lib features tests && npx next build
 ```
 
 배포 확인 (푸시하면 Vercel이 자동 배포)
