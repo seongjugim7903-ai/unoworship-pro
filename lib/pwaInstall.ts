@@ -125,16 +125,28 @@ export function openInOutsideBrowser(): void {
     + `S.browser_fallback_url=${fallback};end`;
 }
 
+/**
+ * 지금 이 브라우저에서 실제로 눌러야 하는 것.
+ *
+ * "브라우저 메뉴에서 앱 설치" 같은 뭉뚱그린 안내는 도움이 안 된다 — 메뉴 이름이
+ * 브라우저마다 다르다. 삼성인터넷에는 '앱 설치'가 아예 없고 '현재 페이지 추가'다.
+ * 설치창(beforeinstallprompt)은 브라우저가 안 줄 수도 있어서, 이 손 경로가
+ * 사실상 유일한 길이 되는 경우가 많다. 그러니 정확히 적는다.
+ */
 export function installSteps(environment: InstallEnvironment, hasPrompt: boolean): string[] {
   switch (environment) {
     /* 카카오 안에서는 설치가 안 돼 브라우저로 옮겨야 한다. 그 단계는 '앱 설치' 버튼이
        알아서 하므로 순서에는 사용자가 할 일만 적는다 */
     case 'kakao-android': return ['앱 설치 누르기', '브라우저에서 설치 확인', '홈 화면에서 실행'];
-    case 'kakao-ios': return ['카카오톡 메뉴 열기', 'Safari로 열기', '공유 > 홈 화면에 추가'];
-    case 'ios': return ['Safari 공유 버튼', '홈 화면에 추가', '추가 확인'];
-    default: return hasPrompt
-      ? ['앱 설치 누르기', '설치 확인', '홈 화면에서 실행']
-      : ['Chrome 메뉴 열기', '앱 설치 선택', '홈 화면에서 실행'];
+    case 'kakao-ios': return ['오른쪽 아래 ⋮ 누르기', '다른 브라우저(Safari)로 열기', '공유 → 홈 화면에 추가'];
+    case 'ios': return ['아래 공유 버튼 누르기', '홈 화면에 추가 선택', '오른쪽 위 추가 누르기'];
+    default:
+      if (hasPrompt) return ['앱 설치 누르기', '설치 확인', '홈 화면에서 실행'];
+      /* 설치창이 없을 때는 브라우저 메뉴로 직접 간다. 이름이 제각각이라 그대로 적는다 */
+      if (typeof navigator !== 'undefined' && /SamsungBrowser/i.test(navigator.userAgent)) {
+        return ['아래 ☰ 메뉴 누르기', '현재 페이지 추가 선택', '홈 화면 선택'];
+      }
+      return ['오른쪽 위 ⋮ 누르기', '앱 설치 (또는 홈 화면에 추가)', '설치 누르기'];
   }
 }
 
