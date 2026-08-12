@@ -3,26 +3,51 @@ import {
   canEditTeam,
   canWriteSermon,
   generateInviteCode,
+  isValidInviteSlug,
   normalizeInviteCode,
   type Membership,
 } from '../features/membership/inviteCode';
 
-// 코드는 사람이 카톡으로 받아 손으로 옮겨 적는다. 그 과정에서 생기는 흔들림
-// (소문자, 하이픈, 공백)을 흘려보내는 것이 이 함수들의 일이다.
+// 코드는 두 모양이다 — 담당자 코드는 무작위 대문자, 팀원 초대 주소는 담당자가 정한
+// 영문 소문자다. 정규화는 둘 다 찾을 수 있는 모양으로 만드는 일을 한다.
 
 describe('normalizeInviteCode', () => {
-  it('소문자를 올린다', () => {
-    expect(normalizeInviteCode('a2c4e6')).toBe('A2C4E6');
+  it('대소문자를 가리지 않는다 — 조회도 대소문자를 무시한다', () => {
+    expect(normalizeInviteCode('A2C4E6')).toBe('a2c4e6');
+    expect(normalizeInviteCode('a2c4e6')).toBe('a2c4e6');
   });
 
-  it('사람이 끼워 넣는 하이픈·공백을 버린다', () => {
-    expect(normalizeInviteCode('ABC-DEF')).toBe('ABCDEF');
-    expect(normalizeInviteCode(' ABC DEF ')).toBe('ABCDEF');
+  it('하이픈은 남긴다 — 담당자가 정한 주소의 일부다', () => {
+    expect(normalizeInviteCode('ULJU-Sunday1')).toBe('ulju-sunday1');
+  });
+
+  it('공백과 그 밖의 글자는 버린다', () => {
+    expect(normalizeInviteCode(' ABC DEF ')).toBe('abcdef');
+    expect(normalizeInviteCode('울주 ulju!')).toBe('ulju');
   });
 
   it('빈 값은 빈 문자열', () => {
     expect(normalizeInviteCode('')).toBe('');
     expect(normalizeInviteCode('   ')).toBe('');
+  });
+});
+
+describe('isValidInviteSlug', () => {
+  it('영문 소문자·숫자·하이픈 3~30자를 받는다', () => {
+    expect(isValidInviteSlug('ulju-sunday1')).toBe(true);
+    expect(isValidInviteSlug('abc')).toBe(true);
+    expect(isValidInviteSlug('a'.repeat(30))).toBe(true);
+  });
+
+  it('너무 짧거나 길면 막는다 — 주소창에 들어갈 이름이다', () => {
+    expect(isValidInviteSlug('ab')).toBe(false);
+    expect(isValidInviteSlug('a'.repeat(31))).toBe(false);
+  });
+
+  it('하이픈으로 시작할 수 없고 대문자·한글은 못 쓴다', () => {
+    expect(isValidInviteSlug('-ulju')).toBe(false);
+    expect(isValidInviteSlug('Ulju')).toBe(false);
+    expect(isValidInviteSlug('울주')).toBe(false);
   });
 });
 

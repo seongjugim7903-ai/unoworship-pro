@@ -11,8 +11,21 @@ export type InviteKind = 'church_join' | 'team_join' | 'team_leader';
 export type TeamRole = 'leader' | 'member';
 export type ChurchRole = 'admin' | 'crew' | 'member';
 
-/* 사람이 카톡으로 받아 손으로 옮겨 적는다 — 헷갈리는 글자(0/O, 1/I/L)를 뺀다 */
+/* 담당자 코드는 1:1 로 한 번 보내고 마는 값이라 무작위로 만든다.
+   헷갈리는 글자(0/O, 1/I/L)는 뺀다 — 손으로 옮겨 적는 경우가 있다. */
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+/**
+ * 팀원 초대 주소는 담당자가 직접 정한다 — 카페 이름을 정하듯이.
+ * 무작위 코드(J95XAF)는 단톡방에 붙였을 때 무엇인지 알 수 없다.
+ *
+ * 소문자·숫자·하이픈만. 하이픈으로 시작하지 않고 3~30자.
+ */
+export const INVITE_SLUG_RE = /^[a-z0-9][a-z0-9-]{2,29}$/;
+
+export function isValidInviteSlug(value: string): boolean {
+  return INVITE_SLUG_RE.test(value);
+}
 
 export function generateInviteCode(length = 6): string {
   const bytes = new Uint8Array(length);
@@ -20,9 +33,15 @@ export function generateInviteCode(length = 6): string {
   return [...bytes].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
 }
 
-/** 입력한 코드를 저장된 모양으로 — 소문자·공백·하이픈을 흘려보낸다 */
+/**
+ * 주소창·카톡에서 온 값을 찾을 수 있는 모양으로 다듬는다.
+ *
+ * 대소문자를 가리지 않는다 — 무작위 코드는 대문자로 만들었고 담당자가 정한 주소는
+ * 소문자다. 조회도 대소문자를 무시하므로 어느 쪽이든 찾힌다.
+ * 하이픈은 남긴다 — 정한 주소의 일부다.
+ */
 export function normalizeInviteCode(raw: string): string {
-  return String(raw ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return String(raw ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
 }
 
 export class InviteError extends Error {

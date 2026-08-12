@@ -35,7 +35,9 @@ export async function findUsableInvite(code: string): Promise<InviteCode> {
 
   const rows = await supabaseRest<InviteCode[]>(
     `/invite_codes?select=id,church_id,code,kind,team,max_uses,used_count,expires_at,revoked_at`
-      + `&code=eq.${encodeURIComponent(normalized)}&limit=1`,
+      /* 대소문자를 가리지 않는다 — 무작위 코드는 대문자, 정한 주소는 소문자다.
+         ilike 에 와일드카드를 넣지 않으므로 정확히 일치하는 것만 찾는다. */
+      + `&code=ilike.${encodeURIComponent(normalized)}&limit=1`,
     { method: 'GET' },
   );
   const invite = rows?.[0];
