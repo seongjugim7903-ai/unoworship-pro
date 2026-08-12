@@ -23,6 +23,7 @@ import { replaceSubProgram, type SavedSubProgram } from '../../../../lib/sermon-
 import { parseSermonOutline } from '../../../../lib/sermon-compose/parseSermonOutline';
 import { PARSER_VERSION } from '../../../../lib/sermon-compose/types';
 import { requireLogin } from '../../../../features/membership/requireLogin';
+import { requireSermonWriter } from '../../../../features/membership/guard';
 
 export const runtime = 'nodejs';
 
@@ -104,6 +105,11 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   try {
+    /* 설교대지는 목회자로 등록된 분과 교회 관리자만 쓴다 —
+       팀이 아니라 개인이라 담당자 코드가 아니라 사람에게 붙는 표시로 가른다 */
+    const writer = await requireSermonWriter();
+    if (writer instanceof NextResponse) return writer;
+
     const body = BodySchema.parse(await request.json());
 
     /* 협조문도 본문도 없으면 설교대지를 만들 수 없다. */

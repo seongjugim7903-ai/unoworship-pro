@@ -17,6 +17,7 @@ import {
   upsertLibrarySong,
 } from '../../../lib/worship-prep/songLibrary';
 import { requireLogin } from '../../../features/membership/requireLogin';
+import { requireTeamEditor } from '../../../features/membership/guard';
 
 export const runtime = 'nodejs';
 
@@ -153,6 +154,11 @@ export async function POST(request: Request) {
       return jsonError('payload가 없습니다.', 400, 'NO_PAYLOAD');
     }
     const payload = PrepSchema.parse(JSON.parse(rawPayload));
+
+    /* 그 팀 담당자(또는 교회 관리자)만 곡·악보를 바꾼다 */
+    const notEditor = await requireTeamEditor(payload.team);
+    if (notEditor) return notEditor;
+
     const teamSegment = sanitizeSegment(payload.team);
 
     const hasNewSheet = payload.songs.some((song) => song.sheetUploads.some((upload) => formData.get(upload.key) instanceof File));

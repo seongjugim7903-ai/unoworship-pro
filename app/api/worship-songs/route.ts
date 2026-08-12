@@ -6,7 +6,7 @@
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { SupabaseServerConfigError } from '../../../lib/supabase/server';
+import { SupabaseServerConfigError, supabaseRest } from '../../../lib/supabase/server';
 import { getActiveChurchId } from '../../../lib/churchScope';
 import {
   deleteLibrarySong,
@@ -14,6 +14,7 @@ import {
   upsertLibrarySong,
 } from '../../../lib/worship-prep/songLibrary';
 import { requireLogin } from '../../../features/membership/requireLogin';
+import { requireTeamEditor } from '../../../features/membership/guard';
 
 export const runtime = 'nodejs';
 
@@ -68,6 +69,10 @@ export async function POST(request: Request) {
 
   try {
     const body = EditSchema.parse(await request.json());
+
+    const notEditor = await requireTeamEditor(body.team);
+    if (notEditor) return notEditor;
+
     await upsertLibrarySong({
       churchId: await getActiveChurchId(),
       team: body.team,
@@ -98,8 +103,22 @@ export async function DELETE(request: Request) {
   try {
     const id = new URL(request.url).searchParams.get('id')?.trim();
     if (!id) return jsonError('id가 없습니다.', 400, 'NO_ID');
+
+    /* 지울 곡이 어느 팀 것인지 먼저 보고 그 팀 담당자인지 확인한다 —
+       id 만으로는 누구 자료인지 알 수 없다 */
+    const churchId = await getActiveChurchId();
+    const rows = await supabaseRest<Array<{ team: string }>>(
+      `/worship_song_library?select=team&church_id=eq.${churchId}&id=eq.${id}&limit=1`,
+      { method: 'GET' },
+    );
+    const team = rows?.[0]?.team;
+    if (!team) return jsonError('그 곡을 찾지 못했습니다.', 404, 'SONG_NOT_FOUND');
+
+    const notEditor = await requireTeamEditor(team);
+    if (notEditor) return notEditor;
+
     /* 라이브러리에서만 뺀다 — 지난 주에 무엇을 불렀는지는 그대로 남는다 */
-    await deleteLibrarySong(await getActiveChurchId(), id);
+    await deleteLibrarySong(churchId, id);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('[worship-songs] delete failed', error);
