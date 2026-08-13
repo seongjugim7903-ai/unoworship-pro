@@ -105,7 +105,17 @@ export async function GET(request: Request) {
     const posts = rows
       .filter((row) => allow.has(String(row.category)))
       .map((row) => ({ ...row, mine: Boolean(caller) && row.author_user_id === caller?.userId }));
-    return NextResponse.json({ ok: true, posts, canPost: callerCanPost(caller), isAdmin, categories });
+    return NextResponse.json({
+      ok: true,
+      posts,
+      canPost: callerCanPost(caller),
+      isAdmin,
+      categories,
+      /* 임시 진단 — 필터 전 행 수와 빌드 표식. 원인 확인 후 제거한다 */
+      total: rows.length,
+      rawCategories: rows.map((row) => String(row.category)),
+      build: 'board-diag-1',
+    });
   } catch (error) {
     console.error('[board] list failed', error);
     if (error instanceof SupabaseServerConfigError) return jsonError(error.message, 503, error.code);
