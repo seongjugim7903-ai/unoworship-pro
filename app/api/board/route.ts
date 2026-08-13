@@ -96,13 +96,15 @@ export async function GET(request: Request) {
       }
       /* URLSearchParams 가 한 번 인코딩한다 — 여기서 또 encode 하면 이중 인코딩으로 안 걸린다 */
       params.set('category', `eq.${selected}`);
-    } else {
-      const list = categories.map((c) => `"${c.replace(/["(),]/g, '')}"`).join(',');
-      params.set('category', `in.(${list})`);
     }
 
     const rows = await supabaseRest<Array<Record<string, unknown>>>(`/board_posts?${params.toString()}`, { method: 'GET' });
-    const posts = rows.map((row) => ({ ...row, mine: Boolean(caller) && row.author_user_id === caller?.userId }));
+    /* 팀 전용 글은 그 팀(과 관리자)만 — '전체'에서도 볼 수 없는 팀 카테고리 글은 여기서 걸러낸다.
+       PostgREST in.(...) 로 한글 목록을 거르면 인코딩 문제가 있어 목록 필터는 서버 코드로 한다. */
+    const allow = new Set(categories);
+    const posts = rows
+      .filter((row) => allow.has(String(row.category)))
+      .map((row) => ({ ...row, mine: Boolean(caller) && row.author_user_id === caller?.userId }));
     return NextResponse.json({ ok: true, posts, canPost: callerCanPost(caller), isAdmin, categories });
   } catch (error) {
     console.error('[board] list failed', error);
