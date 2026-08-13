@@ -135,7 +135,9 @@ export async function GET(request: Request) {
       /* 임시 진단 — 필터 전 행 수와 빌드 표식. 원인 확인 후 제거한다 */
       total: rows.length,
       rawCategories: rows.map((row) => String(row.category)),
-      build: 'board-diag-1',
+      diagChurchId: churchId,
+      diagQuery: params.toString(),
+      build: 'board-diag-2',
     });
   } catch (error) {
     console.error('[board] list failed', error);
