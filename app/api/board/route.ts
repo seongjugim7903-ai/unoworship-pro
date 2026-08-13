@@ -79,13 +79,24 @@ export async function GET(request: Request) {
 
     const churchId = await getActiveChurchId();
 
-    /* 임시 진단 — ?diag=1 이면 전 교회의 글을 그대로 덤프한다. 원인 확인 후 제거한다 */
+    /* 임시 진단 — ?diag=1 이면 여러 변형 쿼리의 결과 수를 비교한다. 원인 확인 후 제거한다 */
     if (url.searchParams.get('diag') === '1') {
-      const dump = await supabaseRest<Array<Record<string, unknown>>>(
-        '/board_posts?select=id,church_id,category,title,created_at&order=created_at.desc&limit=100',
-        { method: 'GET' },
-      );
-      return NextResponse.json({ ok: true, resolvedChurchId: churchId, count: dump.length, dump });
+      const run = async (label: string, q: string) => {
+        try {
+          const rows = await supabaseRest<Array<Record<string, unknown>>>(q, { method: 'GET' });
+          return { label, q, count: rows.length, cats: rows.map((r) => String(r.category)) };
+        } catch (e) {
+          return { label, q, error: e instanceof Error ? e.message : String(e) };
+        }
+      };
+      const cid = churchId;
+      const probes = await Promise.all([
+        run('all-nofilter', '/board_posts?select=id,church_id,category&order=created_at.desc&limit=100'),
+        run('church-only', `/board_posts?select=id,category&church_id=eq.${cid}&limit=50`),
+        run('church-order-pinned', `/board_posts?select=id,category&church_id=eq.${cid}&order=pinned.desc,created_at.desc&limit=50`),
+        run('church-full-select', `/board_posts?select=id,created_at,updated_at,author_user_id,author_name,category,title,body,pinned,comment_count&church_id=eq.${cid}&order=pinned.desc,created_at.desc&limit=50`),
+      ]);
+      return NextResponse.json({ ok: true, resolvedChurchId: cid, probes });
     }
 
     /* 요청자 조회와 팀 목록은 서로 기다릴 필요가 없다 — 함께 던진다 */
