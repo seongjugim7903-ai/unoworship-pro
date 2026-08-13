@@ -78,9 +78,9 @@ export async function GET(request: Request) {
     const selected = url.searchParams.get('category')?.trim() ?? '';
 
     const churchId = await getActiveChurchId();
-    const caller = await who();
+    /* 요청자 조회와 팀 목록은 서로 기다릴 필요가 없다 — 함께 던진다 */
+    const [caller, allTeams] = await Promise.all([who(), teamNames(churchId)]);
     const isAdmin = caller?.membership.churchRole === 'admin';
-    const allTeams = await teamNames(churchId);
     const categories = visibleCategories(caller, allTeams);
 
     const params = new URLSearchParams({

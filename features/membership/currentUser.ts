@@ -6,9 +6,12 @@ import 'server-only';
 // 현장 맥(UnoLive)의 읽기 호출이 살아 있어야 하고, "로그인 여부"는
 // 호출부가 판단할 일이지 여기서 막을 일이 아니다.
 
+import { cache } from 'react';
 import { createSessionClient, isAuthConfigured } from '../../lib/authn/supabaseAuth';
 
-export async function getSessionUserId(): Promise<string | null> {
+/* 한 요청 안에서 여러 번 부른다 — churchScope 도, guard 도 각자 부른다.
+   auth.getUser() 는 인증 서버로 왕복하므로 요청 범위에서 한 번만 하도록 캐시한다. */
+export const getSessionUserId = cache(async (): Promise<string | null> => {
   /* 환경변수가 없으면 로그인 자체가 구성되지 않은 배포다 */
   if (!isAuthConfigured()) return null;
   try {
@@ -19,4 +22,4 @@ export async function getSessionUserId(): Promise<string | null> {
     /* 쿠키를 읽을 수 없는 맥락(정적 렌더 등)에서는 로그인하지 않은 것으로 본다 */
     return null;
   }
-}
+});
