@@ -34,8 +34,9 @@ function jsonError(message: string, status: number, code = 'WORSHIP_SONG_FAILED'
 }
 
 function clampLimit(value: string | null) {
+  if (!value) return 40;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 40;
+  if (!Number.isFinite(parsed) || parsed < 1) return 40;
   return Math.max(1, Math.min(100, Math.floor(parsed)));
 }
 

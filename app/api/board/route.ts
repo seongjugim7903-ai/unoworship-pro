@@ -36,8 +36,11 @@ function jsonError(message: string, status: number, code = 'BOARD_FAILED') {
 }
 
 function clampLimit(value: string | null) {
+  /* 파라미터가 없으면 Number(null)===0 이라 finite 검사를 통과해 1로 눌렸다 —
+     비어 있거나 1 미만이면 기본 50 으로 둔다 */
+  if (!value) return 50;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 50;
+  if (!Number.isFinite(parsed) || parsed < 1) return 50;
   return Math.max(1, Math.min(100, Math.floor(parsed)));
 }
 
@@ -78,27 +81,6 @@ export async function GET(request: Request) {
     const selected = url.searchParams.get('category')?.trim() ?? '';
 
     const churchId = await getActiveChurchId();
-
-    /* 임시 진단 — ?diag=1 이면 여러 변형 쿼리의 결과 수를 비교한다. 원인 확인 후 제거한다 */
-    if (url.searchParams.get('diag') === '1') {
-      const run = async (label: string, q: string) => {
-        try {
-          const rows = await supabaseRest<Array<Record<string, unknown>>>(q, { method: 'GET' });
-          return { label, q, count: rows.length, cats: rows.map((r) => String(r.category)) };
-        } catch (e) {
-          return { label, q, error: e instanceof Error ? e.message : String(e) };
-        }
-      };
-      const cid = churchId;
-      const probes = await Promise.all([
-        run('all-nofilter', '/board_posts?select=id,church_id,category&order=created_at.desc&limit=100'),
-        run('church-only', `/board_posts?select=id,category&church_id=eq.${cid}&limit=50`),
-        run('church-order-pinned', `/board_posts?select=id,category&church_id=eq.${cid}&order=pinned.desc,created_at.desc&limit=50`),
-        run('church-full-select', `/board_posts?select=id,created_at,updated_at,author_user_id,author_name,category,title,body,pinned,comment_count&church_id=eq.${cid}&order=pinned.desc,created_at.desc&limit=50`),
-      ]);
-      return NextResponse.json({ ok: true, resolvedChurchId: cid, probes });
-    }
-
     /* 요청자 조회와 팀 목록은 서로 기다릴 필요가 없다 — 함께 던진다 */
     const [caller, allTeams] = await Promise.all([who(), teamNames(churchId)]);
     const isAdmin = caller?.membership.churchRole === 'admin';
@@ -126,19 +108,7 @@ export async function GET(request: Request) {
     const posts = rows
       .filter((row) => allow.has(String(row.category)))
       .map((row) => ({ ...row, mine: Boolean(caller) && row.author_user_id === caller?.userId }));
-    return NextResponse.json({
-      ok: true,
-      posts,
-      canPost: callerCanPost(caller),
-      isAdmin,
-      categories,
-      /* 임시 진단 — 필터 전 행 수와 빌드 표식. 원인 확인 후 제거한다 */
-      total: rows.length,
-      rawCategories: rows.map((row) => String(row.category)),
-      diagChurchId: churchId,
-      diagQuery: params.toString(),
-      build: 'board-diag-2',
-    });
+    return NextResponse.json({ ok: true, posts, canPost: callerCanPost(caller), isAdmin, categories });
   } catch (error) {
     console.error('[board] list failed', error);
     if (error instanceof SupabaseServerConfigError) return jsonError(error.message, 503, error.code);

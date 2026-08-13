@@ -27,8 +27,9 @@ function jsonError(message: string, status: number, code = 'BULLETIN_SAVE_FAILED
 }
 
 function clampLimit(value: string | null) {
+  if (!value) return 20;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 20;
+  if (!Number.isFinite(parsed) || parsed < 1) return 20;
   return Math.max(1, Math.min(50, Math.floor(parsed)));
 }
 

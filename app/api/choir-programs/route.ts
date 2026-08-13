@@ -8,8 +8,9 @@ import { getActiveChurchId } from '../../../lib/churchScope';
 export const runtime = 'nodejs';
 
 function clampLimit(value: string | null) {
+  if (!value) return 30;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 30;
+  if (!Number.isFinite(parsed) || parsed < 1) return 30;
   return Math.max(1, Math.min(100, Math.floor(parsed)));
 }
 
