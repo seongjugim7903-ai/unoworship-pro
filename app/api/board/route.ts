@@ -78,6 +78,16 @@ export async function GET(request: Request) {
     const selected = url.searchParams.get('category')?.trim() ?? '';
 
     const churchId = await getActiveChurchId();
+
+    /* 임시 진단 — ?diag=1 이면 전 교회의 글을 그대로 덤프한다. 원인 확인 후 제거한다 */
+    if (url.searchParams.get('diag') === '1') {
+      const dump = await supabaseRest<Array<Record<string, unknown>>>(
+        '/board_posts?select=id,church_id,category,title,created_at&order=created_at.desc&limit=100',
+        { method: 'GET' },
+      );
+      return NextResponse.json({ ok: true, resolvedChurchId: churchId, count: dump.length, dump });
+    }
+
     /* 요청자 조회와 팀 목록은 서로 기다릴 필요가 없다 — 함께 던진다 */
     const [caller, allTeams] = await Promise.all([who(), teamNames(churchId)]);
     const isAdmin = caller?.membership.churchRole === 'admin';
