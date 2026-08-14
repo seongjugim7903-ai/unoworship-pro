@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { splitNewsBlocks } from '../lib/sermon-compose/churchNews';
+import { NEWS_SERVICE_TYPE, splitNewsBlocks } from '../lib/sermon-compose/churchNews';
+import { SERVICE_TYPES } from '../lib/sermon-compose/serviceTypeHint';
 
 // 이 규칙은 UnoLive worshipServiceGenerator 의 교회소식 빌더와 같아야 한다.
 //   newsText.split(/\n\s*\n+/).map(trim).filter(Boolean)
@@ -37,5 +38,17 @@ describe('splitNewsBlocks', () => {
   it('내용이 없으면 빈 배열', () => {
     expect(splitNewsBlocks('')).toEqual([]);
     expect(splitNewsBlocks('   \n\n  ')).toEqual([]);
+  });
+});
+
+// 교회소식을 만드는 예배는 하나다. 이 이름이 예배 종류 목록과 어긋나면 규칙이
+// 조용히 죽는다 — 어느 예배에서도 소식이 안 만들어진다.
+describe('NEWS_SERVICE_TYPE', () => {
+  it('실제로 고를 수 있는 예배 종류여야 한다', () => {
+    expect(SERVICE_TYPES).toContain(NEWS_SERVICE_TYPE);
+  });
+
+  it('주일낮예배다 — 주보 소식은 주일 낮에 한 번 알린다', () => {
+    expect(NEWS_SERVICE_TYPE).toBe('주일낮예배');
   });
 });

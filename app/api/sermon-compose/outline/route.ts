@@ -18,7 +18,7 @@ import {
   type SubNewsItem,
   type SubPraiseItem,
 } from '../../../../lib/sermon-compose/subProgram';
-import { splitNewsBlocks } from '../../../../lib/sermon-compose/churchNews';
+import { NEWS_SERVICE_TYPE, splitNewsBlocks } from '../../../../lib/sermon-compose/churchNews';
 import { replaceSubProgram, type SavedSubProgram } from '../../../../lib/sermon-compose/subProgramStore';
 import { parseSermonOutline } from '../../../../lib/sermon-compose/parseSermonOutline';
 import { PARSER_VERSION } from '../../../../lib/sermon-compose/types';
@@ -182,8 +182,10 @@ export async function POST(request: Request) {
       );
     }
 
-    /* 교회소식 — 찬송가·찬양과 같이 한 예배에 하나뿐이라 교체 저장한다 */
-    const newsBlocks = splitNewsBlocks(body.news);
+    /* 교회소식 — 주일낮예배에서만 만든다. 소식은 주보에 한 벌이고 주일 낮에 한 번
+       알리는데, 예배마다 저장하면 같은 소식이 그 주에 네 번 만들어진다.
+       (churchNews 의 NEWS_SERVICE_TYPE 참조) */
+    const newsBlocks = body.serviceType === NEWS_SERVICE_TYPE ? splitNewsBlocks(body.news) : [];
     if (newsBlocks.length > MAX_ITEMS_PER_PROGRAM) {
       return jsonError(
         `교회소식은 한 프로그램에 ${MAX_ITEMS_PER_PROGRAM}건까지 넣을 수 있습니다. (지금 ${newsBlocks.length}건)`,

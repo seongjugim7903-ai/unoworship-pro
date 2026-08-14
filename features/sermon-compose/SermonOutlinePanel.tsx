@@ -13,7 +13,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { MAX_ITEMS_PER_PROGRAM, defaultSubProgramTitle, parseHymnNumber } from '../../lib/sermon-compose/subProgram';
-import { splitNewsBlocks } from '../../lib/sermon-compose/churchNews';
+import { NEWS_SERVICE_TYPE, splitNewsBlocks } from '../../lib/sermon-compose/churchNews';
 import { getUpcomingService } from '../../lib/sermon-compose/upcomingService';
 import { parseSermonOutline } from '../../lib/sermon-compose/parseSermonOutline';
 import { parseServiceOrder, type PreacherSource } from '../../lib/sermon-compose/serviceOrder';
@@ -93,6 +93,11 @@ export default function SermonOutlinePanel() {
 
   const hymns = useMemo(() => readHymnNumbers(hymnText), [hymnText]);
   const praises = useMemo(() => readPraiseSongs(praiseText), [praiseText]);
+  /* 교회소식은 주일낮예배에서만 만든다 — 소식은 주보에 한 벌이고 주일 낮에 한 번
+     알린다. 예배마다 저장하면 같은 소식이 그 주에 네 번 만들어진다.
+     (lib/sermon-compose/churchNews 의 NEWS_SERVICE_TYPE 참조) */
+  const newsForThisService = fields.serviceType === NEWS_SERVICE_TYPE;
+
   const newsBlocks = useMemo(() => splitNewsBlocks(newsText), [newsText]);
   const parsed = useMemo(() => parseSermonOutline(content), [content]);
 
@@ -305,10 +310,18 @@ export default function SermonOutlinePanel() {
     { name: '말씀찾기(인용)', ready: parsed.points.length > 0, note: `대지 ${parsed.points.length}개 · 인용 ${quoteCount}개` },
     { name: '찬송가', ready: hymns.numbers.length > 0, note: hymns.numbers.map((n) => `${n}장`).join(', ') || '장 번호 없음' },
     { name: '찬양(PPT)', ready: praises.length > 0, note: praises.join(', ') || '곡명 없음' },
-    { name: '교회소식', ready: newsBlocks.length > 0, note: newsBlocks.length > 0 ? `${newsBlocks.length}건` : '소식 없음' },
+    {
+      name: '교회소식',
+      ready: newsForThisService && newsBlocks.length > 0,
+      note: !newsForThisService
+        ? `${NEWS_SERVICE_TYPE}에서만 만듭니다`
+        : newsBlocks.length > 0 ? `${newsBlocks.length}건` : '소식 없음',
+    },
   ];
 
-  const canSave = Boolean(content.trim() || scriptureRef.trim()) && newsBlocks.length <= MAX_ITEMS_PER_PROGRAM && !busy;
+  const canSave = Boolean(content.trim() || scriptureRef.trim())
+    && (!newsForThisService || newsBlocks.length <= MAX_ITEMS_PER_PROGRAM)
+    && !busy;
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -398,7 +411,13 @@ export default function SermonOutlinePanel() {
               />
             </label>
           )}
-          {bulletinOrders && (
+          {bulletinOrders && !newsForThisService && (
+            <p className="info-message">
+              교회소식은 <b>{NEWS_SERVICE_TYPE}</b>에서만 만듭니다. 주보에 한 벌뿐이고 주일 낮에
+              한 번 알리는 것이라, 예배마다 만들면 같은 소식이 그 주에 여러 번 쌓입니다.
+            </p>
+          )}
+          {bulletinOrders && newsForThisService && (
             <label>
               주보에서 읽은 교회소식
               <span className="field-hint">
@@ -415,7 +434,7 @@ export default function SermonOutlinePanel() {
               />
             </label>
           )}
-          {bulletinOrders && newsBlocks.length > MAX_ITEMS_PER_PROGRAM && (
+          {bulletinOrders && newsForThisService && newsBlocks.length > MAX_ITEMS_PER_PROGRAM && (
             <p className="error-message">
               교회소식은 한 프로그램에 {MAX_ITEMS_PER_PROGRAM}건까지입니다. (지금 {newsBlocks.length}건)
             </p>
