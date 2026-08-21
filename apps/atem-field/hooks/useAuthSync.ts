@@ -17,6 +17,14 @@ export function useAuthSync() {
     let mounted = true;
     const supabase = createClient();
 
+    // 클라우드가 없는 설치면 로그인 상태랄 것이 없다 — 게스트로 둔다
+    if (!supabase) {
+      setAuthMode('guest');
+      return () => {
+        mounted = false;
+      };
+    }
+
     // 초기 상태 동기화
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!mounted) return;

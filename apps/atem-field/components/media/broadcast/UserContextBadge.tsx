@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@/lib/supabase/browser';
 import type { Profile, Subscription } from '@/lib/supabase/profileTypes';
 import { isSubscriptionActive } from '@/lib/supabase/profileTypes';
 import {
@@ -42,10 +42,9 @@ export default function UserContextBadge() {
   });
 
   useEffect(() => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    /* 클라우드가 없는 현장 설치에서는 보여줄 계정 정보가 없다 — 그냥 접는다 */
+    const supabase = createClient();
+    if (!supabase) return;
 
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();

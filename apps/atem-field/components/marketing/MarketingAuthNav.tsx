@@ -26,6 +26,12 @@ export function MarketingAuthNav() {
 
     async function loadUser() {
       const supabase = createClient();
+      /* 클라우드가 없는 설치면 로그인 자리도 없다 — 빈 상태로 그린다 */
+      if (!supabase) {
+        setUser(null);
+        setLoaded(true);
+        return;
+      }
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!alive) return;
 
@@ -78,7 +84,7 @@ export function MarketingAuthNav() {
     setSigningOut(true);
 
     const supabase = createClient();
-    await supabase.auth.signOut({ scope: 'global' });
+    await supabase?.auth.signOut({ scope: 'global' });
     setUser(null);
     setLoaded(true);
     router.push('/');

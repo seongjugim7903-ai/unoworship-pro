@@ -111,6 +111,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const supabase = createClient();
 
+    // 클라우드를 안 쓰는 설치(현장 전용)에서는 물어볼 곳이 없다 — 게스트로 연다.
+    // 여기서 멈추지 않으면 로딩 표시가 영원히 남는다.
+    if (!supabase) {
+      setUser(null);
+      setProfile(DEFAULT_PROFILE);
+      setIsLoading(false);
+      setAuthMode('guest');
+      syncMediaSession(null);
+      return () => {
+        mounted = false;
+      };
+    }
+
     // 초기 로드
     supabase.auth.getUser().then(({ data: { user: u } }) => {
       if (!mounted) return;

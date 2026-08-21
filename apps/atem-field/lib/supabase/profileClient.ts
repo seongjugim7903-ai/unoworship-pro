@@ -10,12 +10,12 @@ import { createBrowserClient } from '@supabase/ssr';
 import type { Profile, Subscription } from './profileTypes';
 import { isSubscriptionActive } from './profileTypes';
 
-/** 브라우저 Supabase 클라이언트 — 필요 시 재사용 */
+/** 브라우저 Supabase 클라이언트 — 클라우드를 안 쓰는 설치면 null */
 function getClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return null;
+  return createBrowserClient(url, anonKey);
 }
 
 /**
@@ -24,6 +24,8 @@ function getClient() {
  */
 export async function fetchMyProfile(): Promise<Profile | null> {
   const supabase = getClient();
+  /* 클라우드가 없으면 프로필도 없다 — 미로그인과 같게 다룬다 */
+  if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
@@ -49,6 +51,8 @@ export async function updateMyProfile(
   patch: Partial<Pick<Profile, 'full_name' | 'avatar_url' | 'phone' | 'bio'>>,
 ): Promise<Profile | null> {
   const supabase = getClient();
+  /* 클라우드가 없으면 프로필도 없다 — 미로그인과 같게 다룬다 */
+  if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
@@ -72,6 +76,8 @@ export async function updateMyProfile(
  */
 export async function fetchMyActiveSubscription(): Promise<Subscription | null> {
   const supabase = getClient();
+  /* 클라우드가 없으면 프로필도 없다 — 미로그인과 같게 다룬다 */
+  if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 

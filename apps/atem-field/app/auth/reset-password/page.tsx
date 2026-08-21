@@ -15,6 +15,8 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     const supabase = createClient();
+    /* 클라우드가 없는 설치에는 비밀번호를 바꿀 계정 자체가 없다 */
+    if (!supabase) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') {
@@ -46,6 +48,10 @@ export default function ResetPasswordPage() {
 
     try {
       const supabase = createClient();
+      if (!supabase) {
+        setError('이 설치에서는 클라우드 계정을 쓰지 않습니다.');
+        return;
+      }
       const { error: updateError } = await supabase.auth.updateUser({ password });
 
       if (updateError) {
