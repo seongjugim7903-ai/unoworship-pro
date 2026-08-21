@@ -231,8 +231,14 @@ export function HymnModal({ isOpen, onClose }: HymnModalProps) {
       if (hasStructuredSlots) {
         fields = { body: block };
         if (includeHeader) {
-          if (title.trim()) fields.title = title.trim();
-          if (number.trim()) fields.number = number.trim();
+          // 제목(title) 슬롯은 곡명이 없으면 "N장" 으로 대체한다.
+          //   applyTemplate 은 값이 빈 슬롯을 통째로 숨기므로, 곡명을 안 적었을 때
+          //   제목 자리가 사라져 버린다(장 번호만 넣던 기존 사용 방식에서 자주 발생).
+          //   자막협조 생성기(worshipServiceGenerator)와 같은 대체 규칙이다.
+          const hymnName = title.trim();
+          const chapter = number.trim();
+          if (hymnName || chapter) fields.title = hymnName || `${chapter}장`;
+          if (chapter) fields.number = chapter;
           if (source.trim()) fields.copyright = source.trim();
         }
       } else {

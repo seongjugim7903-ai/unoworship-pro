@@ -13,8 +13,8 @@ import { listTemplates } from '@/features/subtitle-template/templateClient';
 import { applyBibleTemplate } from '@/features/subtitle-template/templateOverflow';
 import { createQuickBibleImageSection } from './quickBibleImageSection';
 import QuickBiblePptSearch from './QuickBiblePptSearch';
+import { findTemplate, getActiveTemplateName } from '@/features/subtitle-template/activeTemplate';
 
-const BIBLE_TEMPLATE_NAME = 'basic-001';
 
 interface BibleVersePayload {
   num: number;
@@ -75,11 +75,10 @@ export default function QuickBibleModal({ onSubmit, onPrepare, onLoadPptProgram,
         return;
       }
 
-      const template = templates.find(
-        (item) => item.category === 'bible' && item.name === BIBLE_TEMPLATE_NAME,
-      );
+      /* 이 교회가 고른 세트를 쓰고, 그 세트에 성경문구가 없으면 시드로 폴백한다. */
+      const template = findTemplate(templates, 'bible');
       if (!template) {
-        setError('성경문구 ' + BIBLE_TEMPLATE_NAME + ' 템플릿을 찾지 못했습니다');
+        setError('성경문구 템플릿을 찾지 못했습니다 (세트: ' + getActiveTemplateName() + ')');
         return;
       }
 
@@ -143,7 +142,9 @@ export default function QuickBibleModal({ onSubmit, onPrepare, onLoadPptProgram,
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70"
-      onClick={onClose}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       <div
         className="max-h-[calc(100dvh-40px)] w-[640px] max-w-[calc(100vw-32px)] overflow-y-auto rounded-2xl border border-[#333] bg-[#151515] p-5 shadow-2xl"
@@ -153,7 +154,7 @@ export default function QuickBibleModal({ onSubmit, onPrepare, onLoadPptProgram,
           <div>
             <p className="text-sm font-bold text-amber-400">⚡ 긴급 말씀찾기</p>
             <p className="mt-0.5 text-[11px] text-gray-500">
-              책장절 입력 + Enter = 성경문구 {BIBLE_TEMPLATE_NAME} 적용 · 말씀찾기(인용) 끝에 추가 · 즉시 송출
+              책장절 입력 + Enter = 성경문구 {getActiveTemplateName()} 적용 · 말씀찾기(인용) 끝에 추가 · 즉시 송출
             </p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white" title="닫기 (ESC)">✕</button>

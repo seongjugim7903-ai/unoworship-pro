@@ -266,10 +266,20 @@ export default function VideoElementView({
         <>
           <video
             ref={localVideoRef}
+            /* [FEATURE: LOCAL_VIDEO_TIMELINE] 컨트롤 바가 이 요소를 찾아 함께 제어한다.
+               src 로 찾으면 같은 파일을 쓰는 요소가 둘일 때 엉뚱한 걸 잡는다. */
+            data-video-element-id={element.id}
             src={embedSrc}
             width="100%"
             height="100%"
             autoPlay={false} /* 에디터는 업로드 즉시 재생 안 함 — 아래 컨트롤/송출(출력)에서만 재생 */
+            /* [FEATURE: LOCAL_VIDEO_LOADBAR] 송출 창들과 동일하게 전체를 미리 받는다.
+               - 지정이 없으면 브라우저 기본(metadata)이라 앞부분만 받고 멈춘다.
+                 그러면 상태바의 "불러오는 중 %" 가 중간에 멈춰 잘못된 신호를 준다.
+               - 같은 세션의 HTTP 캐시를 공유하므로, 에디터가 미리 받아두면 송출 창들이
+                 그 캐시를 그대로 쓴다(서빙 라우트에 immutable 캐시를 걸어둔 덕분).
+                 송출 순간 5개 창이 동시에 원본을 내려받던 부하가 사라진다. */
+            preload="auto"
             muted
             loop={element.loop}
             playsInline

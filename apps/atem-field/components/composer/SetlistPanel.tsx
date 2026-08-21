@@ -32,7 +32,7 @@ import { sectionHasYouTube } from '@/lib/youtubeStandby'; // [FEATURE: YT_STANDB
 import { preloadImages, renderElements } from '@/lib/canvasRenderer'; // [FEATURE: FRAME_PRERENDER]
 import { hasCustomRenderTargets, type CanvasElement } from '@/lib/canvasTypes';
 import {
-  getFixedLayerElements,
+  getFixedLayerElementsForItem,
   getSectionOutputElements,
   getSectionOwnElements,
 } from '@/lib/fixedLayers';
@@ -43,7 +43,7 @@ import {
   isLayerOutputWorkspaceItem,
   isLayerOutputWorkspaceSection,
 } from '@/lib/layerOutputWorkspace';
-import { applyBackgroundMotionOnce, isProgramBackgroundSection } from '@/lib/programBackground';
+import { applyBackgroundMotionOnce, getContentSections, isProgramBackgroundSection } from '@/lib/programBackground';
 import { isHiddenScriptureItem } from '@/features/hidden-scripture/hiddenScripture';
 // [FEATURE: HIDDEN_SCRIPTURE 제거 2026-07-10] 말씀찾기(본문) 숨김 동작 삭제 — 일반 프로그램처럼
 //   목록에 보이고 직접 삭제 가능. 플래그(hiddenScripture)는 로더의 "맨앞 배치" 식별용으로만 유지.
@@ -76,9 +76,11 @@ import {
 import ChoirPromptLayoutSelector from '@/components/prompt/choir/ChoirPromptLayoutSelector'; // [FEATURE: CHOIR_PMT]
 import ServerWorshipLoader from '@/components/composer/setlist/ServerWorshipLoader'; // [FEATURE: SERVER_LOAD]
 import CurrentProgramSaveButton from '@/components/composer/setlist/CurrentProgramSaveButton';
+import IndividualProgramSaveButton from '@/components/composer/setlist/IndividualProgramSaveButton';
 import { createSocketTrace } from '@/lib/latencyDiagnostics';
 import { useReferenceBroadcastBridge } from '@/features/section-broadcast/referenceBroadcast'; // [FEATURE: REF_BROADCAST]
 import BroadcastGridOverlay from '@/features/broadcast-grid/BroadcastGridOverlay'; // [FEATURE: BROADCAST_GRID]
+import { moveItemToId } from '@/features/broadcast-grid/broadcastGridPrograms';
 import { useBroadcastGrid } from '@/features/broadcast-grid/useBroadcastGrid'; // [FEATURE: BROADCAST_GRID]
 import { useQuickBible } from '@/features/quick-bible/useQuickBible'; // [FEATURE: QUICK_BIBLE] 그리드 B키 긴급 말씀찾기
 import { useFixedPrograms } from '@/features/fixed-programs/useFixedPrograms'; // [FEATURE: FIXED_PROGRAMS] 그리드 O키 고정 자료
@@ -161,18 +163,21 @@ function SortableItem({
   isConfirmingDelete,
   setlistId,
   onSelect,
+  onCommitSelection,
   onDelete,
   onRename,
-  onShowReference,
+  onContextMenu,
 }: {
   item: SetlistItem;
   isActive: boolean;
   isConfirmingDelete: boolean;
   setlistId: string;
   onSelect: () => void;
+  onCommitSelection: () => void;
   onDelete: () => void;
   onRename: (newTitle: string) => void;
-  onShowReference: () => void;
+  /** [FEATURE: DELETE_ITEM] 우클릭 메뉴 열기 (참조 표시 · 프로그램 삭제) */
+  onContextMenu: (x: number, y: number) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
@@ -231,10 +236,14 @@ function SortableItem({
         e.currentTarget.focus();
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Delete') {
+        // [FEATURE: DELETE_UNCAST] Delete 는 이제 "송출 해제" 전용이다.
+        //   프로그램 삭제는 우클릭 메뉴로 옮겼다(2026-07-28 확정). 여기서 이벤트를
+        //   막지 않아야 카드에 포커스가 있어도 Delete 로 송출이 해제된다.
+        if (e.key === 'Enter' && e.target === e.currentTarget) {
           e.preventDefault();
-          e.stopPropagation(); // 전역 캔버스 요소 삭제(useEditorCommands window 리스너)로 이벤트가 새지 않게
-          onDelete(); // 첫 Delete = 확인 대기(빨간 테두리), 3초 내 다시 Delete = 삭제
+          e.stopPropagation();
+          onSelect();
+          onCommitSelection();
         }
       }}
       className={`group rounded-lg border transition-colors outline-none ${
@@ -246,7 +255,7 @@ function SortableItem({
       } focus-visible:ring-1 focus-visible:ring-blue-400`}
       onContextMenu={(e) => {
         e.preventDefault();
-        onShowReference(); // 우클릭 → 송출번호 참조 패널에 이 프로그램 표시
+        onContextMenu(e.clientX, e.clientY); // 우클릭 → 참조 표시 / 프로그램 삭제 메뉴
       }}
     >
       <div
@@ -412,10 +421,12 @@ export default function SetlistPanel() {
     hasOutputRouting: boolean;
     hasOutputVideo: boolean;
   } | null> => {
-    const fixedElements = getFixedLayerElements(currentSetlist);
     const item = currentSetlist?.items.find((candidate) =>
       candidate.sections.some((s) => s.id === section.id),
     );
+    // [FIX: FIXED_LAYER_PROGRAM_SCOPE] 고정 레이어는 이 프로그램 안에서만 모은다.
+    //   getSectionOutputElements 와 같은 기준이어야 outputOnly 판단이 어긋나지 않는다.
+    const fixedElements = getFixedLayerElementsForItem(item);
     const elements = applyBackgroundMotionOnce(
       getSectionOutputElements(currentSetlist, section),
       item,
@@ -651,7 +662,8 @@ export default function SetlistPanel() {
       ? 'cover'
       : 'default';
 
-    const fixedElements = getFixedLayerElements(currentSetlist);
+    // [FIX: FIXED_LAYER_PROGRAM_SCOPE] 소유 프로그램 기준
+    const fixedElements = getFixedLayerElementsForItem(item);
     const ownElements = applySectionCueMacroElements(getSectionOwnElements(targetSection), cueMacro);
     // [FEATURE: SCRIPTURE_NEXT_LINE] 성경본문 템플릿의 nextLine 슬롯에 다음 섹션 첫 줄 주입 (PMT 규칙 재사용)
     const baseElements = injectNextLineIntoElements(
@@ -973,7 +985,89 @@ export default function SetlistPanel() {
   //   재 송출은 명시적 조작(더블클릭, Enter, PageDown/Up)으로만 가능.
   // [/실시간 동기화]
 
+  /**
+   * [FEATURE: PANE_FOCUS] 지금 화살표가 어느 목록을 움직이는지.
+   *
+   * ProPresenter 와 같은 "포커스 기반 스코핑" — 같은 ↑/↓ 키를 쓰되 포커스가
+   * 있는 목록에만 작용시키고, 어느 쪽이 활성인지 테두리로 보여준다.
+   * 둘 다 포커스가 없으면(null) 기존 전역 단축키가 프로그램을 움직인다.
+   */
+  const [activePane, setActivePane] = useState<'programs' | 'sections' | null>(null);
+  // [FEATURE: DELETE_ITEM] 프로그램 우클릭 메뉴 — 참조 표시 · 삭제.
+  //   삭제를 Delete 키에서 우클릭으로 옮겼다(2026-07-28 확정). Delete 는 송출 해제 전용.
+  const [itemMenu, setItemMenu] = useState<{ itemId: string; x: number; y: number } | null>(null);
+  const sectionListRef = useRef<HTMLDivElement>(null);
+
+  /** Tab 으로 두 목록을 오간다 */
+  const focusPane = useCallback((pane: 'programs' | 'sections') => {
+    const el = pane === 'programs' ? programListRef.current : sectionListRef.current;
+    el?.focus();
+  }, []);
+
+  /**
+   * [FEATURE: PANE_FOCUS] 프로그램 목록 ↑/↓ — 전역 단축키와 동일하게 동작시킨다.
+   *   (OperatorPanel.selectNextProgram/selectPrevProgram 과 같은 규칙:
+   *    프로그램 이동 + 그 프로그램의 첫 본문 섹션 자동 활성)
+   */
+  const handleProgramArrowKey = useCallback((e: React.KeyboardEvent): boolean => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return false;
+    if (visibleItems.length === 0) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    const idx = visibleItems.findIndex((it) => it.id === activeItemId);
+    const nextIdx = e.key === 'ArrowDown'
+      ? (idx < 0 ? 0 : Math.min(idx + 1, visibleItems.length - 1))
+      : (idx <= 0 ? 0 : idx - 1);
+    const item = visibleItems[nextIdx];
+    if (!item) return true;
+    setActiveItem(item.id);
+    setActiveSection(getContentSections(item)[0]?.id ?? null);
+    return true;
+  }, [visibleItems, activeItemId, setActiveItem, setActiveSection]);
+
+  /**
+   * [FEATURE: SECTION_ARROW_NAV] 섹션 리스트를 화살표 ↑/↓ 로 훑어 캔버스에 띄운다.
+   *
+   * 송출은 하지 않는다 — 에디터 선택만. (송출은 기존대로 Enter·더블클릭·PageDown)
+   *
+   * 카드 클릭과 동일한 처리를 하도록 한곳으로 모았다. 클릭 경로와 어긋나면
+   * "클릭했을 때와 화살표로 갔을 때가 다르게 동작"하는 버그가 된다.
+   */
+  const selectSectionAt = useCallback((index: number) => {
+    const target = allSections[index];
+    if (!target) return;
+    suppressNextScroll();
+    setSelectedElement(null);   // 캔버스 요소 선택 해제 (요소가 선택돼 있으면 화살표가 넛지로 감)
+    setActiveItem(target.itemId);
+    setActiveSection(target.section.id);
+    const numEl = numberInputRef.current;
+    if (numEl) numEl.value = String(index + 1);
+  }, [allSections, suppressNextScroll, setSelectedElement, setActiveItem, setActiveSection]);
+
+  /**
+   * [FEATURE: SECTION_ARROW_NAV] ↑/↓ 공통 처리.
+   *
+   * 전역 단축키(useKeyboard)에서 ↑/↓ 는 **프로그램 이동**에 이미 쓰이고 있다.
+   * 그래서 여기서 stopPropagation 으로 막지 않으면 섹션과 프로그램이 동시에
+   * 움직인다. 반드시 전파를 끊는다.
+   */
+  const handleSectionArrowKey = useCallback((e: React.KeyboardEvent): boolean => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return false;
+    if (allSections.length === 0) return false;
+    e.preventDefault();
+    e.stopPropagation();
+    const base = currentIndex >= 0 ? currentIndex : (e.key === 'ArrowDown' ? -1 : 0);
+    const next = e.key === 'ArrowDown' ? base + 1 : base - 1;
+    if (next < 0 || next >= allSections.length) return true; // 끝에서 멈춤 (순환 안 함)
+    selectSectionAt(next);
+    return true;
+  }, [allSections.length, currentIndex, selectSectionAt]);
+
   const handleNumberInput = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    // [FEATURE: SECTION_ARROW_NAV] 카드를 클릭하면 포커스가 이 번호칸으로 오므로,
+    //   여기서 ↑/↓ 를 받는 것이 가장 자연스럽다. type=number 의 값 증감은
+    //   스피너가 CSS 로 숨겨져 있어 어차피 쓰이지 않는다.
+    if (handleSectionArrowKey(e)) return;
     if (e.key === 'Enter') {
       const num = parseInt((e.target as HTMLInputElement).value);
       if (!isNaN(num) && num >= 1 && num <= allSections.length) {
@@ -989,7 +1083,7 @@ export default function SetlistPanel() {
       setBroadcastSection(null); // "송출 중" 하이라이트 제거 (섹션 선택은 유지)
       (e.target as HTMLInputElement).value = '';
     }
-  }, [allSections.length, sendToOutput, clearTextTargets, send, setBroadcastSection]);
+  }, [handleSectionArrowKey, allSections.length, sendToOutput, clearTextTargets, send, setBroadcastSection]);
 
   // 파일 관리 — hooks/useFileManager.ts 에서 관리
   const { triggerImport, handleFileChange, createSetlist, fileInputRef } =
@@ -1030,6 +1124,15 @@ export default function SetlistPanel() {
     },
     [currentSetlist, currentSetlistId, reorderItems]
   );
+
+  // [FEATURE: BROADCAST_GRID] 송출그리드 우측 목록의 ▲▼ — 컴포즈 드래그 순서변경과 같은 store 경로를 쓴다.
+  //   useCallback 을 쓰지 않는다: 이 컴포넌트는 이미 React Compiler 최적화 대상에서 빠져 있어
+  //   수동 메모이제이션이 이득 없이 린트 오류만 늘린다.
+  const handleMoveGridProgram = (itemId: string, targetItemId: string) => {
+    if (!currentSetlist || !currentSetlistId) return;
+    const nextItems = moveItemToId(currentSetlist.items, itemId, targetItemId);
+    if (nextItems) reorderItems(currentSetlistId, nextItems);
+  };
 
   const handleAddItem = useCallback(() => {
     if (!currentSetlistId) return;
@@ -1081,6 +1184,22 @@ export default function SetlistPanel() {
     },
     [setSelectedElement, setActiveItem, setActiveSection]
   );
+
+  const broadcastFirstSectionForItem = useCallback((item: SetlistItem) => {
+    const firstSectionId = item.sections[0]?.id;
+    const firstSectionIndex = firstSectionId
+      ? allSections.findIndex((entry) => entry.itemId === item.id && entry.section.id === firstSectionId)
+      : -1;
+    if (firstSectionIndex >= 0) sendToOutput(firstSectionIndex, true);
+
+    const numEl = numberInputRef.current;
+    if (!numEl) return;
+    numEl.value = firstSectionIndex >= 0 ? String(firstSectionIndex + 1) : '';
+    requestAnimationFrame(() => {
+      numEl.focus();
+      numEl.select();
+    });
+  }, [allSections, sendToOutput]);
 
   // handleExport, handleImport → hooks/useFileManager.ts 로 이동됨
 
@@ -1175,6 +1294,7 @@ export default function SetlistPanel() {
           onClearBroadcast={clearGridBroadcast}
           onOpenQuickBible={openQuickBible}
           onOpenFixedPrograms={openFixedPrograms}
+          onMoveProgram={handleMoveGridProgram}
           onClose={closeGrid}
         />
       )}
@@ -1224,15 +1344,18 @@ export default function SetlistPanel() {
         {/* 현재 선택 프로그램을 서버에 저장/갱신 */}
         <CurrentProgramSaveButton />
 
-        {/* [임시] 변환본 불러오기 — PPT 변환 슬라이드를 프로그램으로 불러오기(load 탭 오픈) */}
+        {/* 현재 프로그램을 자기 이름으로 개별 저장 */}
+        <IndividualProgramSaveButton />
+
+        {/* 찬양검색 — PPT 변환 슬라이드를 프로그램으로 불러오기(load 탭 오픈) */}
         <button
           onClick={() => window.dispatchEvent(new CustomEvent('open-ppt-loader'))}
-          title="변환본 불러오기 (PPT 슬라이드)"
+          title="찬양검색 (PPT 슬라이드)"
           className="flex-shrink-0 h-7 px-2 rounded-md bg-[#0e2a2a] hover:bg-cyan-600
                      flex items-center justify-center text-cyan-300 hover:text-white
                      transition-colors text-[11px] font-bold whitespace-nowrap"
         >
-          변환본
+          찬양검색
         </button>
 
         {/* 서버에서 워십 불러오기 */}
@@ -1284,12 +1407,32 @@ export default function SetlistPanel() {
       </div>
 
       {/* ── 영역 1: 프로그램 목록 (드래그로 높이 조절) ── */}
+      {/* [FEATURE: PANE_FOCUS] 포커스가 있으면 ↑/↓ 가 프로그램을 움직이고 테두리로 표시된다.
+          Tab 을 누르면 아래 섹션 목록으로 넘어간다. */}
       <div
         ref={programListRef}
-        className="overflow-y-auto px-2 py-1.5 border-b border-[#222222]"
+        tabIndex={0}
+        onFocus={() => setActivePane('programs')}
+        onKeyDown={(e) => {
+          if (handleProgramArrowKey(e)) return;
+          if (e.key === 'Tab' && !e.shiftKey) {
+            e.preventDefault();
+            focusPane('sections');
+          }
+        }}
+        className={`overflow-y-auto px-2 py-1.5 border-b outline-none transition-colors ${
+          activePane === 'programs'
+            ? 'border-blue-500/70 ring-1 ring-inset ring-blue-500/40'
+            : 'border-[#222222]'
+        }`}
         style={{ height: itemListHeight }}
       >
-        <p className="text-[10px] text-gray-600 px-1 pb-1">프로그램 목록</p>
+        <p className="px-1 pb-1 text-[10px] text-gray-600">
+          프로그램 목록
+          {activePane === 'programs' && (
+            <span className="ml-1.5 text-blue-400">↑↓ 이동 · Tab 섹션으로</span>
+          )}
+        </p>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -1308,11 +1451,12 @@ export default function SetlistPanel() {
                   isConfirmingDelete={confirmDelete === item.id}
                   setlistId={currentSetlist.id}
                   onSelect={() => handleSelectItem(item)}
+                  onCommitSelection={() => broadcastFirstSectionForItem(item)}
                   onDelete={() => handleDeleteItem(item.id)}
                   onRename={(newTitle) =>
                     currentSetlistId && updateItem(currentSetlistId, item.id, { title: newTitle })
                   }
-                  onShowReference={() => setReferenceItemId(item.id)}
+                  onContextMenu={(x, y) => setItemMenu({ itemId: item.id, x, y })}
                 />
               ))}
             </div>
@@ -1337,12 +1481,27 @@ export default function SetlistPanel() {
       </div>
 
       {/* ── 영역 2: 섹션 목록 (16:9 고정 카드, 패널 너비에 따라 줄바꿈) ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-3">
+      {/* 위쪽 여백은 sticky 인포바가 직접 갖는다 — 컨테이너에 두면 스크롤된 카드(흰 악보)가
+          바 위 여백 틈으로 비쳐 보였다. */}
+      <div className="flex-1 overflow-y-auto px-3 pb-3">
 
         {allSections.length > 0 ? (
           <>
             {/* 상단 인포 바: 번호입력(소형) + 현재 프로그램 제목 + 섹션 카운터 — sticky 고정 */}
-            <div className="sticky top-0 z-10 bg-[#111111] pb-2 mb-1 flex items-center gap-2">
+            {/* -mx-3/px-3 로 좌우 여백까지, pt-3/pb-3 로 위아래 여백까지 바의 검정 배경이 덮는다
+                → 스크롤된 카드가 어느 틈으로도 비치지 않는다 (패널 배경과 동일한 #111111) */}
+            {/* z-30: 카드 오버레이(프로그램 제목·색띠 z-10, 번호 뱃지 z-20)보다 위여야 한다.
+                같은 z-10 이면 DOM 순서상 뒤인 카드 오버레이가 바를 뚫고 올라와,
+                캔버스 이미지는 가려지는데 빨간 제목만 바 위에 떠 보였다. */}
+            <div className="sticky top-0 z-30 -mx-3 bg-[#111111] px-3 pt-3 pb-3 flex items-center gap-2">
+              {/* 바 아래 페이드 — 카드가 바 뒤로 반쯤 숨으면 이미지는 가려지는데
+                  카드 하단에 붙은 프로그램 제목 라벨만 조각으로 남아 떠 보였다.
+                  검정(#111111)→투명 그라데이션으로 그 조각을 자연스럽게 지운다.
+                  absolute 라 flex 레이아웃에 영향 없음, 클릭도 통과시킨다. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-full h-5 bg-gradient-to-b from-[#111111] to-transparent"
+              />
               {/* 번호 송출 — 섹션 번호 입력 후 Enter 로 해당 섹션 송출 */}
               <div
                 className="flex flex-shrink-0 items-center gap-1 rounded border border-[#333] bg-[#0a0a0a] pl-1.5 focus-within:border-red-500"
@@ -1356,6 +1515,7 @@ export default function SetlistPanel() {
                   max={allSections.length}
                   placeholder="번호"
                   onClick={(e) => e.stopPropagation()}
+                  onFocus={() => setActivePane('sections')}
                   onKeyDown={handleNumberInput}
                   style={{ width: 40 }}
                   className="border-0 bg-transparent px-0.5 py-1 text-center text-xs text-white placeholder-gray-600 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -1389,6 +1549,9 @@ export default function SetlistPanel() {
                   +
                 </button>
               )}
+              {activePane === 'sections' && (
+                <span className="flex-shrink-0 text-[10px] text-blue-400">↑↓ 이동 · Shift+Tab 프로그램으로</span>
+              )}
               {/* 섹션 카운터: 활성번호 / 전체 */}
               <span className="flex-shrink-0 text-[11px] font-mono text-gray-500">
                 <span className={currentIndex >= 0 ? 'text-blue-400 font-bold' : ''}>
@@ -1400,7 +1563,23 @@ export default function SetlistPanel() {
             </div>
 
             {/* 카드 그리드: 캔버스 축소판 미러링 [기능1] — 줄간(세로 행 간격) 1/3 축소, 가로 간격은 유지 */}
-            <div className="flex flex-wrap gap-x-2 gap-y-[5.3px]">
+            {/* [FEATURE: SECTION_ARROW_NAV] 리스트에 포커스가 있을 때도 ↑/↓ 로 섹션 이동.
+                (카드 클릭 후에는 포커스가 번호칸으로 가므로 그쪽에서도 같은 핸들러를 쓴다) */}
+            <div
+              ref={sectionListRef}
+              tabIndex={0}
+              onFocus={() => setActivePane('sections')}
+              onKeyDown={(e) => {
+                if (handleSectionArrowKey(e)) return;
+                if (e.key === 'Tab' && e.shiftKey) {
+                  e.preventDefault();
+                  focusPane('programs');
+                }
+              }}
+              className={`flex flex-wrap gap-x-2 gap-y-[5.3px] rounded outline-none transition-colors ${
+                activePane === 'sections' ? 'ring-1 ring-inset ring-blue-500/40' : ''
+              }`}
+            >
               {allSections.map((s, i) => {
                 const isFirstOfItem = i === 0 || allSections[i - 1].itemId !== s.itemId;
                 return (
@@ -1484,6 +1663,49 @@ export default function SetlistPanel() {
           </p>
         )}
       </div>
+
+      {/* [FEATURE: DELETE_ITEM] 프로그램 우클릭 메뉴 — 송출번호 참조 표시 · 프로그램 삭제.
+          삭제를 Delete 키에서 여기로 옮겼다(2026-07-28 확정). Delete 는 송출 해제 전용. */}
+      {itemMenu && (
+        <>
+          {/* 바깥 클릭·우클릭으로 닫기 */}
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={() => { setItemMenu(null); setConfirmDelete(null); }}
+            onContextMenu={(e) => { e.preventDefault(); setItemMenu(null); setConfirmDelete(null); }}
+          />
+          <div
+            className="fixed z-[9999] min-w-[168px] overflow-hidden rounded-md border border-[#3b3b3b] bg-[#1b1b1b] py-1 shadow-2xl"
+            style={{ left: itemMenu.x, top: itemMenu.y }}
+          >
+            <button
+              type="button"
+              onClick={() => { setReferenceItemId(itemMenu.itemId); setItemMenu(null); }}
+              className="block w-full px-3 py-1.5 text-left text-[11px] text-gray-200 hover:bg-[#2a2a2a]"
+            >
+              송출번호 참조 표시
+            </button>
+            <div className="my-1 h-px bg-[#2d2d2d]" />
+            <button
+              type="button"
+              onClick={() => {
+                // 첫 클릭 = 확인 대기(카드가 빨갛게), 한 번 더 = 실제 삭제.
+                // 되돌릴 수 없는 조작이라 메뉴 안에서 두 단계로 확인받는다.
+                const willDelete = confirmDelete === itemMenu.itemId;
+                handleDeleteItem(itemMenu.itemId);
+                if (willDelete) setItemMenu(null);
+              }}
+              className={`block w-full px-3 py-1.5 text-left text-[11px] transition-colors ${
+                confirmDelete === itemMenu.itemId
+                  ? 'bg-red-600/25 font-bold text-red-200'
+                  : 'text-red-300 hover:bg-red-600/20'
+              }`}
+            >
+              {confirmDelete === itemMenu.itemId ? '한 번 더 눌러 삭제' : '프로그램 삭제'}
+            </button>
+          </div>
+        </>
+      )}
 
       {/* 하단: 저장 / 불러오기 / 새로저장 [기능4] */}
       <SetlistFileBar

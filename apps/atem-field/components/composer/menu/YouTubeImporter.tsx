@@ -30,6 +30,8 @@ export function YouTubeModal({ isOpen, onClose }: YouTubeModalProps) {
   const [error, setError] = useState('');
   const [fileError, setFileError] = useState('');
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  // [FIX: UPLOAD_UX] 업로드 진행률 (0~100). fetch 는 진행 이벤트가 없어 XHR 을 쓴다.
+  const [uploadPct, setUploadPct] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [preview, setPreview] = useState<{ id: string; thumb: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -116,20 +118,47 @@ export function YouTubeModal({ isOpen, onClose }: YouTubeModalProps) {
 
     setFileError('');
     setIsUploading(true);
+    setUploadPct(0);
 
     try {
       // [FIX] FormData(multipart) 파서가 Next16 + 커스텀서버에서 실패하므로 raw 바이너리로 전송한다.
       //   파일 Blob 을 그대로 body 로 보내면 브라우저가 Content-Type/Content-Length 를 자동 설정,
       //   파일명만 x-filename 헤더로 전달한다.
-      const res = await fetch('/api/media/videos/upload', {
-        method: 'POST',
-        body: videoFile,
-        headers: { 'x-filename': encodeURIComponent(videoFile.name) },
-        credentials: 'include',
-      });
-      const payload = await res.json().catch(() => null);
+      // [FIX: UPLOAD_UX] 서버로 보내기 전에 크기를 막는다.
+      //   예전에는 상한 검사가 서버에서 "다 받은 뒤"에 있어서, 큰 파일이 그대로
+      //   올라가 서버 메모리를 밀어냈다. 여기서 먼저 걸러야 서버가 안전하다.
+      if (videoFile.size > MAX_VIDEO_BYTES) {
+        throw new Error(
+          `영상이 너무 큽니다 (${formatFileSize(videoFile.size)}). ` +
+            `${formatFileSize(MAX_VIDEO_BYTES)} 이하로 줄여서 올려주세요.`,
+        );
+      }
 
-      if (!res.ok || !payload?.video?.url) {
+      // fetch 는 업로드 진행 이벤트를 주지 않는다. 큰 파일에서 화면이 멈춘 것처럼
+      // 보이는 것이 "불안하다" 는 체감의 큰 부분이라 XHR 로 진행률을 표시한다.
+      const payload = await new Promise<{ video?: { url?: string }; error?: string; detail?: string }>(
+        (resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/media/videos/upload');
+          xhr.withCredentials = true;
+          xhr.setRequestHeader('x-filename', encodeURIComponent(videoFile.name));
+          xhr.upload.onprogress = (ev) => {
+            if (ev.lengthComputable) setUploadPct(Math.round((ev.loaded / ev.total) * 100));
+          };
+          xhr.onload = () => {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              reject(new Error(`업로드 응답을 해석하지 못했습니다 (${xhr.status})`));
+            }
+          };
+          xhr.onerror = () => reject(new Error('업로드 중 연결이 끊겼습니다'));
+          xhr.onabort = () => reject(new Error('업로드가 취소되었습니다'));
+          xhr.send(videoFile);
+        },
+      );
+
+      if (!payload?.video?.url) {
         // 실제 원인(detail)까지 노출해 진단 가능하게 한다.
         throw new Error(
           [payload?.error, payload?.detail].filter(Boolean).join(' — ') ||
@@ -168,6 +197,7 @@ export function YouTubeModal({ isOpen, onClose }: YouTubeModalProps) {
       setFileError(err instanceof Error ? err.message : '영상 파일 업로드에 실패했습니다');
     } finally {
       setIsUploading(false);
+      setUploadPct(0);
     }
   }, [
     videoFile,
@@ -230,7 +260,7 @@ export function YouTubeModal({ isOpen, onClose }: YouTubeModalProps) {
         <div className="mb-4">
           <p className="text-[11px] text-gray-300 mb-1 font-medium">영상파일 업로드</p>
           <p className="text-[10px] text-gray-500 mb-2">
-            MP4, MOV, M4V, WEBM 파일을 서버에 저장한 뒤 모든 송출 창에서 같은 영상으로 재생합니다.
+            MP4, MOV, M4V, WEBM 파일을 서버에 저장한 뒤 모든 송출 창에서 같은 영상으로 재생합니다. (권장 300MB 이하)
           </p>
           <input
             type="file"
@@ -260,8 +290,17 @@ export function YouTubeModal({ isOpen, onClose }: YouTubeModalProps) {
                     : 'bg-blue-600 text-white hover:bg-blue-500'
                 }`}
               >
-                {isUploading ? '업로드 중...' : '영상 삽입'}
+                {isUploading ? `업로드 ${uploadPct}%` : '영상 삽입'}
               </button>
+            </div>
+          )}
+          {/* [FIX: UPLOAD_UX] 진행 막대 — 큰 파일에서 멈춘 것처럼 보이지 않게 */}
+          {isUploading && (
+            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-[#2a2a2a]">
+              <div
+                className="h-full bg-blue-500 transition-[width] duration-150"
+                style={{ width: `${uploadPct}%` }}
+              />
             </div>
           )}
           {fileError && (
@@ -295,6 +334,15 @@ export function YouTubeModal({ isOpen, onClose }: YouTubeModalProps) {
     document.body
   );
 }
+
+/**
+ * [FIX: UPLOAD_UX] 업로드 권장 상한.
+ *
+ * 서버는 1GB 까지 받지만, 송출 시 여러 창(/output · /prompt · ATEM 창들)이 같은
+ * 파일을 받아가므로 큰 파일일수록 부하가 배로 커진다. 예배 영상 기준으로
+ * 300MB 를 넘길 일이 드물어 여기서 먼저 막는다. 압축해서 올리는 편이 안전하다.
+ */
+const MAX_VIDEO_BYTES = 300 * 1024 * 1024;
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

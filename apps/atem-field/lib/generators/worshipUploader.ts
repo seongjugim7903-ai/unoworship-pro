@@ -14,7 +14,7 @@ import { useStore } from '@/lib/store';
 import type { Setlist, SetlistItem, Section } from '@/lib/types';
 import type { CanvasElement } from '@/lib/canvasTypes';
 import type { SavedProgram } from './programTypes';
-import { shouldPreserveProgramElements } from './programTypes';
+import { resolveProgramCategory, shouldPreserveProgramElements } from './programTypes';
 import type { ProgramDesign } from './designs/index';
 import { loadDesignForProgram } from './designs/designLoader';
 
@@ -152,8 +152,12 @@ export async function loadProgramsFromServer(): Promise<number> {
     const res = await fetch('/api/programs');
     if (!res.ok) return 0;
 
-    const { programs }: { programs: SavedProgram[] } = await res.json();
-    if (!programs || programs.length === 0) return 0;
+    const { programs: allPrograms }: { programs: SavedProgram[] } = await res.json();
+    // 개별 저장(category='program')은 워십 복원 대상에서 제외 (워십 목록 오염 방지)
+    const programs = (allPrograms ?? []).filter(
+      (p) => resolveProgramCategory(p) !== 'program',
+    );
+    if (programs.length === 0) return 0;
 
     const state = useStore.getState();
     let loaded = 0;

@@ -8,20 +8,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { Section, PromptLayoutType } from '@/lib/types';
-import type { TextElement } from '@/lib/canvasTypes';
+import type { TextElement, VideoElement } from '@/lib/canvasTypes';
 import { renderElements, preloadImages, wrapText } from '@/lib/canvasRenderer';
-import QuoteReferenceRail, {
+import GridVideoControlBar from './video-control/GridVideoControlBar'; // [FEATURE: GRID_VIDEO_CONTROL]
+import {
   getQuoteReferenceItems,
   isQuoteReferenceProgram,
   useQuoteSectionViewport,
-} from './QuoteReferenceRail';
+} from './QuoteReferenceList';
+import BroadcastGridSideRail, {
+  DEFAULT_RAIL_TAB,
+  type BroadcastGridRailTab,
+} from './BroadcastGridSideRail';
+import {
+  buildBroadcastGridPrograms,
+  findProgramIndexBySectionId,
+} from './broadcastGridPrograms';
+import { findHymnRefrainSectionIds, resolveHymnVerseLabel } from './broadcastGridHymnLabels';
+import {
+  parseMarkedSectionIds,
+  serializeMarkedSectionIds,
+  toggleMarkedSectionId,
+} from './broadcastGridMarkers';
 import {
   runBroadcastGridPreflight,
   type BroadcastGridPreflightIssue,
 } from './broadcastGridPreflight';
 import styles from './BroadcastGridOverlay.module.css';
 import { useBroadcastGridArrowNavigation } from './useBroadcastGridArrowNavigation';
-import { useBroadcastGridProgramJump } from './useBroadcastGridProgramJump';
+import { useBroadcastGridProgramJump, scrollProgramTileToTop } from './useBroadcastGridProgramJump';
 
 /**
  * 본문(body) 슬롯을 가진 템플릿 섹션의 텍스트를 추출한다(송출 그리드 전용 표시용).
@@ -134,36 +149,15 @@ function resolveHymnDisplayTitle(candidates: Array<string | undefined>): { fullL
   );
 }
 
-function normalizeHymnVerseLabel(value: string): string | null {
-  const cleaned = value.trim();
-  if (!cleaned) return null;
-  if (/^후렴$/i.test(cleaned)) return '후렴';
-
-  const verseMatch = cleaned.match(/^(\d{1,2})\s*절$/);
-  if (verseMatch) return `${verseMatch[1]}절`;
-
-  const bareNumberMatch = cleaned.match(/^(\d{1,2})$/);
-  if (bareNumberMatch) return `${bareNumberMatch[1]}절`;
-
-  return null;
-}
-
-function resolveHymnVerseLabel(section: Section): string | null {
-  const verseSlot = (section.elements ?? []).find(
-    (element): element is TextElement =>
-      element.type === 'text' &&
-      element.visible !== false &&
-      element.fieldRole === 'verseLabel' &&
-      Boolean(element.content?.trim()),
-  );
-  const fromSlot = verseSlot ? normalizeHymnVerseLabel(verseSlot.content) : null;
-  if (fromSlot) return fromSlot;
-
-  return normalizeHymnVerseLabel(section.label);
-}
+// 배지 글자 크기는 getHymnTitleBadgeStyle 이 길이에 맞춰 줄여 준다(약 37단위까지 들어간다).
+// 그래서 15자 컷은 필요 이상으로 빡빡해 제목이 낱말 중간에서 잘렸다. 여유를 두되
+// 그래도 넘치면 잘렸다는 것이 보이게 말줄임을 붙인다.
+const SLIDE_BADGE_TITLE_MAX = 24;
 
 function getSlideBadgeTitle(title: string): string {
-  return Array.from(title.trim()).slice(0, 15).join('');
+  const chars = Array.from(title.trim());
+  if (chars.length <= SLIDE_BADGE_TITLE_MAX) return chars.join('');
+  return `${chars.slice(0, SLIDE_BADGE_TITLE_MAX - 1).join('')}…`;
 }
 
 function getCompactTextUnits(text: string): number {
@@ -547,6 +541,8 @@ interface Props {
   onClearBroadcast: () => void;
   onOpenQuickBible: () => void;
   onOpenFixedPrograms: () => void;
+  /** 우측 프로그램 목록의 순서변경 — 없으면 ▲▼ 버튼이 숨는다 */
+  onMoveProgram?: (itemId: string, targetItemId: string) => void;
   onClose: () => void;
 }
 
@@ -570,12 +566,12 @@ function loadColumns(): number {
   return DEFAULT_COLS;
 }
 
-function loadMarkedSectionId(): string | null {
-  if (typeof window === 'undefined') return null;
+function loadMarkedSectionIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
   try {
-    return localStorage.getItem(MARKED_SECTION_KEY);
+    return new Set(parseMarkedSectionIds(localStorage.getItem(MARKED_SECTION_KEY)));
   } catch {
-    return null;
+    return new Set();
   }
 }
 
@@ -605,6 +601,7 @@ function GridTile({
   isBroadcasted,
   isSelected,
   isMarked,
+  isRefrain,
   columns,
   scrollRootRef,
   onSelect,
@@ -618,6 +615,8 @@ function GridTile({
   isBroadcasted: boolean;
   isSelected: boolean;
   isMarked: boolean;
+  /** 이 섹션이 후렴인지 — 프로그램 전체를 봐야 알 수 있어 오버레이에서 판정해 내려준다 */
+  isRefrain: boolean;
   preflightIssues: BroadcastGridPreflightIssue[];
   columns: number;
   scrollRootRef: RefObject<HTMLDivElement | null>;
@@ -628,6 +627,14 @@ function GridTile({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { section } = entry;
+  // [FEATURE: GRID_VIDEO_CONTROL] 영상 요소가 있는 섹션 판별 — 선택 시 하단 제어바 노출용.
+  //   첫 표시(visible) 영상 요소를 대상으로 한다(로컬·유튜브 공통).
+  const videoEl = useMemo(
+    () => (section.elements ?? []).find(
+      (el): el is VideoElement => el.type === 'video' && el.visible !== false,
+    ) ?? null,
+    [section],
+  );
   // [FEATURE: BROADCAST_GRID] 성경문구류면 "장절표기 + 본문(자동 축소)"로, 그 외엔 섹션 요소를 렌더.
   const textTile = useMemo(() => extractTextTileFields(section), [section]);
   const lyricPreview = useMemo(() => resolveLyricPreviewText(section, textTile), [section, textTile]);
@@ -642,9 +649,25 @@ function GridTile({
     () => resolveHymnDisplayTitle([section.label, entry.hymnDisplayTitle, entry.itemTitle]),
     [entry.hymnDisplayTitle, entry.itemTitle, section.label],
   );
-  const showHymnHeader = Boolean(entry.isHymnProgram && entry.isFirstOfItem && hymnTitleInfo.badgeLabel);
-  const hymnVerseLabel = useMemo(() => resolveHymnVerseLabel(section), [section]);
-  const showHymnVerseBadge = Boolean(entry.isHymnProgram && hymnTitleInfo.badgeLabel && hymnVerseLabel);
+  // 악보 이미지 프로그램은 첫 장 이미지 자체에 곡 제목이 인쇄돼 있다. 그 위에 상단 배지를 얹으면
+  // 악보와 제목을 함께 가리므로, 이때는 하단 slideTitleBadge(정제된 제목)에 맡긴다.
+  const showHymnHeader = Boolean(
+    entry.isHymnProgram &&
+    !entry.isSlideImageProgram &&
+    entry.isFirstOfItem &&
+    hymnTitleInfo.badgeLabel,
+  );
+  const hymnVerseLabel = useMemo(
+    () => (isRefrain ? '후렴' : resolveHymnVerseLabel(section)),
+    [isRefrain, section],
+  );
+  // 악보 PPT 찬송가는 이미지에 절이 이미 인쇄돼 있고 라벨은 슬라이드 순번이라 배지를 붙이지 않는다.
+  const showHymnVerseBadge = Boolean(
+    entry.isHymnProgram &&
+    !entry.isSlideImageProgram &&
+    hymnTitleInfo.badgeLabel &&
+    hymnVerseLabel,
+  );
   const hymnVerseBadgeText = showHymnVerseBadge
     ? `${hymnTitleInfo.badgeLabel}장 · ${hymnVerseLabel}`
     : '';
@@ -768,7 +791,8 @@ function GridTile({
             ? 'border-white/90 ring-1 ring-inset ring-white/30 shadow-[0_0_10px_rgba(255,255,255,0.2)]'
             : 'border-[#2a2a2a] hover:border-[#666] hover:shadow-[0_0_10px_rgba(255,255,255,0.12)]'
       }`}
-      style={{ aspectRatio: '16 / 9' }}
+      // 프로그램 첫 섹션은 항상 새 줄 첫 칸에서 시작한다 — 프로그램 경계를 눈으로 끊어 읽게 한다.
+      style={{ aspectRatio: '16 / 9', gridColumnStart: entry.isFirstOfItem ? 1 : undefined }}
     >
       <canvas
         ref={canvasRef}
@@ -872,10 +896,21 @@ function GridTile({
           {slideBadgeTitle}
         </span>
       )}
-      {!showSlideTitle && !showHymnVerseBadge && (
+      {!showSlideTitle && !showHymnVerseBadge && !(isSelected && videoEl) && (
         <span className="absolute bottom-0.5 left-1.5 z-20 max-w-[90%] truncate rounded bg-black/50 px-1 text-[8px] text-gray-400">
           {section.label}
         </span>
+      )}
+      {/* [FEATURE: GRID_VIDEO_CONTROL] 선택된 영상 섹션 타일에만 하단 제어바(재생·시크·라우팅·송출) */}
+      {isSelected && videoEl && (
+        <GridVideoControlBar
+          video={videoEl}
+          itemId={entry.itemId}
+          sectionId={section.id}
+          allElements={section.elements ?? []}
+          index={entry.index}
+          onBroadcast={onBroadcast}
+        />
       )}
     </div>
   );
@@ -890,11 +925,12 @@ export default function BroadcastGridOverlay({
   onClearBroadcast,
   onOpenQuickBible,
   onOpenFixedPrograms,
+  onMoveProgram,
   onClose,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [columns, setColumns] = useState<number>(loadColumns);
-  const [markedSectionId, setMarkedSectionId] = useState<string | null>(loadMarkedSectionId);
+  const [markedSectionIds, setMarkedSectionIds] = useState<Set<string>>(loadMarkedSectionIds);
   const [broadcastedSectionIds, setBroadcastedSectionIds] = useState<Set<string>>(
     () => broadcastSectionId ? new Set([broadcastSectionId]) : new Set(),
   );
@@ -924,10 +960,13 @@ export default function BroadcastGridOverlay({
   useEffect(() => { typedRef.current = typedNum; }, [typedNum]);
   useEffect(() => {
     try {
-      if (markedSectionId) localStorage.setItem(MARKED_SECTION_KEY, markedSectionId);
-      else localStorage.removeItem(MARKED_SECTION_KEY);
+      if (markedSectionIds.size > 0) {
+        localStorage.setItem(MARKED_SECTION_KEY, serializeMarkedSectionIds(markedSectionIds));
+      } else {
+        localStorage.removeItem(MARKED_SECTION_KEY);
+      }
     } catch { /* 저장 실패는 무시 */ }
-  }, [markedSectionId]);
+  }, [markedSectionIds]);
 
   const scriptureMainIndexByVerse = useMemo(() => {
     const byVerse = new Map<number, number>();
@@ -972,7 +1011,27 @@ export default function BroadcastGridOverlay({
   }, []);
 
   const quoteReferenceItems = useMemo(() => getQuoteReferenceItems(entries), [entries]);
+  // 후렴 판정은 같은 프로그램의 모든 절을 봐야 하므로 여기서 한 번 계산해 타일에 내려준다.
+  const refrainSectionIds = useMemo(() => findHymnRefrainSectionIds(entries), [entries]);
   const quoteRailWidth = `calc((100vw - 8px - ${(columns - 1) * 4}px) / ${columns + 1})`;
+
+  // 우측 레일 탭 — 그리드를 열 때마다 이 컴포넌트가 새로 마운트되므로 초기값이 곧 기본 탭이다.
+  const [railTab, setRailTab] = useState<BroadcastGridRailTab>(DEFAULT_RAIL_TAB);
+  const programs = useMemo(() => buildBroadcastGridPrograms(entries), [entries]);
+  const activeProgramIndex = useMemo(
+    () => findProgramIndexBySectionId(programs, activeSectionId),
+    [programs, activeSectionId],
+  );
+  const liveProgramIndex = useMemo(
+    () => findProgramIndexBySectionId(programs, broadcastSectionId),
+    [programs, broadcastSectionId],
+  );
+
+  // 프로그램 클릭 = 첫 섹션 선택 + 그 타일을 맨 위로. 송출은 하지 않는다(Tab 프로그램 점프와 동일).
+  const handleProgramJump = useCallback((firstIndex: number) => {
+    onSelect(firstIndex);
+    scrollProgramTileToTop(scrollRef.current, firstIndex);
+  }, [onSelect]);
 
   // 타일 크기(열 수) 변경 저장
   const changeColumns = (next: number) => {
@@ -1146,13 +1205,14 @@ export default function BroadcastGridOverlay({
                   isLive={e.section.id === broadcastSectionId}
                   isBroadcasted={broadcastedSectionIds.has(e.section.id) || e.section.id === broadcastSectionId}
                   isSelected={e.section.id === activeSectionId}
-                  isMarked={e.section.id === markedSectionId}
+                  isMarked={markedSectionIds.has(e.section.id)}
+                  isRefrain={refrainSectionIds.has(e.section.id)}
                   preflightIssues={preflight.issueBySectionId.get(e.section.id) ?? []}
                   columns={columns}
                   scrollRootRef={scrollRef}
                   onSelect={onSelect}
                   onBroadcast={handleBroadcast}
-                  onToggleMarker={() => setMarkedSectionId((current) => current === e.section.id ? null : e.section.id)}
+                  onToggleMarker={() => setMarkedSectionIds((current) => toggleMarkedSectionId(current, e.section.id))}
                   onQuoteVisibilityChange={handleQuoteVisibilityChange}
                 />
               ))}
@@ -1160,10 +1220,16 @@ export default function BroadcastGridOverlay({
           )}
         </div>
 
-        <QuoteReferenceRail
-          items={quoteReferenceItems}
+        <BroadcastGridSideRail
+          activeTab={railTab}
+          onTabChange={setRailTab}
           width={quoteRailWidth}
-          visible
+          programs={programs}
+          activeProgramIndex={activeProgramIndex}
+          liveProgramIndex={liveProgramIndex}
+          onProgramJump={handleProgramJump}
+          onProgramMove={onMoveProgram}
+          quoteItems={quoteReferenceItems}
           broadcastSectionId={broadcastSectionId}
           broadcastedSectionIds={broadcastedSectionIds}
           onBroadcast={handleBroadcast}

@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom';
 import { useCamera } from '@/hooks/useCamera';
 import { useAutoCamera } from '@/hooks/useAutoCamera'; // [FEATURE: AUTO_CAMERA]
 import { useSocketReceiver } from '@/hooks/useSocketReceiver'; // [FEATURE: SOCKET_IO]
+import { useLocalVideoControl } from '@/hooks/useLocalVideoControl'; // [FEATURE: LOCAL_VIDEO_CONTROL]
 import { useBroadcastPublisher } from '@/hooks/useBroadcastPublisher'; // [FEATURE: BROADCAST_VIEWER / WEBRTC]
 import { SubtitleStyle, DEFAULT_SUBTITLE_STYLE } from '@/lib/types';
 import { CanvasElement, VideoElement, isElementVisibleOn } from '@/lib/canvasTypes';
@@ -27,6 +28,17 @@ import {
 
 const CANVAS_WIDTH = 1920;
 const CANVAS_HEIGHT = 1080;
+
+/**
+ * [YT_AUDIO_SINGLE] 이 창(/output)의 영상 소리를 끌지 여부.
+ *
+ * 유튜브 오디오는 `/atemsignal/fill` (ATEM FILL / Camera 4) 한 곳에서만 나간다
+ * (2026-07-28 현장 확인). 두 창이 동시에 소리를 내면 버퍼링 타이밍이 달라
+ * 미세하게 어긋난 메아리가 되고 원인 추적이 매우 어렵다.
+ * ATEM 창들은 각 페이지의 `audio` prop 으로 같은 일을 한다.
+ * 유튜브 iframe 과 로컬 <video> 양쪽에 모두 적용된다.
+ */
+const MUTE_VIDEO_AUDIO = true;
 const MAX_OUTPUT_FRAME_CACHE_ENTRIES = 40;
 
 type OutputStaticLayerCache = {
@@ -199,6 +211,10 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
   // YouTube iframe refs (youtubeId → iframe)
   const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
 
+  // [FEATURE: LOCAL_VIDEO_CONTROL] 로컬 영상 원격 제어 (오디오는 이 창에서 안 냄)
+  const { registerVideo: registerLocalVideo, pruneVideos: pruneLocalVideos } =
+    useLocalVideoControl({ audio: !MUTE_VIDEO_AUDIO });
+
   // [FEATURE: YT_STANDBY] 각 YouTube 플레이어의 재생 상태 추적.
   // receiver 가 VIDEO_COMMAND (playVideo) 를 받을 때 이미 재생 중(state=1)이면
   // 중복 명령을 스킵해서 "다다다다" 스터터를 방지.
@@ -208,6 +224,22 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
   // [FEATURE: YT_TIMELINE] 대기 중인 seek 대상 시각 (youtubeId → seconds).
   //   state=1 진입 순간 한 번 더 seekTo 를 강제하여 0:00 부터 재생되는 문제 방지.
   const pendingSeekRef = useRef<Map<string, number>>(new Map());
+
+  // [FIX: YT_AUDIO] 대기 중인 unMute 대상 (youtubeId).
+  //   unMute 는 playVideo 와 함께 도착하지만 그 시점엔 iframe/플레이어가
+  //   아직 준비되지 않아 postMessage 가 버려진다. state=1 진입 시 한 번 더
+  //   적용해서 "영상은 나오는데 소리만 안 나는" 상태를 방지.
+  // [FIX: YT_AUDIO] 대기 중인 unMute 대상 (youtubeId).
+  //   unMute 는 playVideo 와 함께 도착하지만 그 시점엔 iframe/플레이어가
+  //   아직 준비되지 않아 postMessage 가 버려진다. state=1 진입 시 한 번 더
+  //   적용해서 "영상은 나오는데 소리만 안 나는" 상태를 방지.
+  const pendingUnmuteRef = useRef<Set<string>>(new Set());
+
+  // [FIX: YT_CONTROL] pause/stop 이후 재생 억제 대상 (youtubeId).
+  //   playVideo 는 [0,500,1100,2000,3200]ms 재시도로 들어오기 때문에, 송출 직후
+  //   3.2초 안에 일시정지를 누르면 남아 있던 재시도가 다시 재생시켜 버린다.
+  //   pause/stop 이 오면 여기에 등록하고, 재시도 콜백이 이를 보고 스스로 중단한다.
+  const playSuppressedRef = useRef<Set<string>>(new Set());
 
   // 모션 애니메이션 시작 시각 (ELEMENTS_UPDATE 수신 시 설정)
   const motionStartRef = useRef<number>(0);
@@ -397,7 +429,9 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
       playingIdsRef.current.delete(youtubeId);
       pendingSeekRef.current.delete(youtubeId);
     }
-  }, [videoElements]);
+    // [FEATURE: LOCAL_VIDEO_CONTROL] 사라진 로컬 영상 참조도 함께 정리
+    pruneLocalVideos(videoElements.map((video) => video.id));
+  }, [pruneLocalVideos, videoElements]);
 
   // [FEATURE: SECTION_TRANSITION] 전환 시작 — 현재 canvas 스냅샷 캡처 후 overlay state 셋
   const triggerTransition = useCallback((transition: { type: string; duration: number } | undefined) => {
@@ -451,6 +485,8 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
     const iframeMap = iframeRefs.current;
     const playingIds = playingIdsRef.current;
     const pendingSeek = pendingSeekRef.current;
+    const pendingUnmute = pendingUnmuteRef.current;
+    const playSuppressed = playSuppressedRef.current;
 
     return () => {
       for (const timer of timers) clearTimeout(timer);
@@ -460,6 +496,8 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
       iframeMap.clear();
       playingIds.clear();
       pendingSeek.clear();
+      pendingUnmute.clear();
+      playSuppressed.clear();
     };
   }, []);
 
@@ -588,7 +626,11 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
         selectCamera(msg.payload.deviceId);
         break;
       case 'VIDEO_COMMAND': {
-        const { youtubeId, command, args } = msg.payload;
+        const { youtubeId, args } = msg.payload;
+        // [YT_AUDIO_SINGLE] 소리를 끈 창은 unMute 가 와도 mute 로 뒤집는다.
+        const command = MUTE_VIDEO_AUDIO && msg.payload.command === 'unMute'
+          ? 'mute'
+          : msg.payload.command;
         // 단일 전송 헬퍼
         const sendOnce = () => {
           const iframe = iframeRefs.current.get(youtubeId);
@@ -608,9 +650,12 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
           // state 체크 기반 smart-retry: state=1 이 확인되는 즉시 중단.
           // iframe 또는 플레이어가 아직 준비되지 않은 슬로우 모니터도 따라잡지만
           // 한 번 재생에 들어가면 추가 명령을 보내지 않아 스터터 없음.
+          playSuppressedRef.current.delete(youtubeId);
           const delays = [0, 500, 1100, 2000, 3200];
           for (const delay of delays) {
             scheduleYouTubeCommand(() => {
+              // [FIX: YT_CONTROL] 그 사이 일시정지/정지가 들어왔으면 재시도 포기
+              if (playSuppressedRef.current.has(youtubeId)) return;
               if (playingIdsRef.current.has(youtubeId)) return;
               sendOnce();
             }, delay);
@@ -625,8 +670,25 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
           if (typeof args?.[0] === 'number') {
             pendingSeekRef.current.set(youtubeId, args[0] as number);
           }
+        } else if (command === 'unMute') {
+          // [FIX: YT_AUDIO] unMute 는 playVideo 와 같은 tick 에 도착하므로
+          // 첫 전송은 iframe 미준비로 버려지기 쉽다. 재시도 + state=1 진입 시
+          // 재적용(아래 onStateChange 핸들러) 으로 확실히 소리를 켠다.
+          pendingUnmuteRef.current.add(youtubeId);
+          for (const delay of [0, 500, 1100, 2000, 3200]) {
+            scheduleYouTubeCommand(() => {
+              // [FIX: YT_CONTROL] 그 사이 음소거를 눌렀으면 재시도 포기
+              if (!pendingUnmuteRef.current.has(youtubeId)) return;
+              sendOnce();
+            }, delay);
+          }
         } else {
-          // seekTo / unMute / pause 등 나머지는 1회 전송
+          // pause / stop / mute 등 나머지는 1회 전송
+          // [FIX: YT_CONTROL] 남아 있는 재시도가 방금 누른 조작을 되돌리지 않도록 해제
+          if (command === 'mute') pendingUnmuteRef.current.delete(youtubeId);
+          if (command === 'pauseVideo' || command === 'stopVideo') {
+            playSuppressedRef.current.add(youtubeId);
+          }
           sendOnce();
         }
         break;
@@ -706,6 +768,15 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
                   'https://www.youtube.com'
                 );
                 pendingSeekRef.current.delete(id);
+              }
+              // [FIX: YT_AUDIO] 재생 진입 직후 unMute 재적용.
+              //   자동재생 정책으로 플레이어가 스스로 음소거된 경우도 여기서 복구.
+              if (pendingUnmuteRef.current.has(id) && iframe.contentWindow) {
+                iframe.contentWindow.postMessage(
+                  JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+                  'https://www.youtube.com'
+                );
+                pendingUnmuteRef.current.delete(id);
               }
             } else if (data.info === 0 || data.info === 2) {
               playingIdsRef.current.delete(id);
@@ -1011,7 +1082,8 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
                   if (prev !== el) playingIdsRef.current.delete(vel.youtubeId);
                 }
               }}
-              src={getEmbedUrl(vel.youtubeId)}
+              // [YT_AUDIO_SINGLE] 음소거 — 오디오는 /atemsignal/fill 담당.
+              src={getEmbedUrl(vel.youtubeId, { muted: MUTE_VIDEO_AUDIO })}
               width="100%"
               height="100%"
               style={{ border: 'none', display: 'block', pointerEvents: 'none' }}
@@ -1019,14 +1091,30 @@ export default function OutputCanvas({ isMirror = false }: { isMirror?: boolean 
             />
           ) : (
             <video
+              // [FEATURE: LOCAL_VIDEO_CONTROL] 원격 제어용 등록
+              ref={registerLocalVideo(vel.id)}
               src={vel.src}
               autoPlay={vel.autoplay}
-              muted={vel.muted}
+              // [YT_AUDIO_SINGLE] 오디오는 /atemsignal/fill 담당 — 여기는 항상 음소거
+              muted={MUTE_VIDEO_AUDIO || vel.muted}
               loop={vel.loop}
               playsInline
               preload="auto"
+              onLoadedMetadata={(e) => {
+                // [FEATURE: PAUSED_BROADCAST] 컨트롤 바에서 멈춰 둔 위치에서 시작한다.
+                //   없으면 항상 0초로 되돌아가 "멈춘 지점부터 송출" 이 안 된다.
+                if (vel.startTime && isFinite(vel.startTime)) {
+                  e.currentTarget.currentTime = vel.startTime;
+                }
+              }}
               onCanPlay={(e) => {
-                if (vel.autoplay) e.currentTarget.play().catch(() => {});
+                // [FIX: STOP_RESTART] seek 로도 canplay 가 다시 뜬다. 그때 또 play() 하면
+                //   ■(정지)로 0초로 되감은 직후 재생이 되살아난다. 자동 시작은 마운트 후
+                //   1회만 — 이후 재생/정지는 명령으로만 바뀐다.
+                const v = e.currentTarget;
+                if (!vel.autoplay || v.dataset.autostarted === '1') return;
+                v.dataset.autostarted = '1';
+                v.play().catch(() => {});
               }}
               style={{
                 width: '100%',

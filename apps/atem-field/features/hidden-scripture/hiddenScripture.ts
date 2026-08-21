@@ -28,3 +28,30 @@ export function isHiddenScriptureItem(item: Pick<SetlistItem, 'hiddenScripture'>
 export function firstVisibleItem(items: readonly SetlistItem[]): SetlistItem | undefined {
   return items.find((i) => !isHiddenScriptureItem(i)) ?? items[0];
 }
+
+/** 말씀찾기(인용) 프로그램인가 */
+export function isScriptureQuoteItem(item: Pick<SetlistItem, 'title'>): boolean {
+  return item.title.includes('말씀찾기(인용)');
+}
+
+/**
+ * [FEATURE: SCRIPTURE_BEFORE_QUOTE] 말씀찾기(본문)을 말씀찾기(인용) **바로 위**로 옮긴다.
+ *
+ * 예전에는 목록 맨 앞(items[0])에 고정했다. 전역 섹션 번호 1..N 이 절 번호와
+ * 일치하게 만들려는 의도였는데, 지금은 그리드가 `scriptureMainIndexByVerse`
+ * (features/broadcast-grid/BroadcastGridOverlay.tsx) 에서 **절 번호를 파싱해서**
+ * 매핑하므로 위치에 의존하지 않는다. 즉 맨 앞 고정은 더 이상 필요 없고,
+ * 설교 흐름상 본문과 인용이 붙어 있는 편이 운영에 낫다.
+ *
+ * 말씀찾기(인용) 이 없으면 기존 동작대로 맨 앞에 둔다.
+ */
+export function orderScriptureMainBeforeQuote<T extends SetlistItem>(items: readonly T[]): T[] {
+  const scriptureMains = items.filter(isHiddenScriptureItem);
+  if (scriptureMains.length === 0) return [...items];
+
+  const rest = items.filter((i) => !isHiddenScriptureItem(i));
+  const quoteIndex = rest.findIndex(isScriptureQuoteItem);
+  if (quoteIndex < 0) return [...scriptureMains, ...rest];
+
+  return [...rest.slice(0, quoteIndex), ...scriptureMains, ...rest.slice(quoteIndex)];
+}

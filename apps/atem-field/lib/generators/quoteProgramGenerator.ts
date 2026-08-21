@@ -6,11 +6,13 @@ import type { SavedProgram } from './programTypes';
 import { formatDateISO } from './worshipUploader';
 import { CHOIR_DESIGN } from './designs/choirDesign';
 import { listTemplates } from '@/features/subtitle-template/templateClient';
+import { SEED_TEMPLATE_NAME } from '@/features/subtitle-template/activeTemplate';
 import { applyTemplate } from '@/features/subtitle-template/applyTemplate';
 import type { SubtitleTemplate } from '@/features/subtitle-template/model';
 import type { TemplateCategory } from '@/features/subtitle-template/schema';
 
-const DEFAULT_TEMPLATE_NAME = 'basic-001';
+/* 시드 세트 이름 — 미등록 카테고리의 폴백 기준 */
+const DEFAULT_TEMPLATE_NAME = SEED_TEMPLATE_NAME;
 
 export interface QuoteProgramForm {
   worshipDate: string;

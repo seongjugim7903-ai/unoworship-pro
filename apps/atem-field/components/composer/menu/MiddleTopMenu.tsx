@@ -52,7 +52,7 @@ export default function MiddleTopMenu() {
     'flex items-center justify-center w-8 h-8 rounded-md bg-[#1a1a1a] hover:bg-[#252525] ' +
     'border border-[#333] hover:border-[#444] text-gray-400 hover:text-gray-200 transition-colors';
 
-  // [임시] 프로그램 리스트(SetlistPanel)의 "변환본" 버튼이 쏘는 이벤트 → PPT 모달을 load 탭으로 연다.
+  // 프로그램 리스트(SetlistPanel)의 "찬양검색" 버튼이 쏘는 이벤트 → PPT 모달을 load 탭으로 연다.
   const pptOpen = pptSlides.open;
   useEffect(() => {
     const handler = () => pptOpen('load');

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import ComposerLayout from '@/components/composer/ComposerLayout';
-import { loadProgramsFromServer } from '@/lib/generators/worshipUploader';
 import { DEMO_SETLIST, useStore } from '@/lib/store';
 
 export default function ComposerEntryPage() {
@@ -29,10 +28,6 @@ export default function ComposerEntryPage() {
         }
       }
     }
-
-    loadProgramsFromServer().then((count) => {
-      if (count > 0) console.log(`[UnoLive] 서버에서 ${count}개 프로그램 로드 완료`);
-    });
 
     let cancelled = false;
     queueMicrotask(() => {

@@ -220,6 +220,40 @@ export interface TextElement extends BaseElement {
   /** 텍스트 그림자 (드롭 쉐도우) */
   useShadow?: boolean;
   shadow?: TextShadowConfig;
+  /**
+   * [FEATURE: TEXT_RUNS] 한 박스 안에서 일부 글자만 다른 스타일로.
+   *
+   * `content` 는 순수 문자열로 그대로 두고, 스타일만 문자 인덱스 구간으로 따로
+   * 들고 간다. content 를 읽고 쓰는 곳(자막 템플릿·fieldRole 주입·프롬프트
+   * 레이아웃·ATEM 키 마스크)이 매우 많아서, 리치 텍스트 트리로 바꾸면 누락이
+   * 반드시 생기기 때문. 기획: docs/features/text-runs/PLAN.md
+   *
+   * 없거나 빈 배열이면 기존 동작과 완전히 동일하다.
+   */
+  runs?: TextRun[];
+}
+
+/** [FEATURE: TEXT_RUNS] 구간에 덧씌울 스타일. 지정 안 한 항목은 요소 기본값을 따른다. */
+export interface TextRunStyle {
+  color?: string;
+  fontWeight?: number;
+  fontStyle?: 'normal' | 'italic';
+  fontFamily?: string;
+  /**
+   * 폰트 크기 배수(1.2 = 20% 크게). 절대 px 이 아닌 이유는 autoFit 때문 —
+   * autoFit 은 박스에 맞추려고 fontSize 에 비율을 곱하는데, 구간이 절대값을
+   * 들고 있으면 자동 축소에서 혼자 안 줄어든다.
+   */
+  fontSizeScale?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
+}
+
+/** [FEATURE: TEXT_RUNS] content 의 [start, end) 문자 구간에 적용할 스타일 */
+export interface TextRun {
+  start: number;
+  end: number;
+  style: TextRunStyle;
 }
 
 // ─────────────────────────────────────────
@@ -313,6 +347,15 @@ export interface VideoElement extends BaseElement {
   loop: boolean;
   muted: boolean;
   autoplay: boolean;
+  /**
+   * [FEATURE: PAUSED_BROADCAST] 송출 창이 이 위치(초)에서 시작한다.
+   *
+   * 로컬 영상은 유튜브와 달리 송출 창이 항상 0초부터 재생한다. 그래서 컨트롤
+   * 바에서 원하는 지점에 멈춰 놓아도, 송출하면 처음으로 되돌아갔다.
+   * 멈추거나 시크한 위치를 여기 기억해 두고, 수신 측이 메타데이터 로드 시점에
+   * 이 값으로 맞춘다. `autoplay: false` 와 함께 쓰면 **그 프레임에서 정지 송출**이 된다.
+   */
+  startTime?: number;
 }
 
 // ─────────────────────────────────────────

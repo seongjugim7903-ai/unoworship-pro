@@ -18,6 +18,8 @@ import {
   type ShapeElement, type ShapeType, type TextElement,
 } from '@/lib/canvasTypes';
 import { ColorIn, Num, Row, Section, Seg, Sel, Toggle } from './controls';
+// [FEATURE: TEXT_RUNS] 선택 구간 디자인 — 신형/구형 속성창 공용 패널
+import TextRunStylePanel from '@/components/text-runs/TextRunStylePanel';
 import {
   getFontWeights, nearestFontWeight, normalizeFontWeight, FONT_WEIGHT_LABELS,
   KOREAN_WEB_FONTS, KOREAN_CDN_FONT_FAMILIES, fontDisplayName,
@@ -39,10 +41,16 @@ function fontLabel(f: string): string {
   return GENERIC_FONT_LABELS[f] ?? fontDisplayName(f);
 }
 
+// [FEATURE: YT_OUTPUT_ROUTING] main/sub/broadcast 는 현장 호칭, 괄호는 내부 타깃값.
+//   docs/features/youtube-output-routing/PLAN.md 참조.
+//
+//   [용어] 여기서 말하는 것은 **자막을 어느 창에 그리는가** 다. 유튜브 RTMP 송출
+//   (라이브·녹화)과는 전혀 다른 축이라, 예전 'live' 호칭을 'broadcast' 로 바꿨다.
+//   "라이브에 안 나온다" 가 두 가지 뜻이 되면 현장에서 원인을 못 찾는다.
 const OUTPUT_TARGETS: { v: CanvasRenderTarget; label: string }[] = [
-  { v: 'output', label: '메인(회중)' },
-  { v: 'prompt', label: '무대' },
-  { v: 'broadcast', label: '방송' },
+  { v: 'output', label: 'main — 메인(회중·강대상)' },
+  { v: 'prompt', label: 'sub — 서브(무대·중상층)' },
+  { v: 'broadcast', label: 'broadcast — 방송·미러' },
 ];
 
 const BLEND_MODES: { v: GlobalCompositeOperation; label: string }[] = [
@@ -226,6 +234,9 @@ export default function ElementInspector({ onSwitchLegacy }: { onSwitchLegacy?: 
 
       {/* ── 타입별 섹션 ── */}
       {el.type === 'text' && <TextSection el={el as TextElement} upd={upd} />}
+
+      {/* [FEATURE: TEXT_RUNS] 선택한 단어만 다른 디자인 (구형 패널과 공용) */}
+      {el.type === 'text' && <TextRunStylePanel el={el as TextElement} upd={upd} />}
       {el.type === 'shape' && <ShapeSection el={el as ShapeElement} upd={upd} />}
       {el.type === 'image' && <ImageSection el={el as ImageElement} upd={upd} />}
 
@@ -256,7 +267,7 @@ export default function ElementInspector({ onSwitchLegacy }: { onSwitchLegacy?: 
           })}
         </div>
         <Toggle
-          label="고정 레이어 (섹션 바뀌어도 유지)"
+          label="고정 레이어 (이 프로그램 안에서 섹션이 바뀌어도 유지)"
           checked={el.fixedLayer ?? false}
           onChange={(v) => upd({ fixedLayer: v })}
         />

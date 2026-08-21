@@ -26,11 +26,6 @@ export function MarketingAuthNav() {
 
     async function loadUser() {
       const supabase = createClient();
-      if (!supabase) {
-        setUser(null);
-        setLoaded(true);
-        return;
-      }
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!alive) return;
 
@@ -83,9 +78,7 @@ export function MarketingAuthNav() {
     setSigningOut(true);
 
     const supabase = createClient();
-    if (supabase) {
-      await supabase.auth.signOut({ scope: 'global' });
-    }
+    await supabase.auth.signOut({ scope: 'global' });
     setUser(null);
     setLoaded(true);
     router.push('/');

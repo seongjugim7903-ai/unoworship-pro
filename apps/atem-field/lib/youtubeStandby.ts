@@ -32,6 +32,8 @@ import { useStore } from './store';
 import { getSocket } from './socketClient';
 import { SOCKET_EVENTS, type SocketMessage } from './socketEvents';
 import { autoPlayVideos } from './videoAutoplay';
+import { isFixedLayerYouTube } from './youtubeRouting'; // [FEATURE: YT_OUTPUT_ROUTING]
+import { getSectionOutputElements } from './fixedLayers'; // [FIX: STANDBY_FIXED_LAYER]
 
 /**
  * 섹션에 YouTube 링크가 있는 video 요소가 하나라도 있는지 판정.
@@ -40,7 +42,14 @@ import { autoPlayVideos } from './videoAutoplay';
 export function sectionHasYouTube(section: Section | null | undefined): boolean {
   if (!section) return false;
   return section.elements.some(
-    (el) => el.type === 'video' && !!(el as VideoElement).youtubeId
+    (el) =>
+      el.type === 'video' &&
+      !!(el as VideoElement).youtubeId &&
+      // [FEATURE: YT_OUTPUT_ROUTING] 고정 레이어 영상은 STANDBY 대상이 아니다.
+      //   고정 레이어는 모든 섹션 payload 에 합성되므로(lib/fixedLayers.ts),
+      //   이걸 STANDBY 로 잡으면 섹션마다 Enter 를 눌러야 해서 운영이 불가능하다.
+      //   고정 레이어 영상은 한 번 재생되면 섹션이 바뀌어도 계속 흐른다.
+      !isFixedLayerYouTube(el)
   );
 }
 
@@ -82,17 +91,24 @@ export function commitYouTubeStandby(): void {
   if (state.isBlackout) state.setBlackout(false);
 
   // ── 송출 ──
+  // [FIX: STANDBY_FIXED_LAYER] 예전에는 `section.elements` (원본)를 그대로 보냈다.
+  //   그러면 고정 레이어 요소가 빠진 payload 가 나가서, 스탠바이 커밋 순간
+  //   고정 레이어 영상이 언마운트되고 재생이 끊겼다. 다른 두 송출 경로
+  //   (OperatorPanel / SetlistPanel)는 이미 getSectionOutputElements 로
+  //   고정 레이어·프로그램 배경을 합성해 보내고 있었다 — 이 경로만 누락.
+  const elements = getSectionOutputElements(setlist, section);
+
   const socket = getSocket();
   if (socket) {
     const msg: SocketMessage = {
       type: 'ELEMENTS_UPDATE',
       payload: {
-        elements: section.elements,
+        elements,
         sectionText: section.text,
       },
     };
     socket.emit(SOCKET_EVENTS.BROADCAST, msg);
   }
   // 에디터 iframe + 송출 PC 양쪽에 seekTo/playVideo/unMute (재시도 포함)
-  autoPlayVideos(section.elements);
+  autoPlayVideos(elements);
 }

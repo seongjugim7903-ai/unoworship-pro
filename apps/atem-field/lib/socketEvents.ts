@@ -80,6 +80,9 @@ export type SocketMessage =
   | ({ type: 'CLEAR_TEXT' } & TargetedSocketMessage)
   | ({ type: 'CAMERA_SOURCE'; payload: { deviceId: string } } & TargetedSocketMessage)
   | ({ type: 'VIDEO_COMMAND'; payload: { youtubeId: string; command: string; args?: unknown[] } } & TargetedSocketMessage)
+  // [FEATURE: LOCAL_VIDEO_CONTROL] 로컬 업로드 영상(<video>) 제어. 유튜브(iframe)와
+  //   대상이 달라서 요소 id 로 지정한다. lib/localVideoCommand.ts 참조.
+  | ({ type: 'LOCAL_VIDEO_COMMAND'; payload: { elementId: string; command: string; args?: number[] } } & TargetedSocketMessage)
   | ({ type: 'FRAME_UPDATE'; payload: { frame: string; sectionText: string; hasMotion: boolean; promptLayout?: PromptLayoutType; nextSectionText?: string; sectionKind?: SectionKind; transition?: SectionTransitionPayload } } & TargetedSocketMessage)
   | ({ type: 'FRAME_CACHE'; payload: { sectionId: string; frame: string } } & TargetedSocketMessage)
   | ({ type: 'FRAME_SHOW'; payload: { sectionId: string; sectionText: string; hasMotion: boolean; promptLayout?: PromptLayoutType; nextSectionText?: string; sectionKind?: SectionKind; transition?: SectionTransitionPayload } } & TargetedSocketMessage)

@@ -6,8 +6,9 @@
  */
 
 import fs from 'node:fs';
-import { dataPath } from '@/lib/localLibraryPath';
+import path from 'node:path';
 import type { BibleData, BibleBook, BibleVerse, BibleChapter } from './types';
+import { dataPath } from '@/lib/localLibraryPath';
 
 let cache: BibleData | null = null;
 

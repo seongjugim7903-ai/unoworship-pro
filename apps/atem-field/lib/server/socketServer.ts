@@ -40,6 +40,7 @@ const SOCKET_MESSAGE_TYPES = new Set<string>([
   'CLEAR_TEXT',
   'CAMERA_SOURCE',
   'VIDEO_COMMAND',
+  'LOCAL_VIDEO_COMMAND',
   'FRAME_UPDATE',
   'FRAME_CACHE',
   'FRAME_SHOW',
@@ -535,6 +536,15 @@ function isValidSocketMessage(value: unknown): value is SocketMessage {
         isShortString(value.payload.youtubeId, 128) &&
         isShortString(value.payload.command, 64) &&
         (!('args' in value.payload) || Array.isArray(value.payload.args))
+      );
+    case 'LOCAL_VIDEO_COMMAND':
+      return (
+        isRecord(value.payload) &&
+        isShortString(value.payload.elementId, 128) &&
+        isShortString(value.payload.command, 64) &&
+        (!('args' in value.payload) ||
+          (Array.isArray(value.payload.args) &&
+            value.payload.args.every((n) => typeof n === 'number')))
       );
     case 'SUBTITLE_UPDATE':
       return (

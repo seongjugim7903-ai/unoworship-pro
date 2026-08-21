@@ -3,7 +3,6 @@ import fs from 'fs/promises';
 import path from 'path';
 import type { ImageElement, ShapeElement, TextElement } from '@/lib/canvasTypes';
 import type { SavedProgram } from '@/lib/generators/programTypes';
-
 import { dataPath, generatedPath, generatedUrlBase } from '@/lib/localLibraryPath';
 
 const BUCKET_FALLBACK = 'choir-generated-images';

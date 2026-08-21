@@ -13,7 +13,10 @@ import {
   CanvasRenderTarget,
   isElementVisibleOn,
   resolveCornerRadii,
+  type TextRunStyle,
 } from './canvasTypes';
+// [FEATURE: TEXT_RUNS] 구간별 스타일 — 기획: docs/features/text-runs/PLAN.md
+import { getLineStartOffsets, hasTextRuns, splitLineIntoSegments } from './textRuns';
 import { calcImageFillRect } from './imageProcessing/shapeFill';
 import { getTextElementContent } from './sectionText';
 
@@ -520,11 +523,33 @@ function renderTextElement(
   const lh = fontSize * el.lineHeight;
   const totalH = lines.length * lh;
 
+  // [FEATURE: TEXT_RUNS] 구간 스타일이 있을 때만 조각 경로를 탄다.
+  //   없으면 아래 측정·그리기 모두 기존 코드 그대로 동작한다.
+  const runsActive = hasTextRuns(el.runs);
+  const lineOffsets = runsActive ? getLineStartOffsets(displayText, lines) : [];
+  /** 조각 스타일을 반영한 폰트 문자열. 지정 안 한 항목은 요소 기본값. */
+  const fontForSegment = (style: TextRunStyle) =>
+    `${style.fontStyle ?? el.fontStyle} ${style.fontWeight ?? el.fontWeight} ` +
+    `${fontSize * (style.fontSizeScale ?? 1)}px "${style.fontFamily ?? el.fontFamily}", sans-serif`;
+  /** 한 줄을 조각으로 나누고 각 폭을 잰다 (폰트가 조각마다 다르므로 개별 측정) */
+  const measureLine = (line: string, lineIndex: number) => {
+    const segments = splitLineIntoSegments(line, lineOffsets[lineIndex] ?? -1, el.runs);
+    const widths = segments.map((seg) => {
+      ctx.font = fontForSegment(seg.style);
+      return ctx.measureText(seg.text).width;
+    });
+    ctx.font = fontOf(fontSize);
+    return { segments, widths, total: widths.reduce((sum, v) => sum + v, 0) };
+  };
+
   // 가장 긴 줄의 렌더 너비 측정
+  //   구간 스타일로 글자가 커질 수 있으므로, 런이 있으면 조각 합으로 잰다.
+  //   (안 그러면 auto-width 박스에서 커진 글자가 클립 박스에 잘린다)
   let maxLineW = 0;
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (!line) continue;
-    const mw = ctx.measureText(line).width;
+    const mw = runsActive ? measureLine(line, i).total : ctx.measureText(line).width;
     if (mw > maxLineW) maxLineW = mw;
   }
   // 실제 시각 너비 = auto-width는 긴 줄에 맞춰 확장, fixed-width는 설계 박스 유지.
@@ -568,27 +593,66 @@ function renderTextElement(
     ctx.shadowBlur    = el.shadow!.blur;
   }
 
+  /** 그림자 끄기/복원 — 외곽선에 이중 그림자가 생기지 않도록 (기존 규칙 유지) */
+  const shadowOff = () => { if (hasShadow) ctx.shadowColor = 'transparent'; };
+  const shadowOn = () => {
+    if (!hasShadow) return;
+    ctx.shadowColor   = el.shadow!.color;
+    ctx.shadowOffsetX = el.shadow!.offsetX;
+    ctx.shadowOffsetY = el.shadow!.offsetY;
+    ctx.shadowBlur    = el.shadow!.blur;
+  };
+
   lines.forEach((line, i) => {
     const ly = startY + i * lh;
-    if (el.strokeWidth > 0) {
-      // 외곽선에는 그림자 적용하지 않음 (이중 그림자 방지)
-      if (hasShadow) {
-        ctx.shadowColor = 'transparent';
+
+    // ── 기존 경로: 구간 스타일 없음 → 줄 통째로 한 번에 (동작 무변화) ──
+    if (!runsActive) {
+      if (el.strokeWidth > 0) {
+        shadowOff();
+        ctx.strokeStyle = el.strokeColor;
+        ctx.lineWidth   = el.strokeWidth * fitScale;
+        ctx.lineJoin    = 'round';
+        ctx.strokeText(line, anchorX, ly);
+        shadowOn();
       }
-      ctx.strokeStyle = el.strokeColor;
-      ctx.lineWidth   = el.strokeWidth * fitScale;
-      ctx.lineJoin    = 'round';
-      ctx.strokeText(line, anchorX, ly);
-      // fillText 에만 그림자 복원
-      if (hasShadow) {
-        ctx.shadowColor   = el.shadow!.color;
-        ctx.shadowOffsetX = el.shadow!.offsetX;
-        ctx.shadowOffsetY = el.shadow!.offsetY;
-        ctx.shadowBlur    = el.shadow!.blur;
-      }
+      ctx.fillStyle = fillStyle;
+      ctx.fillText(line, anchorX, ly);
+      return;
     }
-    ctx.fillStyle = fillStyle;
-    ctx.fillText(line, anchorX, ly);
+
+    // ── [FEATURE: TEXT_RUNS] 조각 경로 ──
+    //   조각마다 폰트가 달라 x 를 직접 누적해야 하므로 textAlign 을 left 로 바꾸고
+    //   줄 전체 폭을 재서 시작점을 정렬 기준에 맞춘다. 안 그러면 가운데/오른쪽
+    //   정렬에서 줄이 밀린다.
+    if (!line) return;
+    const { segments, widths, total } = measureLine(line, i);
+    const prevAlign = ctx.textAlign;
+    ctx.textAlign = 'left';
+    let penX =
+      el.textAlign === 'left'  ? anchorX :
+      el.textAlign === 'right' ? anchorX - total :
+                                 anchorX - total / 2;
+
+    segments.forEach((seg, si) => {
+      ctx.font = fontForSegment(seg.style);
+      const strokeW = seg.style.strokeWidth ?? el.strokeWidth;
+      if (strokeW > 0) {
+        shadowOff();
+        ctx.strokeStyle = seg.style.strokeColor ?? el.strokeColor;
+        ctx.lineWidth   = strokeW * fitScale;
+        ctx.lineJoin    = 'round';
+        ctx.strokeText(seg.text, penX, ly);
+        shadowOn();
+      }
+      // 구간 색이 없으면 요소 기본(그라데이션 포함)을 그대로 쓴다.
+      ctx.fillStyle = seg.style.color ?? fillStyle;
+      ctx.fillText(seg.text, penX, ly);
+      penX += widths[si];
+    });
+
+    ctx.textAlign = prevAlign;
+    ctx.font = fontOf(fontSize);
   });
 
   // 그림자 리셋

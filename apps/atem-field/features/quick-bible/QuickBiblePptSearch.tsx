@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ImageElement } from '@/lib/canvasTypes';
 import type { SavedProgram } from '@/lib/generators/programTypes';
+import { openPptBrowserSearch } from '@/lib/pptBrowserSearch';
 
 interface Props {
   onLoadProgram: (program: SavedProgram) => void | Promise<void>;
@@ -27,10 +28,6 @@ function getProgramSearchText(program: SavedProgram): string {
     program.worshipName,
     sourceLabel,
   ].join(' ').toLowerCase();
-}
-
-function buildBrowserSearchUrl(query: string): string {
-  return `https://www.google.com/search?q=${encodeURIComponent(`${query.trim()} PPT`)}`;
 }
 
 export default function QuickBiblePptSearch({ onLoadProgram }: Props) {
@@ -75,7 +72,7 @@ export default function QuickBiblePptSearch({ onLoadProgram }: Props) {
   const openBrowserSearch = () => {
     const q = search.trim();
     if (!q) return;
-    const win = window.open(buildBrowserSearchUrl(q), '_blank', 'noopener,noreferrer');
+    const win = openPptBrowserSearch(q);
     if (!win) setError('브라우저 팝업이 차단되었습니다. 검색어를 복사해 직접 검색해 주세요.');
   };
 

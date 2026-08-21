@@ -12,9 +12,15 @@ interface Props {
   error: string;
   onRefresh: () => void;
   onSelect: (program: SavedProgram, action: FixedProgramAction) => void | Promise<void>;
+  /** [FEATURE: FIXED_PROGRAM_BATCH] 체크한 프로그램을 한 번에 배치 (송출은 안 함) */
+  onSelectMany: (programs: SavedProgram[]) => void | Promise<void>;
   onClose: () => void;
 }
 
+// 좌측 "고정 찬양·예식문" 열에 이 순서대로 표시한다.
+//   여기 제목과 data/fixed-programs/*.json 의 title 이 **정확히 일치**해야 뜬다
+//   (아래 fixedPrograms 가 제목으로 매칭). 목록에 넣어도 해당 자료 파일이 없으면
+//   조용히 빠지므로, 새로 추가할 때는 파일 존재 여부를 함께 확인할 것.
 const LEFT_TITLES = [
   '사도신경',
   '주기도문',
@@ -23,6 +29,8 @@ const LEFT_TITLES = [
   '왕이신 나의 하나님',
   '나의 하나님',
   '파송의 노래',
+  '교회소식',
+  '헵시바 선교단',
 ] as const;
 
 function isResponsiveReading(program: SavedProgram): boolean {
@@ -42,7 +50,7 @@ function ProgramActions({
         type="button"
         disabled={busy !== null}
         onClick={() => onSelect('broadcast')}
-        className="h-8 rounded-md bg-red-700 px-2 text-[11px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-40"
+        className="h-8 rounded-md bg-red-600 px-2 text-[11px] font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-40"
       >
         {busy === 'broadcast' ? '처리 중…' : '배치 + 송출'}
       </button>
@@ -61,9 +69,14 @@ function ProgramActions({
 function ProgramCard({
   program,
   onSelect,
+  checked,
+  onToggle,
 }: {
   program: SavedProgram;
   onSelect: (program: SavedProgram, action: FixedProgramAction) => Promise<void>;
+  /** [FEATURE: FIXED_PROGRAM_BATCH] 일괄 배치 선택 여부 */
+  checked: boolean;
+  onToggle: () => void;
 }) {
   const [busy, setBusy] = useState<FixedProgramAction | null>(null);
 
@@ -78,13 +91,25 @@ function ProgramCard({
   };
 
   return (
-    <div className="rounded-lg border border-[#343434] bg-[#111111] p-2.5 transition-colors hover:border-[#666]">
-      <div className="min-w-0">
+    <div
+      className={`rounded-lg border bg-[#111111] p-2.5 transition-colors ${
+        checked ? 'border-amber-500 bg-amber-950/20' : 'border-[#343434] hover:border-[#666]'
+      }`}
+    >
+      <label className="flex min-w-0 cursor-pointer items-start gap-2">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+          className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 accent-amber-500"
+        />
+        <span className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold text-white" title={program.item.title}>{program.item.title}</p>
         <p className="mt-0.5 text-[10px] text-gray-500">
           {program.item.sections.length > 0 ? `${program.item.sections.length}개 섹션` : '섹션 없음'}
         </p>
-      </div>
+        </span>
+      </label>
       <ProgramActions busy={busy} onSelect={(action) => void select(action)} />
     </div>
   );
@@ -96,10 +121,14 @@ export default function FixedProgramModal({
   error,
   onRefresh,
   onSelect,
+  onSelectMany,
   onClose,
 }: Props) {
   const [query, setQuery] = useState('');
   const [actionError, setActionError] = useState('');
+  // [FEATURE: FIXED_PROGRAM_BATCH] 일괄 배치용 체크 상태 (프로그램 id)
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -135,6 +164,31 @@ export default function FixedProgramModal({
       });
   }, [programs, query]);
 
+  const toggleChecked = (id: string) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  /** 체크된 프로그램을 화면에 보이는 순서대로 배치한다 (좌측 목록 → 교독문 순) */
+  const checkedPrograms = [...fixedPrograms, ...responsiveReadings].filter((p) => checkedIds.has(p.id));
+
+  const handleBatch = async () => {
+    if (checkedPrograms.length === 0 || batchBusy) return;
+    setActionError('');
+    setBatchBusy(true);
+    try {
+      await onSelectMany(checkedPrograms);
+      onClose();
+    } catch (caught) {
+      setActionError(caught instanceof Error ? caught.message : '선택한 프로그램을 배치하지 못했습니다.');
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
   const handleSelect = async (program: SavedProgram, action: FixedProgramAction) => {
     setActionError('');
     try {
@@ -154,7 +208,7 @@ export default function FixedProgramModal({
         <div className="flex flex-shrink-0 items-center justify-between border-b border-[#2d2d2d] px-5 py-3">
           <div>
             <p className="text-sm font-bold text-amber-300">고정 프로그램 · O</p>
-            <p className="mt-0.5 text-[11px] text-gray-500">프로그램을 배치하고 바로 송출하거나, 프로그램에만 미리 넣을 수 있습니다.</p>
+            <p className="mt-0.5 text-[11px] text-gray-500">카드를 체크하면 여러 개를 한꺼번에 배치할 수 있습니다. 개별 버튼으로 배치·송출도 그대로 됩니다.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -185,7 +239,13 @@ export default function FixedProgramModal({
             </div>
             <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
               {fixedPrograms.map((program) => (
-                <ProgramCard key={program.id} program={program} onSelect={handleSelect} />
+                <ProgramCard
+                  key={program.id}
+                  program={program}
+                  onSelect={handleSelect}
+                  checked={checkedIds.has(program.id)}
+                  onToggle={() => toggleChecked(program.id)}
+                />
               ))}
             </div>
             {!loading && fixedPrograms.length === 0 && (
@@ -207,7 +267,13 @@ export default function FixedProgramModal({
             />
             <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
               {responsiveReadings.map((program) => (
-                <ProgramCard key={program.id} program={program} onSelect={handleSelect} />
+                <ProgramCard
+                  key={program.id}
+                  program={program}
+                  onSelect={handleSelect}
+                  checked={checkedIds.has(program.id)}
+                  onToggle={() => toggleChecked(program.id)}
+                />
               ))}
             </div>
             {!loading && responsiveReadings.length === 0 && (
@@ -216,6 +282,46 @@ export default function FixedProgramModal({
               </p>
             )}
           </section>
+        </div>
+
+        {/* [FEATURE: FIXED_PROGRAM_BATCH] 일괄 배치 바 — 항상 표시(미선택 시 버튼 비활성)해
+            "여러 개 골라 한꺼번에 배치" 동작을 눈에 띄게 한다. 송출 버튼은 두지 않는다
+            (여러 섹션을 동시에 송출할 수는 없음 — 배치만). */}
+        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-amber-900/60 bg-amber-950/25 px-5 py-2.5">
+          <p className="min-w-0 truncate text-[11px] text-amber-200">
+            {checkedPrograms.length > 0 ? (
+              <>
+                <b>{checkedPrograms.length}개</b> 선택 —{' '}
+                <span className="text-amber-300/80">
+                  {checkedPrograms.map((p) => p.item.title).join(' · ')}
+                </span>
+              </>
+            ) : (
+              <span className="text-gray-500">카드를 체크하면 여러 개를 한꺼번에 배치할 수 있어요</span>
+            )}
+          </p>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCheckedIds(new Set())}
+              disabled={batchBusy || checkedPrograms.length === 0}
+              className="h-8 rounded-md border border-[#444] px-2.5 text-[11px] text-gray-300 hover:bg-[#252525] disabled:opacity-30"
+            >
+              선택 해제
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleBatch()}
+              disabled={batchBusy || checkedPrograms.length === 0}
+              className="h-8 rounded-md bg-amber-500 px-3 text-[11px] font-bold text-black transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              {batchBusy
+                ? '배치 중…'
+                : checkedPrograms.length > 0
+                  ? `선택한 ${checkedPrograms.length}개 한꺼번에 배치`
+                  : '선택한 항목 한꺼번에 배치'}
+            </button>
+          </div>
         </div>
 
         {loading && <p className="border-t border-[#2d2d2d] px-5 py-2 text-[11px] text-gray-500">고정 프로그램을 불러오는 중…</p>}

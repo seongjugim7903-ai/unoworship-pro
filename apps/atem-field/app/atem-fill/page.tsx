@@ -9,6 +9,7 @@ export default function AtemFillPage() {
     <main className="h-dvh w-screen overflow-hidden bg-black">
       <OutputRuntimeGuards />
       <FullscreenOverlay />
+      {/* [YT_AUDIO_SINGLE] 음소거 — 오디오는 /atemsignal/fill 담당 */}
       <AtemKeyCanvas target="output" label="FILL / 원본 색상" signalMode="fill" />
     </main>
   );

@@ -8,6 +8,7 @@ export type TemplateCategory =
   | 'sermon'
   | 'worshipTitle'
   | 'notice'
+  | 'churchNews'
   | 'lowerthird'
   | 'apostlesCreed'
   | 'preacher'
@@ -37,6 +38,7 @@ export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   sermon: '설교',
   worshipTitle: '예배 타이틀',
   notice: '공지',
+  churchNews: '교회소식',
   lowerthird: '하단자막',
   apostlesCreed: '사도신경',
   preacher: '설교자',
@@ -97,6 +99,10 @@ export const CATEGORY_FIELDS: Record<TemplateCategory, FieldDef[]> = {
     { key: 'scriptureRef', label: '본문', advanced: true },
   ],
   notice: [
+    { key: 'title', label: '제목', required: true },
+    { key: 'body', label: '내용', required: true },
+  ],
+  churchNews: [
     { key: 'title', label: '제목', required: true },
     { key: 'body', label: '내용', required: true },
   ],

@@ -21,6 +21,7 @@
 
 import React, { useCallback, useEffect, useRef } from 'react';
 import { TextElement } from '@/lib/canvasTypes';
+import { setTextSelection } from '@/lib/textSelectionStore'; // [FEATURE: TEXT_RUNS]
 import { getTextElementContent } from '@/lib/sectionText';
 
 export interface InlineTextEditorProps {
@@ -195,6 +196,12 @@ export default function InlineTextEditor({
         requestAnimationFrame(autoResizeTextarea);
       }}
       onBlur={() => onClose()}
+      // [FEATURE: TEXT_RUNS] 선택 범위를 속성창에 전달. blur 로 닫혀도 마지막
+      //   선택을 남겨야 스타일 버튼을 눌렀을 때 적용할 대상이 있다.
+      onSelect={(e) => {
+        const ta = e.currentTarget;
+        setTextSelection({ elementId: element.id, start: ta.selectionStart, end: ta.selectionEnd });
+      }}
       onPointerDown={(e) => e.stopPropagation()} // 드래그 방지
       onKeyDown={handleKeyDown}
       placeholder={

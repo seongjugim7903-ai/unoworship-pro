@@ -17,6 +17,8 @@ import { useCanvasEditor } from '@/hooks/useCanvasEditor';
 import { undoManager } from '@/lib/undoManager';
 // [FEATURE: EDITOR_COMMANDS] Undo/Redo/Cut/Copy/Paste/SelectAll/Delete 통합 훅
 import { useEditorCommands } from '@/hooks/useEditorCommands';
+// [FEATURE: TEXT_RUNS] 편집 시 구간 스타일 인덱스 보정
+import { hasTextRuns, remapRunsAfterEdit } from '@/lib/textRuns';
 // [/FEATURE: EDITOR_COMMANDS]
 import {
   CanvasElement,
@@ -307,9 +309,17 @@ export default function EditorCanvas({ background, className }: EditorCanvasProp
             sectionText={section?.text}
             isSelected={isSelected}
             onPointerDown={(handleId) => onElementPointerDown(el.id, handleId)}
-            onContentChange={(content) =>
-              updateElement(currentSetlistId!, activeItemId!, activeSectionId!, el.id, { content })
-            }
+            onContentChange={(content) => {
+              // [FEATURE: TEXT_RUNS] 글자를 고치면 인덱스가 밀린다. 수정한 줄의
+              //   구간 스타일만 버리고 나머지는 위치를 보정한다(2026-07-28 확정 정책).
+              //   이 보정을 빼면 스타일이 엉뚱한 글자에 붙는다.
+              const tel = el as TextElement;
+              const patch: Partial<TextElement> = { content };
+              if (hasTextRuns(tel.runs)) {
+                patch.runs = remapRunsAfterEdit(tel.content, content, tel.runs);
+              }
+              updateElement(currentSetlistId!, activeItemId!, activeSectionId!, el.id, patch);
+            }}
             onWidthChange={(newWidth) =>
               updateElement(currentSetlistId!, activeItemId!, activeSectionId!, el.id, { width: newWidth })
             }

@@ -20,10 +20,14 @@ import {
   type WorshipServiceResult,
   type RegularProgramId,
 } from '@/lib/generators/worshipServiceGenerator';
+// [FEATURE: REGULAR_PROGRAM_DEFAULTS] 예배별 기본 체크 규칙 — 조건 가감은 이 파일만
+import { getDefaultRegularProgramIds } from '@/lib/generators/regularProgramDefaults';
 import { listTemplates } from '@/features/subtitle-template/templateClient';
 import type { SubtitleTemplate } from '@/features/subtitle-template/model';
-import type { SavedProgram } from '@/lib/generators/programTypes';
-import QuoteProgramCreateButton from './QuoteProgramCreateButton';
+import {
+  SEED_TEMPLATE_NAME as DEFAULT_TEMPLATE_NAME,
+  getActiveTemplateName,
+} from '@/features/subtitle-template/activeTemplate';
 
 // 설교자 선택지 — 순서 고정, 마지막 '직접기입' 선택 시 텍스트 입력
 const PREACHER_OPTIONS = ['한만상 목사', '김동경 강도사'];
@@ -42,7 +46,7 @@ const textareaCls =
   'w-full px-3 py-3 rounded-lg border border-gray-300 text-sm leading-relaxed resize-y focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none font-mono';
 const legendCls = 'text-xs font-bold text-violet-700 uppercase tracking-widest mb-3';
 const labelCls = 'block text-xs font-medium text-gray-600 mb-1';
-const DEFAULT_TEMPLATE_NAME = 'basic-001';
+
 
 export default function WorshipServiceForm() {
   // 설교자 섹션의 소속/교회 슬롯에 들어갈 교회 이름 — 직접기입 (활성 교회가 있으면 초기값, 없으면 울주교회)
@@ -54,7 +58,8 @@ export default function WorshipServiceForm() {
   const [customWorshipName, setCustomWorshipName] = useState('');
   const [customDate, setCustomDate] = useState('');
   const [worshipFileNameInput, setWorshipFileNameInput] = useState('');
-  const [templateName, setTemplateName] = useState(DEFAULT_TEMPLATE_NAME);
+  /* 이 교회가 고른 세트를 기본 선택으로 둔다 (여기서 바꿔도 이번 생성에만 적용) */
+  const [templateName, setTemplateName] = useState(getActiveTemplateName);
   const [templates, setTemplates] = useState<SubtitleTemplate[]>([]);
   // 설교대지
   const [sermonTitle, setSermonTitle] = useState('');
@@ -75,9 +80,11 @@ export default function WorshipServiceForm() {
   // 주일낮예배 추가 프로그램 — 템플릿 등록 전까지 내용 필드만 받는다.
   const [campaignText, setCampaignText] = useState('');
   const [churchNewsText, setChurchNewsText] = useState('');
-  const [selectedRegularProgramIds, setSelectedRegularProgramIds] = useState<RegularProgramId[]>([]);
-  const [fixedPrograms, setFixedPrograms] = useState<SavedProgram[]>([]);
-  const [selectedFixedProgramIds, setSelectedFixedProgramIds] = useState<string[]>([]);
+  // [FEATURE: REGULAR_PROGRAM_DEFAULTS] 예배 종류별 기본 체크로 시작한다 (해제 자유).
+  //   규칙은 lib/generators/regularProgramDefaults.ts 한 곳에만 있다.
+  const [selectedRegularProgramIds, setSelectedRegularProgramIds] = useState<RegularProgramId[]>(
+    () => getDefaultRegularProgramIds(worshipType),
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<WorshipServiceResult | null>(null);
@@ -115,12 +122,6 @@ export default function WorshipServiceForm() {
 
   useEffect(() => {
     void listTemplates().then(setTemplates);
-    void fetch('/api/fixed-programs', { cache: 'no-store' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { programs?: SavedProgram[] } | null) => {
-        if (Array.isArray(data?.programs)) setFixedPrograms(data.programs);
-      })
-      .catch(() => setFixedPrograms([]));
   }, []);
 
   useEffect(() => {
@@ -158,8 +159,22 @@ export default function WorshipServiceForm() {
   const actualPreacher =
     preacherSelect === PREACHER_CUSTOM ? customPreacher.trim() : preacherSelect;
 
-  const isValid =
-    !!actualWorshipType && !!sermonTitle.trim() && !!scriptureRef.trim() && !!actualPreacher;
+  // 예배 종류만 정해지면, 좌측 폼 중 어느 한 섹션이라도 채워졌거나 정기 프로그램을 하나라도
+  //   선택했으면 생성할 수 있다(설교 정보 전체를 요구하지 않는다).
+  const hasAnyContent =
+    !!sermonTitle.trim()
+    || !!scriptureRef.trim()
+    || !!actualPreacher
+    || !!quotesText.trim()
+    || !!hymn1Number.trim()
+    || !!hymn2Number.trim()
+    || extraHymns.some((h) => h.trim())
+    || !!praiseSongs.trim()
+    || !!preparationPraiseSongs.trim()
+    || !!campaignText.trim()
+    || !!churchNewsText.trim()
+    || selectedRegularProgramIds.length > 0;
+  const isValid = !!actualWorshipType && hasAnyContent;
 
   const handleSubmit = async () => {
     if (!isValid || submitting) return;
@@ -182,7 +197,6 @@ export default function WorshipServiceForm() {
         preparationPraiseProgramName: preparationPraiseProgramName.trim(),
         preparationPraiseSongs,
         selectedRegularProgramIds,
-        selectedFixedProgramIds,
         campaignText,
         churchNewsText,
       };
@@ -295,6 +309,10 @@ export default function WorshipServiceForm() {
                       setWorshipType(e.target.value);
                       if (e.target.value !== WORSHIP_OTHER_VALUE) setCustomWorshipName('');
                       setCustomDate('');
+                      // [FEATURE: REGULAR_PROGRAM_DEFAULTS] 예배를 바꾸면 기본 체크를 다시 잡는다.
+                      //   이후 체크 해제·추가는 자유. (useEffect 가 아니라 여기서 처리 —
+                      //   기타 예배명 타이핑 중에 체크가 초기화되지 않게 하려는 것)
+                      setSelectedRegularProgramIds(getDefaultRegularProgramIds(e.target.value));
                     }}
                     className="w-full h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
                   >
@@ -409,14 +427,7 @@ export default function WorshipServiceForm() {
                   본문묵상 = 입력한 요절 그대로 크게 · 말씀찾기(본문) = 1절부터 끝절까지 절별 자동 섹션화
                 </p>
                 <div>
-                  <div className="mb-1 flex items-center justify-between gap-3">
-                    <label className={`${labelCls} mb-0`}>말씀찾기(인용) · 대지타이틀</label>
-                    <QuoteProgramCreateButton
-                      worshipDate={worshipDate}
-                      templateName={templateName}
-                      quotesText={quotesText}
-                    />
-                  </div>
+                  <label className={labelCls}>말씀찾기(인용) · 대지타이틀</label>
                   <textarea
                     value={quotesText}
                     onChange={(e) => setQuotesText(e.target.value)}
@@ -531,12 +542,14 @@ export default function WorshipServiceForm() {
                     />
                   </div>
                   <div>
-                    <label className={labelCls}>교회소식</label>
+                    <label className={labelCls}>
+                      교회소식 <span className="font-normal normal-case text-gray-400">— 빈 줄로 섹션 구분</span>
+                    </label>
                     <textarea
                       value={churchNewsText}
                       onChange={(e) => setChurchNewsText(e.target.value)}
-                      rows={3}
-                      placeholder="교회소식 내용을 입력합니다."
+                      rows={6}
+                      placeholder={'매주 목요일은 울주전도의 날로 실천합니다.\n\n8월1일(토) 월삭감사예배를 드립니다.\n\n(빈 줄로 나누면 소식마다 섹션이 생성됩니다)'}
                       className={textareaCls}
                     />
                   </div>
@@ -573,6 +586,8 @@ export default function WorshipServiceForm() {
                   <button
                     key={p.order}
                     type="button"
+                    role={selectable ? 'checkbox' : undefined}
+                    aria-checked={selectable ? p.included : undefined}
                     disabled={!selectable}
                     onClick={() => {
                       if (p.regularProgramId) toggleRegularProgram(p.regularProgramId);
@@ -585,6 +600,21 @@ export default function WorshipServiceForm() {
                           : 'border-gray-100 bg-gray-50 opacity-50'
                     } ${selectable ? 'cursor-pointer' : 'cursor-default'}`}
                   >
+                    {/* 선택 가능한 정기 프로그램은 체크박스로 포함 여부를 명확히 보여준다 */}
+                    {selectable ? (
+                      <span
+                        aria-hidden
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold ${
+                          p.included
+                            ? 'border-violet-600 bg-violet-600 text-white'
+                            : 'border-gray-300 bg-white text-transparent'
+                        }`}
+                      >
+                        ✓
+                      </span>
+                    ) : (
+                      <span aria-hidden className="h-4 w-4 shrink-0" />
+                    )}
                     <span className={`text-[10px] font-mono font-bold ${p.included ? 'text-violet-600' : visible ? 'text-violet-400' : 'text-gray-400'}`}>
                       {p.order}
                     </span>
@@ -607,36 +637,8 @@ export default function WorshipServiceForm() {
                 );
               })}
             </div>
-            {fixedPrograms.length > 0 && (
-              <div className="mt-5 border-t border-gray-200 pt-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-gray-500">고정 라이브러리</h4>
-                  <span className="text-[10px] text-gray-400">워십 생성 시 선택 자료 추가</span>
-                </div>
-                <div className="grid gap-1.5 sm:grid-cols-2">
-                  {fixedPrograms.map((program) => {
-                    const included = selectedFixedProgramIds.includes(program.id);
-                    return (
-                      <button
-                        key={program.id}
-                        type="button"
-                        onClick={() => setSelectedFixedProgramIds((current) =>
-                          included ? current.filter((id) => id !== program.id) : [...current, program.id],
-                        )}
-                        className={`flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-left text-[11px] transition-colors ${
-                          included
-                            ? 'border-amber-300 bg-amber-50 text-amber-800'
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-amber-300'
-                        }`}
-                      >
-                        <span className="min-w-0 truncate">{program.item.title}</span>
-                        <span className="shrink-0 text-[10px] font-bold">{included ? '포함' : '추가'}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* [제거] 고정 라이브러리 선택 UI — 예배 중 돌발 상황용이라 송출그리드(긴급 말씀찾기)에서만 사용한다.
+                워십 생성 단계에서는 노출하지 않는다. */}
             <p className="mt-4 text-[11px] text-gray-400 leading-relaxed">
               템플릿은 각 카테고리의 <span className="font-mono font-semibold">basic-001</span> 을 사용합니다.
               미등록 카테고리는 기본 디자인으로 생성되며, 나중에 템플릿 등록 후 다시 생성하면 반영됩니다.

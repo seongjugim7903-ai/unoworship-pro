@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
+import { createWriteStream } from 'fs';
 import path from 'path';
+// [FIX: UPLOAD_STREAMING] 업로드를 메모리에 올리지 않고 디스크로 흘려보낸다
+import { Readable, Transform } from 'stream';
+import { pipeline } from 'stream/promises';
 import { rejectLargeRequest, requireRequestRole, requireTrustedWriteRequest } from '@/lib/auth/serverAuth';
+import { dataPath } from '@/lib/localLibraryPath';
 
 export const runtime = 'nodejs';
 // 큰 영상 저장에 대비한 타임아웃 여유값(자체 호스팅 커스텀 서버에선 사실상 무제한).
 export const maxDuration = 60;
-
-import { dataPath } from '@/lib/localLibraryPath';
 
 const DATA_DIR = dataPath('media', 'videos');
 const MAX_VIDEO_UPLOAD_BYTES = 1024 * 1024 * 1024;
@@ -65,12 +68,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const bytes = Buffer.from(await req.arrayBuffer());
-    if (bytes.length <= 0 || bytes.length > MAX_VIDEO_UPLOAD_BYTES) {
-      return NextResponse.json(
-        { error: 'Video file size is invalid or too large.' },
-        { status: 413 }
-      );
+    // [FIX: UPLOAD_STREAMING] 예전에는 `Buffer.from(await req.arrayBuffer())` 로
+    //   파일 전체를 메모리에 올린 뒤에야 크기를 검사했다. 상한이 1GB 라 큰 영상에서
+    //   ArrayBuffer + Buffer 사본으로 파일 크기의 2배가 순간에 잡혀 서버가 죽었고,
+    //   그동안 브라우저에 "페이지를 찾을 수 없습니다" 가 떴다.
+    //   이제 요청 본문을 디스크로 흘려보내 메모리 사용량이 파일 크기와 무관하다.
+    if (!req.body) {
+      return NextResponse.json({ error: 'Empty request body.' }, { status: 400 });
     }
 
     await ensureDir();
@@ -78,13 +82,47 @@ export async function POST(req: NextRequest) {
     const safeBase = sanitizeBaseName(originalName);
     const filename = `${Date.now()}-${safeBase}.${ext}`;
     const fp = path.join(DATA_DIR, filename);
-    await fs.writeFile(fp, bytes);
+
+    let written = 0;
+    let tooLarge = false;
+    // 상한 초과를 다 받은 뒤가 아니라 **흘려보내는 중에** 감지해 즉시 끊는다.
+    const limitGuard = new Transform({
+      transform(chunk, _enc, cb) {
+        written += chunk.length;
+        if (written > MAX_VIDEO_UPLOAD_BYTES) {
+          tooLarge = true;
+          cb(new Error('VIDEO_TOO_LARGE'));
+          return;
+        }
+        cb(null, chunk);
+      },
+    });
+
+    try {
+      await pipeline(
+        Readable.fromWeb(req.body as Parameters<typeof Readable.fromWeb>[0]),
+        limitGuard,
+        createWriteStream(fp),
+      );
+    } catch (streamErr) {
+      // 실패하면 부분 파일을 남기지 않는다 — 깨진 파일을 물고 재생하지 않도록.
+      await fs.rm(fp, { force: true }).catch(() => {});
+      if (tooLarge) {
+        return NextResponse.json({ error: 'Video file is too large.' }, { status: 413 });
+      }
+      throw streamErr;
+    }
+
+    if (written <= 0) {
+      await fs.rm(fp, { force: true }).catch(() => {});
+      return NextResponse.json({ error: 'Video file is empty.' }, { status: 413 });
+    }
 
     return NextResponse.json({
       video: {
         filename,
         originalName,
-        size: bytes.length,
+        size: written,
         contentType: contentType || `video/${ext}`,
         url: `/api/media/videos/${encodeURIComponent(filename)}`,
       },

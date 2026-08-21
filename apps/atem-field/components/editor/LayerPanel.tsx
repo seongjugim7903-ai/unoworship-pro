@@ -85,6 +85,14 @@ function LockIcon({ locked }: { locked: boolean }) {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+      <path d="M2 3h8M5 3V2h2v1M3 3l.5 7h5L9 3" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /* ── 레이어 액션 버튼 SVG ─────────────────────────── */
 const LAYER_BTNS: {
   action: LayerAction;
@@ -177,6 +185,7 @@ export default function LayerPanel() {
     selectedElementId,
     setSelectedElement,
     updateElement,
+    removeElement,
   } = useStore();
 
   const setlist = setlists.find((sl) => sl.id === currentSetlistId);
@@ -220,6 +229,17 @@ export default function LayerPanel() {
     updateElement(currentSetlistId!, activeItemId!, activeSectionId!, el.id, {
       locked: !el.locked,
     });
+  }
+
+  // ── 요소 삭제 — [UNDO] ────────────────────────
+  //   [FEATURE: DELETE_UNCAST] Delete 키는 송출 해제 전용이라, 캔버스 요소 삭제는
+  //   우클릭 메뉴와 이 버튼(마우스)로만 한다(2026-08-16 사용자 확정).
+  function handleDeleteElement(el: CanvasElement, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!isReady) return;
+    undoManager.pushState(elements);
+    removeElement(currentSetlistId!, activeItemId!, activeSectionId!, el.id);
+    if (selectedElementId === el.id) setSelectedElement(null);
   }
 
   return (
@@ -343,6 +363,17 @@ export default function LayerPanel() {
                     `}
                   >
                     <LockIcon locked={el.locked} />
+                  </button>
+
+                  {/* 삭제 버튼 — [FEATURE: DELETE_UNCAST] 캔버스 요소 삭제 전용(맨 오른쪽).
+                      Delete 키는 송출 해제 전용이므로 요소 삭제는 여기 또는 우클릭으로. */}
+                  <button
+                    onClick={(e) => handleDeleteElement(el, e)}
+                    title="요소 삭제"
+                    className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded
+                               text-gray-600 transition-colors hover:bg-red-600 hover:text-white"
+                  >
+                    <TrashIcon />
                   </button>
                 </li>
               );

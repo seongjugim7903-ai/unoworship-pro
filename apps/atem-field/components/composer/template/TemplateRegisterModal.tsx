@@ -13,6 +13,12 @@ import {
 } from '@/features/subtitle-template/schema';
 import { TEMPLATE_VERSION, type SubtitleTemplate } from '@/features/subtitle-template/model';
 import { listTemplates, removeTemplate, saveTemplate } from '@/features/subtitle-template/templateClient';
+import {
+  SEED_TEMPLATE_NAME,
+  getActiveTemplateName,
+  listTemplateSetNames,
+  setActiveTemplateName,
+} from '@/features/subtitle-template/activeTemplate';
 import { renderTemplateThumbnail } from '@/features/subtitle-template/thumbnail';
 
 const CATEGORY_ORDER: TemplateCategory[] = [
@@ -23,6 +29,7 @@ const CATEGORY_ORDER: TemplateCategory[] = [
   'sermon',
   'worshipTitle',
   'notice',
+  'churchNews',
   'lowerthird',
   'apostlesCreed',
   'preacher',
@@ -78,6 +85,9 @@ export function TemplateRegisterModal({ isOpen, onClose }: Props) {
   const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [existing, setExisting] = useState<SubtitleTemplate[]>([]);
+  /* 이 교회가 쓰는 세트 이름. localStorage 는 최초 마운트에서 한 번만 읽는다 —
+     이 모달이 유일한 변경 지점이라 이후에는 화면 상태가 곧 저장값이다. */
+  const [activeSet, setActiveSet] = useState(getActiveTemplateName);
 
   const reloadExisting = useCallback(() => {
     void listTemplates().then(setExisting);
@@ -87,6 +97,8 @@ export function TemplateRegisterModal({ isOpen, onClose }: Props) {
   useEffect(() => {
     if (isOpen) reloadExisting();
   }, [isOpen, reloadExisting]);
+
+  const setNames = useMemo(() => listTemplateSetNames(existing), [existing]);
 
   // 카테고리 변경 시 현 카테고리에 없는 역할 선택은 초기화한다(이펙트 대신 이벤트 핸들러에서 처리).
   const changeCategory = useCallback((cat: TemplateCategory) => {
@@ -104,8 +116,33 @@ export function TemplateRegisterModal({ isOpen, onClose }: Props) {
   const fields = CATEGORY_FIELDS[category];
   const canSave = Boolean(name.trim() && activeElements.length > 0);
 
+  /**
+   * 같은 카테고리·같은 이름으로 이미 저장된 템플릿.
+   * listTemplates() 는 /api/templates 의 순서를 그대로 유지하고, 프로그램 생성 시
+   * loadTemplatePicker 도 같은 순서에서 첫 번째를 고른다 — 즉 [0] 이 실제로 쓰이는 것이다.
+   * 새 id 로 저장하면 파일만 하나 더 생기고 옛것이 계속 이기므로, [0] 에 덮어쓴다.
+   */
+  const duplicates = useMemo(
+    () => existing.filter((t) => t.category === category && t.name === name.trim()),
+    [existing, category, name],
+  );
+
   const handleSave = useCallback(async () => {
     if (!canSave) return;
+
+    const target = duplicates[0];
+    if (target && typeof window !== 'undefined') {
+      const ok = window.confirm(
+        `"${name.trim()}" (${CATEGORY_LABELS[category]}) 템플릿이 이미 있습니다.\n덮어쓸까요?\n\n` +
+          '덮어쓰지 않으면 같은 이름이 둘이 되고, 프로그램 생성에는 먼저 등록된 옛것이 계속 쓰입니다.',
+      );
+      if (!ok) {
+        setStatus('idle');
+        setMessage('저장을 취소했습니다.');
+        return;
+      }
+    }
+
     setStatus('saving');
     setMessage('저장 중입니다.');
 
@@ -123,27 +160,36 @@ export function TemplateRegisterModal({ isOpen, onClose }: Props) {
 
     const iso = new Date().toISOString();
     const template: SubtitleTemplate = {
-      id: `tpl-${Date.now()}`,
+      /* 같은 이름이 있으면 그 파일을 덮어쓴다(id = 파일명). 없으면 새로 만든다. */
+      id: target?.id ?? `tpl-${Date.now()}`,
       name: name.trim(),
       category,
       templateVersion: TEMPLATE_VERSION,
       thumbnail: thumbnail || undefined,
       variants: [{ id: 'body', label: '본문', elements: variantElements }],
-      createdAt: iso,
+      createdAt: target?.createdAt ?? iso,
       updatedAt: iso,
     };
 
     const ok = await saveTemplate(template);
     if (ok) {
       setStatus('idle');
-      setMessage(`"${template.name}" 저장됨`);
+      /* 예전에 쌓인 중복이 남아 있으면 알려 준다 — 지우지 않으면 계속 헷갈린다. */
+      const leftovers = Math.max(0, duplicates.length - 1);
+      setMessage(
+        leftovers > 0
+          ? `"${template.name}" 덮어씀 — 같은 이름이 ${leftovers}개 더 있습니다. 아래 목록에서 지워 주세요.`
+          : target
+            ? `"${template.name}" 덮어씀`
+            : `"${template.name}" 저장됨`,
+      );
       setName('');
       reloadExisting();
     } else {
       setStatus('error');
       setMessage('저장에 실패했습니다. 운영자 권한으로 로그인되어 있는지 확인해 주세요.');
     }
-  }, [canSave, activeElements, roles, name, category, autoFitBody, reloadExisting]);
+  }, [canSave, duplicates, activeElements, roles, name, category, autoFitBody, reloadExisting]);
 
   const handleDelete = useCallback(
     async (id: string, tName: string) => {
@@ -177,6 +223,33 @@ export function TemplateRegisterModal({ isOpen, onClose }: Props) {
           <button onClick={onClose} className="text-lg leading-none text-gray-500 hover:text-gray-300">
             ×
           </button>
+        </div>
+
+        {/* 이 교회가 쓰는 세트 — 자동 생성(설교대지·말씀찾기·예배 자막 협조·빠른 성경)이 모두 이걸 쓴다 */}
+        <div className="mb-3 rounded-md border border-[#2f2f2f] bg-[#141414] p-3">
+          <div className="flex items-center gap-2">
+            <label className="shrink-0 text-[11px] text-gray-400">이 교회 기본 세트</label>
+            <select
+              value={activeSet}
+              onChange={(e) => {
+                setActiveTemplateName(e.target.value);
+                setActiveSet(e.target.value);
+              }}
+              className="h-8 min-w-0 flex-1 rounded-md border border-[#333] bg-[#0a0a0a] px-2 text-xs text-white outline-none focus:border-blue-500"
+            >
+              {setNames.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                  {n === SEED_TEMPLATE_NAME ? ' (제품 기본)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-gray-500">
+            자동으로 만들어지는 프로그램이 이 세트를 씁니다. 이 세트에 없는 카테고리는{' '}
+            <span className="font-mono text-gray-400">{SEED_TEMPLATE_NAME}</span> 으로 자동 대체되고,
+            제품 업데이트는 <span className="font-mono text-gray-400">{SEED_TEMPLATE_NAME}</span> 만 갱신합니다.
+          </p>
         </div>
 
         {activeElements.length === 0 ? (
@@ -214,6 +287,13 @@ export function TemplateRegisterModal({ isOpen, onClose }: Props) {
                 placeholder="예: 성경 기본 하단자막"
                 className="h-9 w-full rounded-md border border-[#333] bg-[#0a0a0a] px-3 text-sm text-white placeholder-gray-600 outline-none focus:border-blue-500"
               />
+              {/* 저장을 누르기 전에 덮어쓰기 여부를 알 수 있게 한다 */}
+              {duplicates.length > 0 && (
+                <p className="mt-1 text-[10px] leading-relaxed text-amber-400">
+                  같은 이름의 {CATEGORY_LABELS[category]} 템플릿이 이미 있습니다 — 저장하면 덮어씁니다.
+                  {duplicates.length > 1 && ` (지금 ${duplicates.length}개 중복 · 저장 후 나머지를 지워 주세요)`}
+                </p>
+              )}
             </div>
 
             {/* 텍스트 박스 역할 지정 */}

@@ -17,7 +17,7 @@ import {
 export const runtime = 'nodejs';
 
 const execFileAsync = promisify(execFile);
-// 소스 스캔 폴더: 사용자 다운로드 폴더(요청). 아카이브·출력 경로는 로컬 라이브러리 모듈을 따른다.
+// 소스 스캔 폴더: 사용자 다운로드 폴더(요청). 아카이브·출력 경로는 기존 그대로 유지한다.
 const INBOX_DIR = path.join(os.homedir(), 'Downloads');
 const INBOX_ARCHIVE_DIR = archivePath();
 const GENERATED_DIR = manifestsPath();

@@ -12,7 +12,7 @@
  * 영상: 플레이스홀더 표시
  */
 
-import { useRef, useEffect, useState, useCallback, memo } from 'react';
+import { useRef, useEffect, useState, useCallback, memo, type PointerEvent } from 'react';
 import { Section } from '@/lib/types';
 import { CanvasElement } from '@/lib/canvasTypes';
 import { renderElements, preloadImages } from '@/lib/canvasRenderer';
@@ -125,7 +125,11 @@ const SectionCard = memo(function SectionCard({
   // ── 클릭 판정: 한번=선택 / 두번=송출 / 세번+=무시 (별도 훅으로 분리) ──
   const runSectionClick = useSectionClick({ onSingle: onSelect, onDouble: onDoubleClick });
 
-  const handlePointerDown = useCallback(() => {
+  const handlePointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    // 섹션 카드는 클릭 판정만 맡고, 포커스는 번호 송출 입력칸에 유지한다.
+    // 트리플 이상 클릭이 무시될 때도 브라우저가 카드로 포커스를 빼앗지 않게 한다.
+    event.preventDefault();
     if (contextMenu) { setContextMenu(null); return; } // 컨텍스트 메뉴 열려 있으면 닫기만
     runSectionClick();
   }, [contextMenu, runSectionClick]);

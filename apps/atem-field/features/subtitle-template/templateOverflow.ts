@@ -292,15 +292,21 @@ export function applyBibleTemplate(
   const bodyParts = splitTemplateBody(template, fields.body ?? '', { strategy: opts.splitStrategy });
   if (!bodyParts) return applyTemplate(template, { fields }, baseOptions);
 
-  return bodyParts.flatMap((part, index) =>
-    applyTemplate(
+  return bodyParts.flatMap((part, index) => {
+    // 절이 길어서 나뉜 것을 화면에서 알 수 있게, 마지막 조각을 뺀 나머지 끝에 '-' 를 붙인다.
+    //   (예: 3개로 나뉘면 1·2번째 섹션 끝에만 표시)
+    const isLastPart = index === bodyParts.length - 1;
+    //   '-' 를 붙여 박스를 넘치면(줄이 하나 더 생기면) 레이아웃이 깨지므로 그때는 표시를 생략한다.
+    const marked = `${part.replace(/\s+$/, '')} -`;
+    const body = isLastPart || !templateBodyFits(template, marked) ? part : marked;
+    return applyTemplate(
       template,
-      { fields: { ...fields, body: part } },
+      { fields: { ...fields, body } },
       {
         ...baseOptions,
         idPrefix: `${opts.idPrefix}-s${index + 1}`,
         label: `${opts.label ?? ''} (${index + 1}/${bodyParts.length})`,
       },
-    ),
-  );
+    );
+  });
 }

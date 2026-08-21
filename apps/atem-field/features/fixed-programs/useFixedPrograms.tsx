@@ -133,6 +133,44 @@ export function useFixedPrograms(
     });
   }, [addItem, currentSetlistId, setActiveItem, setActiveSection]);
 
+  /**
+   * [FEATURE: FIXED_PROGRAM_BATCH] 체크한 프로그램을 한 번에 배치한다.
+   *
+   * 단일 배치(handleSelect)를 그대로 재사용하지 않는 이유:
+   *   handleSelect 는 배치할 때마다 activeItem/activeSection 을 옮긴다. 여러 개를
+   *   돌리면 마지막 것으로 끌려가고, 중간 상태가 깜빡인다. 여기서는 전부 담은 뒤
+   *   **첫 번째** 프로그램으로 한 번만 이동한다.
+   *
+   * 송출은 하지 않는다 — 여러 섹션을 동시에 송출할 수는 없다.
+   */
+  const handleSelectMany = useCallback(async (selected: SavedProgram[]) => {
+    if (selected.length === 0) return;
+    if (!currentSetlistId) throw new Error('현재 예배 세트리스트가 없습니다.');
+    const currentSetlist = useStore.getState().setlists.find((setlist) => setlist.id === currentSetlistId);
+    if (!currentSetlist) throw new Error('현재 예배 세트리스트를 찾지 못했습니다.');
+
+    const placed: { program: SavedProgram; item: SetlistItem }[] = [];
+    for (const program of selected) {
+      const item = cloneForPlacement(program.item);
+      addItem(currentSetlistId, item);
+      placed.push({ program, item });
+    }
+
+    const first = placed[0];
+    if (first) {
+      setActiveItem(first.item.id);
+      const firstSection = first.item.sections[0];
+      if (firstSection) setActiveSection(firstSection.id);
+    }
+
+    // 저장 실패가 배치 자체를 막지 않도록 개별로 흘려보낸다 (단일 배치와 동일 규칙).
+    for (const { program, item } of placed) {
+      void savePlacement(program, currentSetlistId, currentSetlist.name, item).catch((caught) => {
+        console.warn('[FixedPrograms] 고정 프로그램 배치 저장 실패', program.item.title, caught);
+      });
+    }
+  }, [addItem, currentSetlistId, setActiveItem, setActiveSection]);
+
   useEffect(() => {
     if (!pendingSectionId) return;
     const index = allSections.findIndex((entry) => entry.section.id === pendingSectionId);
@@ -150,6 +188,7 @@ export function useFixedPrograms(
           error,
           onRefresh: () => void loadPrograms(),
           onSelect: handleSelect,
+          onSelectMany: handleSelectMany,
           onClose: () => setOpen(false),
         })
       : null,

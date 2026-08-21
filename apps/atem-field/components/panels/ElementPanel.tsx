@@ -14,6 +14,8 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { undoManager } from '@/lib/undoManager';
+// [FEATURE: TEXT_RUNS] 선택 구간 디자인 — 신형 속성창과 공용
+import TextRunStylePanel from '@/components/text-runs/TextRunStylePanel';
 import {
   CanvasElement, ShapeElement, TextElement, ImageElement,
   ShapeType, GradientConfig, DEFAULT_GRADIENT,
@@ -1586,13 +1588,20 @@ export default function ElementPanel() {
             </>
           )}
 
+          {/* [FEATURE: TEXT_RUNS] 선택한 단어만 다른 디자인 — 신형 속성창과 공용 패널.
+              위 타이포그래피는 박스 전체에 적용되고, 이 아래는 드래그로 고른 구간에만
+              적용된다. 기획: docs/features/text-runs/PLAN.md */}
+          {el.type === 'text' && (
+            <TextRunStylePanel el={el as TextElement} upd={(patch) => upd(patch as Partial<CanvasElement>)} />
+          )}
+
           {/* ── 잠금 · 표시 ── */}
           <SectionTitle>기타</SectionTitle>
           <Row label="고정">
             <Toggle
               checked={el.fixedLayer === true}
               onChange={(v) => upd({ fixedLayer: v } as Partial<CanvasElement>)}
-              label={el.fixedLayer ? '항상 표시' : '섹션 전용'}
+              label={el.fixedLayer ? '프로그램 내 항상 표시' : '섹션 전용'}
             />
           </Row>
           <Row label="레이어">

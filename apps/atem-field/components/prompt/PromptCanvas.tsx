@@ -23,7 +23,8 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useCamera } from '@/hooks/useCamera';
 import { useAutoCamera } from '@/hooks/useAutoCamera'; // [FEATURE: AUTO_CAMERA]
-import { useSocketReceiver } from '@/hooks/useSocketReceiver'; // [FEATURE: SOCKET_IO]
+import { useSocketReceiver } from '@/hooks/useSocketReceiver';
+import { useLocalVideoControl } from '@/hooks/useLocalVideoControl'; // [FEATURE: LOCAL_VIDEO_CONTROL]
 import { SubtitleStyle, DEFAULT_SUBTITLE_STYLE, PromptLayoutType } from '@/lib/types';
 import { CanvasElement, VideoElement, isElementVisibleOn } from '@/lib/canvasTypes';
 import { SocketMessage, isSocketMessageTargetedTo, type SectionKind } from '@/lib/socketEvents'; // [FEATURE: SOCKET_IO]
@@ -150,6 +151,11 @@ export default function PromptCanvas() {
   // YouTube iframe refs (youtubeId → iframe)
   const iframeRefs = useRef<Map<string, HTMLIFrameElement>>(new Map());
 
+  // [FEATURE: LOCAL_VIDEO_CONTROL] 로컬 영상 원격 제어.
+  //   프롬프트는 모니터링 화면이라 audio 를 넘기지 않는다 = 항상 음소거.
+  const { registerVideo: registerLocalVideo, pruneVideos: pruneLocalVideos } =
+    useLocalVideoControl();
+
   // [FEATURE: YT_STANDBY] 각 YouTube 플레이어의 재생 상태 추적.
   // receiver 가 VIDEO_COMMAND (playVideo) 를 받을 때 이미 재생 중(state=1)이면
   // 중복 명령을 스킵해서 "다다다다" 스터터를 방지.
@@ -160,6 +166,11 @@ export default function PromptCanvas() {
   //   상태 (state=1) 에 진입하는 순간 "최종 seek" 을 한 번 더 강제하여
   //   iframe 로드 타이밍 지연으로 0:00 부터 재생되는 문제를 방지.
   const pendingSeekRef = useRef<Map<string, number>>(new Map());
+
+  // [FIX: YT_CONTROL] pause/stop 이후 재생 억제 대상 (youtubeId).
+  //   playVideo 재시도(최대 3.2초)가 남아 있는 동안 일시정지를 누르면 다시
+  //   재생되어 강대상과 프롬프트가 어긋난다. OutputCanvas 와 동일한 처리.
+  const playSuppressedRef = useRef<Set<string>>(new Set());
 
   // 모션 애니메이션 시작 시각 (ELEMENTS_UPDATE 수신 시 설정)
   const motionStartRef = useRef<number>(0);
@@ -442,7 +453,9 @@ export default function PromptCanvas() {
       playingIdsRef.current.delete(youtubeId);
       pendingSeekRef.current.delete(youtubeId);
     }
-  }, [videoElements]);
+    // [FEATURE: LOCAL_VIDEO_CONTROL] 사라진 로컬 영상 참조도 함께 정리
+    pruneLocalVideos(videoElements.map((video) => video.id));
+  }, [pruneLocalVideos, videoElements]);
 
   const triggerPromptTransition = useCallback((
     _transition: { type: string; duration: number } | undefined,
@@ -527,6 +540,7 @@ export default function PromptCanvas() {
     const iframeMap = iframeRefs.current;
     const playingIds = playingIdsRef.current;
     const pendingSeek = pendingSeekRef.current;
+    const playSuppressed = playSuppressedRef.current;
 
     return () => {
       for (const timer of timers) clearTimeout(timer);
@@ -536,6 +550,7 @@ export default function PromptCanvas() {
       iframeMap.clear();
       playingIds.clear();
       pendingSeek.clear();
+      playSuppressed.clear();
     };
   }, []);
 
@@ -764,9 +779,12 @@ export default function PromptCanvas() {
 
         if (command === 'playVideo') {
           // state=1 이 확인되는 즉시 재시도 중단 → 스터터 방지
+          playSuppressedRef.current.delete(youtubeId);
           const delays = [0, 500, 1100, 2000, 3200];
           for (const delay of delays) {
             scheduleYouTubeCommand(() => {
+              // [FIX: YT_CONTROL] 그 사이 일시정지/정지가 들어왔으면 재시도 포기
+              if (playSuppressedRef.current.has(youtubeId)) return;
               if (playingIdsRef.current.has(youtubeId)) return;
               sendOnce();
             }, delay);
@@ -783,6 +801,10 @@ export default function PromptCanvas() {
           }
         } else {
           // unMute / pause 등은 1회 전송
+          // [FIX: YT_CONTROL] 남아 있는 playVideo 재시도가 일시정지를 되돌리지 않도록
+          if (command === 'pauseVideo' || command === 'stopVideo') {
+            playSuppressedRef.current.add(youtubeId);
+          }
           sendOnce();
         }
         break;
@@ -1215,14 +1237,29 @@ export default function PromptCanvas() {
             />
           ) : (
             <video
+              // [FEATURE: LOCAL_VIDEO_CONTROL] 원격 제어용 등록 (오디오는 항상 끔)
+              ref={registerLocalVideo(vel.id)}
               src={vel.src}
               autoPlay={vel.autoplay}
               muted
               loop={vel.loop}
               playsInline
               preload="auto"
+              onLoadedMetadata={(e) => {
+                // [FEATURE: PAUSED_BROADCAST] 컨트롤 바에서 멈춰 둔 위치에서 시작한다.
+                //   없으면 항상 0초로 되돌아가 "멈춘 지점부터 송출" 이 안 된다.
+                if (vel.startTime && isFinite(vel.startTime)) {
+                  e.currentTarget.currentTime = vel.startTime;
+                }
+              }}
               onCanPlay={(e) => {
-                if (vel.autoplay) e.currentTarget.play().catch(() => {});
+                // [FIX: STOP_RESTART] seek 로도 canplay 가 다시 뜬다. 그때 또 play() 하면
+                //   ■(정지)로 0초로 되감은 직후 재생이 되살아난다. 자동 시작은 마운트 후
+                //   1회만 — 이후 재생/정지는 명령으로만 바뀐다.
+                const v = e.currentTarget;
+                if (!vel.autoplay || v.dataset.autostarted === '1') return;
+                v.dataset.autostarted = '1';
+                v.play().catch(() => {});
               }}
               style={{
                 width: '100%',

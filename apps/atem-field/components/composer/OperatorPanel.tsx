@@ -544,10 +544,15 @@ export default function OperatorPanel() {
   }, [isBlackout, setBlackout]);
 
   const clearText = useCallback(() => {
-    setActiveSection(null);
+    // [FIX: CLEAR_TEXT_KEEP_SECTION] 송출 해제는 출력 화면과 "송출 중" 표시만 끈다.
+    //   예전엔 setActiveSection(null) 로 편집 활성 섹션까지 해제해, 송출 해제 시
+    //   캔버스가 통째로 비어 "선택한 요소가 삭제된 것처럼" 보였다(2026-08-16 사용자 신고).
+    //   activeSection(편집 포커스)은 유지하고 broadcastSection(라이브 표시)만 해제한다
+    //   — SetlistPanel 의 다른 송출 해제 경로와 동일 규약.
     send({ type: 'CLEAR_TEXT' });
     clearAtemSubtitle();
-  }, [setActiveSection, send, clearAtemSubtitle]);
+    setBroadcastSection(null);
+  }, [send, clearAtemSubtitle, setBroadcastSection]);
 
   const openOutput = useCallback(() => {
     if (outputWindowRef.current && !outputWindowRef.current.closed) {

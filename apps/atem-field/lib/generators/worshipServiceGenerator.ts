@@ -3,7 +3,9 @@
 // 워십 ID는 "(예배일자)-worship" — 같은 날짜의 순서가 한 워십으로 묶여 방송실이 한 번에 불러온다.
 
 import type { Section, SetlistItem } from '@/lib/types';
+import type { TextElement } from '@/lib/canvasTypes';
 import type { SavedProgram } from './programTypes';
+import { resolveProgramCategory } from './programTypes';
 import { formatDateISO } from './worshipUploader';
 import { CHOIR_DESIGN } from './designs/choirDesign';
 import { chunkTwoLines, buildHymnSectionChunks } from './hymnLyrics';
@@ -13,9 +15,11 @@ import {
   type ScriptureTemplateSectionOptions,
 } from './scriptureTemplateSections';
 import { listTemplates } from '@/features/subtitle-template/templateClient';
+import { SEED_TEMPLATE_NAME } from '@/features/subtitle-template/activeTemplate';
 import { applyTemplate } from '@/features/subtitle-template/applyTemplate';
 import type { SubtitleTemplate } from '@/features/subtitle-template/model';
 import type { TemplateCategory } from '@/features/subtitle-template/schema';
+import { orderScriptureMainBeforeQuote } from '@/features/hidden-scripture/hiddenScripture'; // [FEATURE: SCRIPTURE_BEFORE_QUOTE]
 
 // ─── 폼 타입 ─────────────────────────────────────────────────────────────────
 
@@ -67,6 +71,7 @@ export interface WorshipServiceResult {
 }
 
 export type RegularProgramId =
+  | 'apostles-creed'
   | 'king-my-god'
   | 'bless-my-soul'
   | 'my-god'
@@ -146,28 +151,31 @@ const SONG_ONLY_JESUS = {
   ],
 };
 
-export function getRegularProgramOptions(worshipType: string): RegularProgramOption[] {
-  const isSundayMorning = worshipType === '주일낮예배';
-  const isSundayAfternoon = worshipType === '주일오후예배';
-
+// 예배 종류에 따른 자동 선택은 제거했다 — 사용자가 미리보기에서 하나씩 체크해 구성한다.
+//   (worshipType 인자는 호출부 호환·향후 예배별 기본값 복원 여지를 위해 유지)
+export function getRegularProgramOptions(_worshipType: string): RegularProgramOption[] {
   return [
-    { id: 'king-my-god', title: SONG_KING_MY_GOD.title, eligible: isSundayMorning, note: '주일낮예배 1·2부' },
-    { id: 'bless-my-soul', title: SONG_BLESS_MY_SOUL.title, eligible: !isSundayMorning, note: '주일낮예배 제외 정기예배' },
-    { id: 'my-god', title: SONG_MY_GOD.title, eligible: isSundayMorning, note: '주일낮예배 1·2부' },
-    { id: 'campaign', title: '행복한 신앙생활 캠페인', eligible: isSundayMorning, note: '주일낮예배 1·2부 · 필드' },
-    { id: 'church-news', title: '교회소식', eligible: isSundayMorning, note: '주일낮예배 1·2부 · 필드' },
-    { id: 'hephzibah', title: '헵시바 선교단', eligible: isSundayMorning, note: '주일낮예배 1·2부 · PPT 이미지 또는 빈 프로그램' },
+    { id: 'apostles-creed', title: '사도신경', eligible: true, note: '선택 시 생성 · 고정 라이브러리 자료 있으면 본문 포함' },
+    { id: 'king-my-god', title: SONG_KING_MY_GOD.title, eligible: true, note: '선택 시 생성' },
+    { id: 'bless-my-soul', title: SONG_BLESS_MY_SOUL.title, eligible: true, note: '선택 시 생성' },
+    { id: 'my-god', title: SONG_MY_GOD.title, eligible: true, note: '선택 시 생성' },
+    { id: 'campaign', title: '행복한 신앙생활 캠페인', eligible: true, note: '선택 시 생성 · 필드' },
+    { id: 'church-news', title: '교회소식', eligible: true, note: '선택 시 생성 · 필드' },
+    { id: 'hephzibah', title: '헵시바 선교단', eligible: true, note: '선택 시 생성 · PPT 이미지 또는 빈 프로그램' },
     { id: 'only-jesus', title: SONG_ONLY_JESUS.title, eligible: true, note: '추가 고정 찬양' },
-    { id: 'sending-song', title: SONG_SENDING.title, eligible: isSundayAfternoon, note: '주일오후예배' },
+    { id: 'sending-song', title: SONG_SENDING.title, eligible: true, note: '선택 시 생성' },
   ];
 }
 
 // ─── 템플릿 로딩 ─────────────────────────────────────────────────────────────
 
-const DEFAULT_TEMPLATE_NAME = 'basic-001';
+/* 시드 세트 이름 — 미등록 카테고리의 폴백 기준 (features/subtitle-template/activeTemplate.ts) */
+const DEFAULT_TEMPLATE_NAME = SEED_TEMPLATE_NAME;
 
-interface TemplatePicker {
+export interface TemplatePicker {
   get(category: TemplateCategory): SubtitleTemplate;
+  /** 그 카테고리로 등록된 템플릿이 실제로 있는지(폴백 디자인 여부 판단용) */
+  has(category: TemplateCategory): boolean;
   missing: Set<TemplateCategory>;
   selectedName: string;
 }
@@ -187,7 +195,7 @@ function makeFallbackTemplate(category: TemplateCategory): SubtitleTemplate {
   };
 }
 
-async function loadTemplatePicker(templateName: string): Promise<TemplatePicker> {
+export async function loadTemplatePicker(templateName: string): Promise<TemplatePicker> {
   let all: SubtitleTemplate[] = [];
   try {
     all = await listTemplates();
@@ -200,6 +208,9 @@ async function loadTemplatePicker(templateName: string): Promise<TemplatePicker>
   return {
     missing,
     selectedName,
+    has(category) {
+      return all.some((t) => t.category === category);
+    },
     get(category) {
       const cached = cache.get(category);
       if (cached) return cached;
@@ -224,7 +235,7 @@ interface BibleVerseDto {
   text: string;
 }
 
-interface BibleResponseDto {
+export interface BibleResponseDto {
   reference: string;
   bookId: string;
   chapter: number;
@@ -232,7 +243,7 @@ interface BibleResponseDto {
 }
 
 /** 개역개정 편집 소제목(<...>) 제거 — /api/bible buildSections 와 동일 규칙 */
-function stripHeadings(text: string): string {
+export function stripHeadings(text: string): string {
   return text
     .replace(/<[^>]*>/g, '')
     .replace(/^\s*-\d+\s+/, '')
@@ -240,7 +251,7 @@ function stripHeadings(text: string): string {
     .trim();
 }
 
-async function fetchBible(query: string): Promise<BibleResponseDto | null> {
+export async function fetchBible(query: string): Promise<BibleResponseDto | null> {
   try {
     const res = await fetch(`/api/bible?${query}`);
     if (!res.ok) return null;
@@ -260,7 +271,7 @@ export function isScriptureRefLine(line: string): boolean {
 
 // ─── 섹션/프로그램 빌더 ──────────────────────────────────────────────────────
 
-function makeSection(
+export function makeSection(
   picker: TemplatePicker,
   category: TemplateCategory,
   fields: Record<string, string>,
@@ -270,7 +281,7 @@ function makeSection(
   return applyTemplate(picker.get(category), { fields }, { idPrefix, label, colorMark: '#ffffff' });
 }
 
-function makeBibleSections(
+export function makeBibleSections(
   picker: TemplatePicker,
   fields: ScriptureTemplateFields,
   idPrefix: string,
@@ -285,7 +296,7 @@ function makeBibleSections(
   });
 }
 
-function makeMeditationSections(
+export function makeMeditationSections(
   picker: TemplatePicker,
   fields: ScriptureTemplateFields,
   idPrefix: string,
@@ -337,7 +348,7 @@ function buildSongItem(
   return { id: itemId, title, sections, promptLayout: 'none' };
 }
 
-interface LocalHymnDto {
+export interface LocalHymnDto {
   num: number;
   title: string;
   lyrics: string;
@@ -345,7 +356,7 @@ interface LocalHymnDto {
 }
 
 /** 로컬 찬송가 데이터(/api/hymn)에서 장 번호로 조회 */
-async function fetchHymn(num: number): Promise<LocalHymnDto | null> {
+export async function fetchHymn(num: number): Promise<LocalHymnDto | null> {
   try {
     const res = await fetch(`/api/hymn?num=${num}`);
     if (!res.ok) return null;
@@ -356,15 +367,45 @@ async function fetchHymn(num: number): Promise<LocalHymnDto | null> {
   }
 }
 
-async function fetchSlideImagePrograms(): Promise<SavedProgram[]> {
+export async function fetchSlideImagePrograms(): Promise<SavedProgram[]> {
   try {
     const res = await fetch('/api/programs?type=slide-images');
     if (!res.ok) return [];
     const data = (await res.json()) as { programs?: SavedProgram[] };
-    return Array.isArray(data.programs) ? data.programs : [];
+    // 개별 저장(category='program')은 워십 자동생성 풀에서 제외
+    return Array.isArray(data.programs)
+      ? data.programs.filter((p) => resolveProgramCategory(p) !== 'program')
+      : [];
   } catch {
     return [];
   }
+}
+
+/** 저장된 전 프로그램(data/programs) — 제목으로 최신본을 찾을 때 사용 */
+async function fetchAllPrograms(): Promise<SavedProgram[]> {
+  try {
+    const res = await fetch('/api/programs', { cache: 'no-store' });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { programs?: SavedProgram[] };
+    // 개별 저장(category='program')은 제목 키워드 매칭 대상에서 제외
+    return Array.isArray(data.programs)
+      ? data.programs.filter((p) => resolveProgramCategory(p) !== 'program')
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 제목에 키워드가 들어간 프로그램 중 '가장 최근에 저장된' 것을 찾는다.
+ *   섹션이 비어 있는 자리표시 프로그램은 건너뛴다(빈 파일이 최신이어도 내용 있는 걸 쓰도록).
+ */
+function latestProgramByKeyword(programs: SavedProgram[], keyword: string): SavedProgram | undefined {
+  const query = keyword.trim().toLowerCase();
+  return programs
+    .filter((program) => program.item.title.toLowerCase().includes(query))
+    .filter((program) => (program.item.sections?.length ?? 0) > 0)
+    .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0];
 }
 
 async function fetchFixedPrograms(): Promise<SavedProgram[]> {
@@ -394,7 +435,10 @@ async function resolveWorshipIdentity(baseId: string, baseName: string): Promise
     if (!res.ok) return { worshipId: baseId, worshipName: baseName, lookupFailed: true };
 
     const data = (await res.json()) as { programs?: SavedProgram[] };
-    const programs = Array.isArray(data.programs) ? data.programs : [];
+    // 개별 저장(category='program')의 자기 이름/ID가 워십 중복번호 계산을 오염시키지 않게 제외
+    const programs = (Array.isArray(data.programs) ? data.programs : []).filter(
+      (program) => resolveProgramCategory(program) !== 'program',
+    );
     const names = new Set(programs.map((program) => program.worshipName));
     const ids = new Set(programs.map((program) => program.worshipId));
 
@@ -416,7 +460,7 @@ async function resolveWorshipIdentity(baseId: string, baseName: string): Promise
   }
 }
 
-function cloneSlideItem(source: SavedProgram, id: string, title: string): SetlistItem {
+export function cloneSlideItem(source: SavedProgram, id: string, title: string): SetlistItem {
   const item = JSON.parse(JSON.stringify(source.item)) as SetlistItem;
   return {
     ...item,
@@ -457,9 +501,13 @@ export async function submitWorshipService(form: WorshipServiceForm): Promise<Wo
 
   const slidePrograms = await fetchSlideImagePrograms();
   const fixedPrograms = await fetchFixedPrograms();
+  const allPrograms = await fetchAllPrograms();
   const selectedFixedProgramIds = new Set(form.selectedFixedProgramIds ?? []);
   const selectedFixedPrograms = fixedPrograms.filter((program) => selectedFixedProgramIds.has(program.id));
   const selectedFixedByTitle = new Map(selectedFixedPrograms.map((program) => [program.item.title.trim(), program]));
+  // 미리보기 체크로 생성하는 고정 자료(사도신경 등)는 라이브러리에서 제목으로 바로 찾아 쓴다.
+  //   (폼의 고정 라이브러리 선택 UI 제거 후에도 본문이 비지 않도록 — 2026-07-26)
+  const fixedByTitle = new Map(fixedPrograms.map((program) => [program.item.title.trim(), program]));
   if (selectedFixedProgramIds.size > 0 && fixedPrograms.length === 0) {
     warnings.push('고정 프로그램 라이브러리를 불러오지 못해 선택 자료를 건너뛰었습니다.');
   }
@@ -580,17 +628,26 @@ export async function submitWorshipService(form: WorshipServiceForm): Promise<Wo
     items.push(buildSongItem(picker, nextId(SONG_BLESS_MY_SOUL.title), SONG_BLESS_MY_SOUL.title, SONG_BLESS_MY_SOUL.blocks));
   }
 
-  // 04. 사도신경 — 라이브러리에서 선택하면 본문까지 넣고, 선택하지 않으면 기존 빈 프로그램을 유지한다.
+  // 04. 사도신경 — 미리보기에서 체크했을 때만 생성한다(자동 생성 안 함).
+  //   고정 라이브러리에 자료가 있으면 본문까지 넣고, 없으면 빈 프로그램으로 자리만 만든다.
   const selectedApostlesCreed = selectedFixedByTitle.get('사도신경');
-  if (selectedApostlesCreed) {
+  if (includeRegularProgram('apostles-creed')) {
+    // 체크 시에는 라이브러리 본문을 그대로 가져온다. 자료가 없을 때만 빈 자리 프로그램.
+    const creedSource = selectedApostlesCreed ?? fixedByTitle.get('사도신경');
+    if (creedSource) {
+      addSelectedFixedProgram(creedSource, '사도신경');
+    } else {
+      warnings.push('고정 라이브러리에서 사도신경 자료를 찾지 못해 빈 프로그램으로 생성했습니다.');
+      items.push({
+        id: nextId('사도신경'),
+        title: '사도신경',
+        sections: [],
+        promptLayout: 'none',
+      });
+    }
+  } else if (selectedApostlesCreed) {
+    // 체크는 없지만 고정 라이브러리에서 직접 고른 경우엔 그 자료를 그대로 존중한다.
     addSelectedFixedProgram(selectedApostlesCreed, '사도신경');
-  } else {
-    items.push({
-      id: nextId('사도신경'),
-      title: '사도신경',
-      sections: [],
-      promptLayout: 'none',
-    });
   }
 
   // 주기도문·교독문 등 새로 추가되는 고정 자료도 선택 시 함께 생성한다.
@@ -629,7 +686,10 @@ export async function submitWorshipService(form: WorshipServiceForm): Promise<Wo
         'hymn',
         {
           body: c.body,
-          title,
+          // 제목(title) 슬롯에는 곡명을 넣는다 — 장 번호는 number 슬롯이 따로 있고,
+          //   프로그램 이름(item.title)은 목록 표기용으로 "N장" 을 그대로 유지한다.
+          //   (곡명이 비어 있는 자료만 "N장" 으로 대체 — 슬롯이 비어 보이지 않게)
+          title: hymnTitle || title,
           number: String(num),
           verseLabel: c.verseLabel,
           ...(c.amen ? { amen: c.amen } : {}),
@@ -669,28 +729,63 @@ export async function submitWorshipService(form: WorshipServiceForm): Promise<Wo
     });
   }
 
-  if (includeRegularProgram('church-news')) {
-    const newsId = nextId('교회소식');
-    items.push({
-      id: newsId,
-      title: '교회소식',
-      sections: makeSection(
-        picker,
-        'notice',
-        { title: '교회소식', body: form.churchNewsText?.trim() ?? '' },
-        `${newsId}-section`,
-        '교회소식',
-      ),
-      promptLayout: 'none',
-    });
+  // 교회소식 — 폼에 직접 입력한 내용이 있으면 그것으로, 없으면 고정 라이브러리 자료를 그대로 가져온다.
+  // 내용을 입력하면 체크하지 않아도 자동 생성한다(찬송가·준비찬양과 동일 방식).
+  const churchNewsInput = form.churchNewsText?.trim() ?? '';
+  if (includeRegularProgram('church-news') || churchNewsInput) {
+    const newsText = churchNewsInput;
+    const newsSource = !newsText ? (selectedFixedByTitle.get('교회소식') ?? fixedByTitle.get('교회소식')) : undefined;
+    if (newsSource) {
+      addSelectedFixedProgram(newsSource, '교회소식');
+    } else {
+      const newsId = nextId('교회소식');
+      // 교회소식 전용 템플릿이 등록돼 있으면 그것을, 없으면 기존 공지 템플릿을 쓴다.
+      const newsCategory: TemplateCategory = picker.has('churchNews') ? 'churchNews' : 'notice';
+      // 선택된 템플릿에 본문(body) 슬롯이 있는지 — 없으면 소식 내용을 제목 슬롯으로 보낸다.
+      const newsTemplateHasBody = picker.get(newsCategory).variants.some((variant) =>
+        variant.elements.some((el) => el.type === 'text' && (el as TextElement).fieldRole === 'body'),
+      );
+      // 빈 줄(엔터 두 번)마다 섹션을 나눈다 — 소식 한 건이 한 섹션.
+      const newsBlocks = newsText
+        .split(/\n\s*\n+/)
+        .map((block) => block.trim())
+        .filter(Boolean);
+      const blocks = newsBlocks.length > 0 ? newsBlocks : [newsText];
+      items.push({
+        id: newsId,
+        title: '교회소식',
+        sections: blocks.flatMap((block, index) =>
+          makeSection(
+            picker,
+            newsCategory,
+            // 템플릿에 본문(body) 슬롯이 없고 제목(title) 슬롯만 있으면 소식 내용을 제목 슬롯에 넣는다
+            //   (한 줄짜리 교회소식 디자인 지원 — 내용이 사라지지 않게).
+            newsTemplateHasBody
+              ? { title: '교회소식', body: block }
+              : { title: block, body: block },
+            `${newsId}-section${index + 1}`,
+            blocks.length > 1 ? `교회소식 ${index + 1}` : '교회소식',
+          ),
+        ),
+        promptLayout: 'none',
+      });
+    }
   }
 
+  // 헵시바 선교단 — 매주 곡이 바뀌므로 '제목에 헵시바가 든 가장 최신 저장 프로그램'을 가져온다.
+  //   (내용이 빈 자리표시 프로그램은 건너뛴다) → 없으면 PPT 이미지 → 그래도 없으면 고정 라이브러리.
   if (includeRegularProgram('hephzibah')) {
+    const hephzibahLatest = latestProgramByKeyword(allPrograms, '헵시바');
     const hephzibah = findSlideProgram('헵시바') ?? findSlideProgram('hephzibah');
-    if (hephzibah) {
+    const hephzibahFixed = selectedFixedByTitle.get('헵시바 선교단') ?? fixedByTitle.get('헵시바 선교단');
+    if (hephzibahLatest) {
+      addSelectedFixedProgram(hephzibahLatest, '헵시바 선교단');
+    } else if (hephzibah) {
       addSlideItem(hephzibah, '헵시바 선교단');
+    } else if (hephzibahFixed) {
+      addSelectedFixedProgram(hephzibahFixed, '헵시바 선교단');
     } else {
-      warnings.push('헵시바 선교단 PPT 이미지가 없어 빈 프로그램을 생성했습니다.');
+      warnings.push('헵시바 선교단 자료(PPT·고정 라이브러리)가 없어 빈 프로그램을 생성했습니다.');
       items.push({
         id: nextId('헵시바선교단'),
         title: '헵시바 선교단',
@@ -860,21 +955,12 @@ export async function submitWorshipService(form: WorshipServiceForm): Promise<Wo
   praiseNames.forEach((name) => {
     if (!findSlideProgram(name)) skippedPraise.push(name);
   });
-  if (pastorPraisePrograms.length > 0) {
-    const first = pastorPraisePrograms[0].program;
-    const id = nextId('목사님찬양');
-    const sections = pastorPraisePrograms.flatMap(({ program }) =>
-      program.item.sections.map((section) => ({
-        ...section,
-        id: `${id}-${section.id}`,
-        elements: section.elements.map((element) => ({
-          ...element,
-          id: `${id}-${element.id}`,
-        })),
-      })),
-    );
-    items.push({ ...cloneSlideItem(first, id, '목사님 찬양'), sections });
-    slideSources.set(id, first);
+  // 한 프로그램으로 묶지 않고 곡마다 별도 프로그램으로 넣는다 — 제목은 PPT 변환본의 제목을 그대로 사용.
+  for (const { name, program } of pastorPraisePrograms) {
+    const title = program.item.title.trim() || name;
+    const id = nextId(title);
+    items.push(cloneSlideItem(program, id, title));
+    slideSources.set(id, program);
   }
 
   // 15. 오직 예수 — 추가 고정 찬양.
@@ -893,8 +979,13 @@ export async function submitWorshipService(form: WorshipServiceForm): Promise<Wo
     );
   }
 
+  // [FEATURE: SCRIPTURE_BEFORE_QUOTE] 말씀찾기(본문)은 조립 순서상 맨 앞(00번)에서
+  //   만들어지지만, 최종 목록에서는 말씀찾기(인용) 바로 위에 오도록 재배치한다.
+  //   로더(ServerWorshipLoader)와 같은 규칙을 써서 생성·로드 순서를 일치시킨다.
+  const orderedItems = orderScriptureMainBeforeQuote(items);
+
   // 프로그램 레코드 구성 (텍스트 프로그램)
-  const savedPrograms: SavedProgram[] = items.map((item) => {
+  const savedPrograms: SavedProgram[] = orderedItems.map((item) => {
     const source = slideSources.get(item.id);
     return {
       id: item.id,
@@ -955,10 +1046,11 @@ const WORSHIP_START_TIMES: Record<string, { hour: number; minute: number; dayOfW
   월삭감사예배: { hour: 20, minute: 30, dayOfWeek: 'firstOfMonth' },
 };
 
-/** 지금 시점에서 가장 가까운(아직 시작 전인) 정기예배를 반환 */
-export function getUpcomingWorshipType(now = new Date()): string {
+/** 지금 시점에서 가장 가까운(아직 시작 전인) 정기예배의 종류와 시작 시각 */
+export function getUpcomingWorship(now = new Date()): { worshipType: string; startsAt: Date } {
   let best = '주일낮예배';
   let bestTime = Infinity;
+  let bestDate = now;
 
   for (const [name, t] of Object.entries(WORSHIP_START_TIMES)) {
     let next: Date;
@@ -976,9 +1068,15 @@ export function getUpcomingWorshipType(now = new Date()): string {
     if (next.getTime() < bestTime) {
       bestTime = next.getTime();
       best = name;
+      bestDate = next;
     }
   }
-  return best;
+  return { worshipType: best, startsAt: bestDate };
+}
+
+/** 지금 시점에서 가장 가까운(아직 시작 전인) 정기예배를 반환 */
+export function getUpcomingWorshipType(now = new Date()): string {
+  return getUpcomingWorship(now).worshipType;
 }
 
 // ─── 폼 미리보기용: 선택된 예배에 포함될 순서 목록 ──────────────────────────
@@ -1019,36 +1117,23 @@ export function getPlannedPrograms(
       regularProgramId: id,
     };
   };
-  const extraHymns = Array.from({ length: opts.extraHymnCount ?? 0 }, (_, i) => ({
-    order: `12-${i + 1}`,
-    title: '추가 찬송가',
-    included: true,
-    note: '설교 후 뒤에 삽입',
-  }));
   const king = regularProgram('king-my-god');
   const bless = regularProgram('bless-my-soul');
   const myGod = regularProgram('my-god');
   const campaign = regularProgram('campaign');
-  const churchNews = regularProgram('church-news');
   const hephzibah = regularProgram('hephzibah');
   const onlyJesus = regularProgram('only-jesus');
   const sending = regularProgram('sending-song');
+  // 말씀찾기(본문)·설교대지·말씀찾기(인용)은 정기예배에 무조건 포함되는 기본 구성이라
+  //   선택 목록에 노출하지 않는다(생성은 그대로 유지 — 아래 생성 로직에서 항상 만든다).
+  //   준비찬양·찬송가(설교 전/후)·목사님 찬양도 좌측 폼 입력만으로 생성되므로 선택 목록에서 제외한다.
   return [
-    { order: '00', title: '말씀찾기(본문) · 장 전체', included: true, note: '숨김 프로그램 — 섹션 1번부터, 번호 송출 시에만 표시' },
-    { order: '01', title: opts.preparationPraiseProgramName.trim() || '준비찬양', included: opts.preparationPraiseCount > 0, note: '모든 정기예배 · PPT 변환본 검색' },
     { ...king, order: '02' },
     { ...bless, order: '03' },
-    { order: '04', title: '사도신경', included: true, note: '템플릿 등록 전 수동 입력' },
-    { order: '05', title: '찬송가 (설교 전)', included: opts.hasHymn1, note: '장 번호 입력 시' },
+    { ...regularProgram('apostles-creed'), order: '04' },
     { ...myGod, order: '06' },
     { ...campaign, order: '07' },
-    { ...churchNews, order: '08' },
     { ...hephzibah, order: '09' },
-    { order: '10', title: '설교대지', included: true, note: '말씀타이틀·본문묵상·제목/본문·설교자' },
-    { order: '11', title: '말씀찾기(인용)', included: true, note: '인용 구절·대지타이틀 (입력 시)' },
-    { order: '12', title: '찬송가 (설교 후)', included: opts.hasHymn2, note: '장 번호 입력 시' },
-    ...extraHymns,
-    { order: '14', title: `목사님 찬양 ${opts.praiseCount}곡`, included: opts.praiseCount > 0, note: '설교 후 · PPT 변환본 검색' },
     { ...onlyJesus, order: '15' },
     { ...sending, order: '16' },
   ];

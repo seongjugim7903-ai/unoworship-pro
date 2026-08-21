@@ -61,26 +61,29 @@ export function useKeyboard({
       //   (그 외 키는 입력 중 방해 방지를 위해 기존대로 무시)
       if (isFormField && e.key !== 'PageDown' && e.key !== 'PageUp') return;
 
+      // ── [FEATURE: DELETE_UNCAST] Delete 는 항상 "송출 해제" 전용 ──
+      //   요소가 선택돼 있어도 Delete 로 요소를 지우지 않는다(예배 중 송출 해제하려다
+      //   캔버스 요소가 삭제되는 사고 방지, 2026-08-16 사용자 확정).
+      //   캔버스 요소 삭제는 우클릭 메뉴 + 레이어 목록의 삭제 버튼(마우스)로만 한다.
+      //   화살표만 캔버스 소유 — 선택 요소 1px 넛지(useEditorCommands 가 처리).
+      const CANVAS_OWNED_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+      if (selectedElementIds.length > 0 && CANVAS_OWNED_KEYS.includes(e.key)) return;
+
       switch (e.key) {
         // 화살표: ←/→ = 섹션 선택, ↑/↓ = 프로그램(item) 이동 (송출 없음)
-        // — 캔버스 요소가 선택되어 있으면 넛지가 우선이므로 여기서 무시
         case 'ArrowRight':
-          if (selectedElementIds.length > 0) return;
           e.preventDefault();
           selectNext();
           break;
         case 'ArrowLeft':
-          if (selectedElementIds.length > 0) return;
           e.preventDefault();
           selectPrev();
           break;
         case 'ArrowDown':
-          if (selectedElementIds.length > 0) return;
           e.preventDefault();
           selectNextProgram();
           break;
         case 'ArrowUp':
-          if (selectedElementIds.length > 0) return;
           e.preventDefault();
           selectPrevProgram();
           break;
@@ -107,7 +110,12 @@ export function useKeyboard({
           e.preventDefault();
           toggleBlackout();
           break;
-        case 'Escape':
+        // [FEATURE: DELETE_UNCAST] 송출 해제 — 컴포저·송출그리드 공통으로 Delete 하나로 통일.
+        //   ESC 는 "닫기·취소" 전용으로 비워둔다. 모달을 닫으려고 누른 ESC 로 회중
+        //   화면이 꺼지는 사고를 막기 위함 (송출그리드가 ESC 를 일부러 삼키던 이유와 같다).
+        //   프로그램/캔버스 요소 선택 여부와 무관하게 항상 "송출 중인 섹션"만 해제한다
+        //   (요소 삭제는 우클릭·레이어 목록 버튼으로만 — 위 CANVAS_OWNED_KEYS 참조).
+        case 'Delete':
           e.preventDefault();
           clearText();
           break;

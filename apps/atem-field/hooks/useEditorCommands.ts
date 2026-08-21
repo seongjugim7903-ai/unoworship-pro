@@ -283,9 +283,13 @@ export function useEditorCommands({
         return;
       }
 
-      // Delete / Backspace — 선택 요소가 있을 때만 동작
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+      // Backspace — 선택 요소 삭제(키보드 보조). Delete 는 제외한다.
+      // [FEATURE: DELETE_UNCAST] Delete 는 전역에서 "송출 해제" 전용이므로 여기서 다루지 않는다
+      //   (요소 선택 중 Delete 로 요소가 삭제되던 사고 방지, 2026-08-16). 요소 삭제의 주
+      //   경로는 우클릭 메뉴 + 레이어 목록의 삭제 버튼(마우스)이다.
+      if (e.key === 'Backspace' && selectedIds.length > 0) {
         e.preventDefault();
+        e.stopPropagation();
         deleteSelected();
         return;
       }

@@ -1,5 +1,5 @@
 import type { CanvasElement } from './canvasTypes';
-import type { Section, Setlist } from './types';
+import type { Section, Setlist, SetlistItem } from './types';
 import { getProgramBackgroundElements, isProgramBackgroundSection } from './programBackground';
 
 const PROGRAM_BACKGROUND_Z_BASE = -10_000;
@@ -12,16 +12,24 @@ export function getSectionOwnElements(section: Section): CanvasElement[] {
   return (section.elements ?? []).filter((el) => !isFixedLayerElement(el));
 }
 
-export function getFixedLayerElements(setlist: Setlist | null | undefined): CanvasElement[] {
-  if (!setlist) return [];
+/**
+ * 이 **프로그램(item) 안의** 고정 레이어 요소.
+ *
+ * [FIX: FIXED_LAYER_PROGRAM_SCOPE] 예전에는 세트리스트 전체를 훑어서, A 프로그램에
+ * 걸어둔 고정 레이어(예: 배경 유튜브 영상)가 B·C 프로그램에까지 따라붙었다.
+ * 고정 레이어는 "그 프로그램 안에서 섹션이 바뀌어도 유지" 라는 의미이므로
+ * 프로그램 경계를 넘지 않는다.
+ */
+export function getFixedLayerElementsForItem(
+  item: SetlistItem | null | undefined,
+): CanvasElement[] {
+  if (!item) return [];
 
   const fixedElements = new Map<string, CanvasElement>();
-  for (const item of setlist.items) {
-    for (const section of item.sections) {
-      for (const el of section.elements ?? []) {
-        if (isFixedLayerElement(el)) {
-          fixedElements.set(el.id, el);
-        }
+  for (const section of item.sections) {
+    for (const el of section.elements ?? []) {
+      if (isFixedLayerElement(el)) {
+        fixedElements.set(el.id, el);
       }
     }
   }
@@ -46,12 +54,11 @@ export function getSectionOutputElements(
   // 배경 섹션 자체를 합성 대상으로 부르면 자기 요소만 반환(무한 중첩 방지).
   if (isProgramBackgroundSection(section)) return section.elements ?? [];
 
-  const fixedElements = getFixedLayerElements(setlist);
-
-  // 이 섹션을 소유한 프로그램의 배경 요소(맨 뒤 = 가장 아래층).
+  // 이 섹션을 소유한 프로그램 — 고정 레이어·배경 모두 이 프로그램 안에서만 모은다.
   const owningItem = setlist?.items.find((it) =>
     it.sections.some((s) => s.id === section.id),
   );
+  const fixedElements = getFixedLayerElementsForItem(owningItem);
   const backgroundElements = lowerProgramBackgroundElements(
     getProgramBackgroundElements(owningItem),
   );

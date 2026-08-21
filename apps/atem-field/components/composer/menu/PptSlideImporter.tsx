@@ -6,6 +6,7 @@ import type { SavedProgram } from '@/lib/generators/programTypes';
 import type { Setlist } from '@/lib/types';
 import type { CanvasElement, ImageElement } from '@/lib/canvasTypes';
 import { compressImageDataUrl } from '@/lib/imageProcessing/compressImageDataUrl';
+import { openPptBrowserSearch } from '@/lib/pptBrowserSearch';
 
 interface PptSource {
   id: string;
@@ -21,11 +22,11 @@ type FitMode = 'contain' | 'fill' | 'cover';
 
 export function usePptSlideImporter() {
   const [isOpen, setOpen] = useState(false);
-  const [initialMode, setInitialMode] = useState<'convert' | 'load'>('convert');
+  const [initialMode, setInitialMode] = useState<'convert' | 'load'>('load');
   return {
     isOpen,
     initialMode,
-    open: useCallback((mode: 'convert' | 'load' = 'convert') => {
+    open: useCallback((mode: 'convert' | 'load' = 'load') => {
       setInitialMode(mode);
       setOpen(true);
     }, []),
@@ -85,7 +86,7 @@ async function compressProgramImages(
   return { ...program, item: { ...program.item, sections: newSections } };
 }
 
-export function PptSlideModal({ isOpen, onClose, initialMode = 'convert' }: { isOpen: boolean; onClose: () => void; initialMode?: 'convert' | 'load' }) {
+export function PptSlideModal({ isOpen, onClose, initialMode = 'load' }: { isOpen: boolean; onClose: () => void; initialMode?: 'convert' | 'load' }) {
   const [sources, setSources] = useState<PptSource[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [programName, setProgramName] = useState('');
@@ -98,11 +99,12 @@ export function PptSlideModal({ isOpen, onClose, initialMode = 'convert' }: { is
   const [progressMsg, setProgressMsg] = useState('');
   const [inboxDir, setInboxDir] = useState('');
 
-  // ── 변환본 불러오기 탭 ──
+  // ── 찬양검색 탭 ──
   const [mode, setMode] = useState<'convert' | 'load'>(initialMode);
   const [savedPrograms, setSavedPrograms] = useState<SavedProgram[]>([]);
   const [savedLoading, setSavedLoading] = useState(false);
   const [savedSearch, setSavedSearch] = useState('');
+  const [savedSearchError, setSavedSearchError] = useState('');
 
   const {
     currentSetlistId,
@@ -221,6 +223,11 @@ export function PptSlideModal({ isOpen, onClose, initialMode = 'convert' }: { is
     onClose();
   }, [insertProgram, onClose]);
 
+  const handleBrowseSavedSearch = useCallback(() => {
+    const win = openPptBrowserSearch(savedSearch);
+    setSavedSearchError(win ? '' : '브라우저 팝업이 차단되었습니다. 검색어를 복사해 직접 검색해 주세요.');
+  }, [savedSearch]);
+
   const handleImport = useCallback(async () => {
     if (!selectedSource) return;
     setImporting(true);
@@ -269,8 +276,8 @@ export function PptSlideModal({ isOpen, onClose, initialMode = 'convert' }: { is
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 backdrop-blur-sm">
-      <div className="w-[560px] max-w-[calc(100vw-32px)] rounded-xl border border-[#333] bg-[#151515] shadow-2xl">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/65 px-4 py-6 backdrop-blur-sm">
+      <div className="w-[560px] max-w-full rounded-xl border border-[#333] bg-[#151515] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[#292929] px-5 py-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-400">
@@ -287,7 +294,7 @@ export function PptSlideModal({ isOpen, onClose, initialMode = 'convert' }: { is
           </button>
         </div>
 
-        {/* 탭: 새로 변환 / 변환본 불러오기 */}
+        {/* 탭: 새로 변환 / 찬양검색 */}
         <div className="flex gap-1 border-b border-[#292929] px-4 pt-3">
           <button
             onClick={() => setMode('convert')}
@@ -303,7 +310,7 @@ export function PptSlideModal({ isOpen, onClose, initialMode = 'convert' }: { is
               mode === 'load' ? 'bg-[#101010] text-cyan-300 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-gray-200'
             }`}
           >
-            변환본 불러오기
+            찬양검색
           </button>
         </div>
 
@@ -491,17 +498,31 @@ export function PptSlideModal({ isOpen, onClose, initialMode = 'convert' }: { is
         </>
         ) : (
         <>
-          {/* ── 변환본 불러오기 ── */}
+          {/* ── 찬양검색 ── */}
           <div className="space-y-3 px-5 py-4">
             <div className="rounded-lg border border-cyan-500/25 bg-cyan-500/10 px-3 py-2 text-xs leading-5 text-cyan-100">
               이미 변환해 저장한 송출용 슬라이드(FILES)를 검색해 현재 예배에 프로그램으로 불러옵니다. 다시 변환할 필요 없이 바로 사용합니다.
             </div>
-            <input
-              value={savedSearch}
-              onChange={(e) => setSavedSearch(e.target.value)}
-              placeholder="이름으로 검색 (예: 나의 하나님)"
-              className="h-10 w-full rounded-lg border border-[#333] bg-[#0f0f0f] px-3 text-sm text-white outline-none focus:border-cyan-500"
-            />
+            <div className="flex gap-2">
+              <input
+                value={savedSearch}
+                onChange={(e) => {
+                  setSavedSearch(e.target.value);
+                  if (savedSearchError) setSavedSearchError('');
+                }}
+                placeholder="이름으로 검색 (예: 나의 하나님)"
+                className="h-10 min-w-0 flex-1 rounded-lg border border-[#333] bg-[#0f0f0f] px-3 text-sm text-white outline-none focus:border-cyan-500"
+              />
+              <button
+                type="button"
+                onClick={handleBrowseSavedSearch}
+                disabled={!savedSearch.trim()}
+                className="h-10 rounded-lg border border-cyan-700 px-3 text-xs font-bold text-cyan-100 hover:bg-cyan-900/70 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                브라우즈
+              </button>
+            </div>
+            {savedSearchError ? <p className="text-xs text-red-400">{savedSearchError}</p> : null}
             {savedLoading ? (
               <div className="rounded-lg border border-[#333] bg-[#101010] px-3 py-5 text-center text-sm text-gray-400">
                 불러오는 중…

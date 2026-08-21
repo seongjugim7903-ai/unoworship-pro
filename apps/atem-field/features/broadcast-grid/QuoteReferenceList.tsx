@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Section } from '@/lib/types';
 import type { TextElement } from '@/lib/canvasTypes';
+import { blurThen } from './useBroadcastGridProgramJump';
 
 export interface QuoteReferenceSourceEntry {
   index: number;
@@ -82,10 +83,8 @@ export function useQuoteSectionViewport(
   return elementRef;
 }
 
-interface QuoteReferenceRailProps {
+interface QuoteReferenceListProps {
   items: QuoteReferenceItem[];
-  width: string;
-  visible: boolean;
   broadcastSectionId: string | null;
   broadcastedSectionIds: ReadonlySet<string>;
   onBroadcast: (index: number) => void;
@@ -125,15 +124,13 @@ function getRailDensity(itemCount: number, height: number, width: number): RailD
   };
 }
 
-export default function QuoteReferenceRail({
+export default function QuoteReferenceList({
   items,
-  width,
-  visible,
   broadcastSectionId,
   broadcastedSectionIds,
   onBroadcast,
-}: QuoteReferenceRailProps) {
-  const railRef = useRef<HTMLElement | null>(null);
+}: QuoteReferenceListProps) {
+  const railRef = useRef<HTMLDivElement | null>(null);
   const [railSize, setRailSize] = useState({ width: 0, height: 0 });
   const density = useMemo(
     () => getRailDensity(items.length, railSize.height, railSize.width),
@@ -154,26 +151,13 @@ export default function QuoteReferenceRail({
   }, []);
 
   return (
-    <aside
+    <div
       ref={railRef}
+      role="tabpanel"
       aria-label="말씀찾기(인용) 장절 목록"
-      aria-hidden={!visible}
       data-testid="quote-reference-rail"
-      className={`relative flex h-full min-w-0 flex-none flex-col overflow-hidden bg-black text-white shadow-[-8px_0_24px_rgba(0,0,0,.45)] transition-[width,opacity] duration-300 ease-out ${
-        visible
-          ? 'pointer-events-auto border-l border-amber-400/50 opacity-100'
-          : 'pointer-events-none border-l-0 opacity-0'
-      }`}
-      style={{ width: visible ? width : '0px' }}
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
     >
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-[#333] px-2 py-2">
-        <span className="truncate font-bold text-amber-300" style={{ fontSize: density.headerFontSize }}>
-          말씀찾기(인용)
-        </span>
-        <span className="font-mono text-gray-500" style={{ fontSize: Math.max(11, density.headerFontSize - 1) }}>
-          {items.length}
-        </span>
-      </div>
       {items.length === 0 ? (
         <div className="flex min-h-0 flex-1 items-center justify-center px-3 text-center text-[12px] leading-relaxed text-gray-600">
           B 키로 말씀을 추가하면<br />번호송출 목록이 표시됩니다.
@@ -201,7 +185,7 @@ export default function QuoteReferenceRail({
                   aria-label={`${item.index + 1}번 ${item.reference} 송출`}
                   aria-pressed={isBroadcasted}
                   title={`${item.index + 1}번 ${item.reference} 송출`}
-                  onClick={() => onBroadcast(item.index)}
+                  onClick={blurThen(() => onBroadcast(item.index))}
                   className={`flex h-full w-full min-w-0 items-center rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
                     isLive ? 'bg-red-600/15' : isBroadcasted ? 'bg-white/10' : 'hover:bg-white/10'
                   }`}
@@ -233,6 +217,6 @@ export default function QuoteReferenceRail({
           })}
         </ol>
       )}
-    </aside>
+    </div>
   );
 }
