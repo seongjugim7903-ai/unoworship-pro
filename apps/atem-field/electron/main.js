@@ -33,6 +33,14 @@ const fileRecorder = require('./recording/fileRecorder');
 //   "connecting" 에서 멈춤. Electron 쪽에서 실제 LAN IP 를 노출하도록 해제.
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 
+// [FIX: YT_AUDIO] 현장 운영판에서 확인된 수정 (2026-07-28).
+//   /atemsignal/fill 등 kiosk 창은 사용자가 클릭할 일이 없다. Chromium 기본
+//   정책(document-user-activation-required)에서는 제스처 없는 playVideo() 가
+//   "소리 있는 재생" 으로 허용되지 않아 YouTube 플레이어가 스스로 음소거로
+//   전환한 뒤 재생한다 → 송출 화면은 나오는데 오디오만 없음.
+//   송출 전용 앱이므로 제스처 요구를 해제한다.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 const isDev = process.env.NODE_ENV === 'development';
 const SERVER_PORT = process.env.PORT || 3000;
 const SERVER_URL = `http://localhost:${SERVER_PORT}`;
