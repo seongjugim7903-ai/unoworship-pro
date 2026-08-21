@@ -5,6 +5,8 @@
 // 담당자가 여기서 할 일은 순서가 있다.
 //   1. 앱 설치      예배 중에 쓸 화면이라 홈 화면에 있어야 한다
 //   2. 팀원 초대     주소를 정하고 링크를 복사해 단톡방에 붙여넣는다
+//                    한 번 보내고 나면 접어 둔다 — 할 일이 끝난 자리가 화면을 차지하면
+//                    다음에 열었을 때 아직 할 일이 남은 것으로 보인다. 다시 펼 수 있다.
 //   3. 팀 자료로     준비찬양·찬양대 화면으로 들어간다
 //
 // 그래서 화면도 그 순서로 둔다. 초대 링크는 1회용이 아니라서 나중에 다시 와도 복사할 수 있다.
@@ -164,6 +166,18 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
   /* 늦게 도착한 응답이 새 입력의 판정을 덮어쓰지 않도록 마지막 요청만 인정한다 */
   const latest = useRef(0);
 
+  /* 한 번 보냈으면 접어 둔다. 브라우저에 적어 두므로 다음에 열어도 접힌 채로 시작한다 —
+     끝난 일이 펼쳐져 있으면 아직 할 일이 남은 것으로 보인다. */
+  const SENT_KEY = `ulju:invite-sent:${team.name}`;
+  const [sent, setSent] = useState(false);
+  useEffect(() => {
+    try { setSent(window.localStorage.getItem(SENT_KEY) === '1'); } catch { /* 없으면 없는 대로 */ }
+  }, [SENT_KEY]);
+  const markSent = () => {
+    setSent(true);
+    try { window.localStorage.setItem(SENT_KEY, '1'); } catch { /* 무시 */ }
+  };
+
   const slug = normalizeInviteCode(draft);
   const link = code ? `${window.location.origin}/join/${code}` : null;
 
@@ -195,6 +209,7 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      markSent();
       onMessage('초대 링크를 복사했습니다. 팀 단톡방에 붙여넣으세요.');
     } catch {
       onMessage('복사하지 못했습니다. 링크를 길게 눌러 직접 복사해 주세요.');
@@ -206,6 +221,7 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
   const sendKakao = async (url: string) => {
     try {
       await shareInviteLinkToKakao({ team: team.name, linkUrl: url });
+      markSent();
     } catch (error) {
       console.error('[invite] kakao share failed', error);
       onMessage('카카오톡 공유창을 열지 못했습니다. 초대 링크 복사를 써 주세요.');
@@ -242,7 +258,28 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
         {team.category && <span className="field-hint">{team.category}</span>}
       </div>
 
-      {link && !editing && (
+      {/* 보내고 나면 접는다. 다시 필요할 때 펴면 링크가 그대로 있다 */}
+      {link && !editing && sent && (
+        <details className="invite-fold">
+          <summary>보냈습니다 · 다시 보내려면 여기</summary>
+          <p className="invite-link-box">{link}</p>
+          <div className="invite-actions">
+            {isKakaoShareConfigured() && (
+              <button type="button" className="kakao-button" onClick={() => void sendKakao(link)}>
+                카카오톡으로 보내기
+              </button>
+            )}
+            <button type="button" className="primary-button" onClick={() => copy(link)}>
+              초대 링크 복사
+            </button>
+          </div>
+          <button type="button" className="text-button" onClick={() => setEditing(true)}>
+            주소 바꾸기
+          </button>
+        </details>
+      )}
+
+      {link && !editing && !sent && (
         <>
           <p className="invite-link-box">{link}</p>
           <div className="invite-actions">

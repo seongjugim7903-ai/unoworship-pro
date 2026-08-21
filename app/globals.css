@@ -489,3 +489,17 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .gate-fallback { margin: 18px 0 0; color: #99a1b3; font-size: 11.5px; line-height: 1.6; }
 .gate-fallback code { padding: 2px 7px; border-radius: 5px; background: #f0f1f6; color: #5745c8; font-size: 12px; font-weight: 800; user-select: all; }
 .gate-fallback a { color: #6754d9; font-weight: 700; text-decoration: underline; }
+
+/* 코드 칸 접어 두기 — 정상 경로에서는 아무도 코드를 넣지 않는다.
+   링크를 잃어버린 관리자·담당자만 펴서 쓴다. */
+.join-code-fold { margin: 4px 0 14px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fbfcff; }
+.join-code-fold > summary { color: #6f7b8f; font-size: 12px; font-weight: 700; cursor: pointer; list-style: none; }
+.join-code-fold > summary::-webkit-details-marker { display: none; }
+.join-code-fold > summary::before { content: '▸ '; color: #a4adbd; }
+.join-code-fold[open] > summary::before { content: '▾ '; }
+.join-code-fold[open] > summary { margin-bottom: 8px; }
+/* 보내고 난 초대 — 접어 두되 다시 펼 수 있게 */
+.invite-fold > summary { color: #19ad76; font-size: 12px; font-weight: 800; cursor: pointer; list-style: none; }
+.invite-fold > summary::-webkit-details-marker { display: none; }
+.invite-fold > summary::before { content: '✓ '; }
+.invite-fold[open] > summary { margin-bottom: 10px; }

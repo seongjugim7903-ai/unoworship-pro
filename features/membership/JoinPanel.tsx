@@ -155,9 +155,12 @@ export default function JoinPanel() {
     <main className="site-shell">
       <section className="panel">
         <h2>교회 참여</h2>
+        {/* 정상 경로에서는 아무도 코드를 넣지 않는다 — 관리자·담당자·팀원 모두 링크를
+            누른다. 여기 오는 사람은 링크를 잃어버린 경우다. 그래서 링크 안내가 먼저이고
+            코드 칸은 접어 둔다. 팀원에게 '코드를 넣으라'고 하면 낼 코드가 없어 막힌다. */}
         <p className="field-hint">
-          받으신 <b>코드</b>를 그대로 넣어 주세요. 팀 코드든 담당자 코드든 상관없습니다 —
-          코드에 교회와 팀이 담겨 있어서 한 번만 넣으면 됩니다.
+          <b>팀원이시면</b> 담당자가 단톡방에 올린 초대 링크로 들어오세요.
+          코드는 필요 없습니다. 링크를 못 찾으시면 담당자에게 다시 받아 주세요.
         </p>
 
         <label>
@@ -171,16 +174,20 @@ export default function JoinPanel() {
           />
         </label>
 
-        <label>
-          참여 코드
-          <input
-            value={code}
-            onChange={(event) => setCode(event.target.value.toUpperCase())}
-            placeholder="예: K7M2QX"
-            autoCapitalize="characters"
-            disabled={busy}
-          />
-        </label>
+        {/* 코드를 받은 사람은 교회 관리자와 팀 담당자뿐이다 — 그 둘만 펴서 쓴다 */}
+        <details className="join-code-fold">
+          <summary>코드를 받으셨나요? (관리자 · 담당자)</summary>
+          <label>
+            참여 코드
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+              placeholder="예: K7M2QX"
+              autoCapitalize="characters"
+              disabled={busy}
+            />
+          </label>
+        </details>
 
         {error && <p className="error-message">{error}</p>}
 
