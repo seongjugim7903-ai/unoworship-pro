@@ -2,7 +2,7 @@ import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createClient } from '../supabase/server';
+import { createClientOrNull } from '../supabase/server';
 import type { Database } from '../../types/database.types';
 import { hashDeviceToken } from './deviceToken';
 import { ROLE_LEVEL, UserRole } from './types';
@@ -192,7 +192,10 @@ export async function getRequestAuth(req: NextRequest): Promise<ServerAuthContex
   const devAuth = getSocketDevAuth();
   if (devAuth) return devAuth;
 
-  const supabase = await createClient();
+  const supabase = await createClientOrNull();
+  /* 클라우드가 없는 설치에는 확인할 세션이 없다 — 미인증으로 둔다(401).
+     예전에는 여기서 예외가 나 라우트가 통째로 500 이 됐다. */
+  if (!supabase) return null;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
