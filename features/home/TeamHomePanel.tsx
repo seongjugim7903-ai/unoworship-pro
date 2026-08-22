@@ -80,7 +80,12 @@ export default function TeamHomePanel({ me, onOpen }: TeamHomeProps) {
   const [choir, setChoir] = useState<ChoirSong[]>([]);
 
   const canBoard = me.can.board;
-  const prepTeam = Object.entries(me.teamCategories).find(([, category]) => category === '준비찬양')?.[0] ?? '';
+  /* 악보를 두는 팀 — 준비찬양이든 찬양대든 같은 자리에 쌓인다. 팀 페이지 구조는 모두 같다.
+     둘 다 맡았으면 준비찬양 쪽을 먼저 본다(곡 수가 많아 다음 예배가 더 자주 바뀐다). */
+  const scoreTeam = Object.entries(me.teamCategories)
+    .find(([, category]) => category === '준비찬양')?.[0]
+    ?? Object.entries(me.teamCategories).find(([, category]) => category === '찬양대')?.[0]
+    ?? '';
   const choirTeam = Object.entries(me.teamCategories).find(([, category]) => category === '찬양대')?.[0] ?? '';
 
   /* 게시판은 볼 수 있는 사람에게만 부른다. 못 보는 사람에게 빈 카드를 보이지 않는다 */
@@ -94,27 +99,28 @@ export default function TeamHomePanel({ me, onOpen }: TeamHomeProps) {
     })();
   }, [canBoard]);
 
-  /* 다음 예배 — 준비찬양 팀은 곡과 악보를, 찬양대는 최근 올린 자막 곡을 본다.
-     둘 다 맡았으면 악보가 있는 쪽을 보여 준다. 악보가 예배 중에 더 급하다. */
+  /* 다음 예배 — 그 팀에 올려 둔 곡과 악보 */
   useEffect(() => {
-    if (!prepTeam) return;
+    if (!scoreTeam) return;
     (async () => {
       try {
-        const json = await (await fetch(`/api/worship-prep?team=${encodeURIComponent(prepTeam)}&limit=20`)).json();
+        const json = await (await fetch(`/api/worship-prep?team=${encodeURIComponent(scoreTeam)}&limit=20`)).json();
         setPrep((json?.songs ?? []) as PrepSong[]);
-      } catch { /* 비어 있으면 카드가 안 나온다 */ }
+      } catch { /* 비어 있으면 자막 쪽으로 물러선다 */ }
     })();
-  }, [prepTeam]);
+  }, [scoreTeam]);
 
+  /* 찬양대는 악보를 아직 안 올렸을 수 있다 — 그때는 최근 올린 자막 곡이라도 보여 준다.
+     자리를 비워 두면 그 팀만 카드가 하나 적어 보인다. */
   useEffect(() => {
-    if (prepTeam || !choirTeam) return;
+    if (!choirTeam) return;
     (async () => {
       try {
         const json = await (await fetch('/api/choir-requests?limit=3')).json();
         setChoir((json?.requests ?? []) as ChoirSong[]);
       } catch { /* 위와 같다 */ }
     })();
-  }, [prepTeam, choirTeam]);
+  }, [choirTeam]);
 
   const menu = MENU.filter((item) => me.can[item.can]);
   /* 같은 날짜의 곡만 묶어 보여 준다 — 목록 전체를 늘어놓으면 이번 주가 안 보인다 */
@@ -164,7 +170,7 @@ export default function TeamHomePanel({ me, onOpen }: TeamHomeProps) {
           {/* 반주자는 이 버튼을 아이패드에 띄워 놓고 연주한다 — 언제 것인지 괄호에 적는다 */}
           <a
             className="home-play"
-            href={`/worship/play?team=${encodeURIComponent(prepTeam)}`}
+            href={`/worship/play?team=${encodeURIComponent(scoreTeam)}`}
             target="_blank"
             rel="noreferrer"
           >
@@ -173,7 +179,7 @@ export default function TeamHomePanel({ me, onOpen }: TeamHomeProps) {
         </section>
       )}
 
-      {!prepTeam && choir.length > 0 && (
+      {nextSongs.length === 0 && choir.length > 0 && (
         <section className="home-card">
           <div className="home-card-head"><h2>최근 올린 자막</h2></div>
           <ol className="home-songs">

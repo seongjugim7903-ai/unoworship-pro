@@ -1,6 +1,10 @@
 'use client';
 
-// 준비찬양 — 정기예배·일자·찬양팀별로 준비 곡(제목·악보·조·구성)을 저장한다.
+// 찬양 올리기 — 정기예배·일자·팀별로 부를 곡(제목·악보·조·구성)을 저장한다.
+//
+// 준비찬양 팀(주일1부…)과 찬양대(헵시바)가 같은 화면을 쓴다. 반주자가 보는 것은
+// 어느 팀이든 악보 한 장이라 화면을 둘로 나눌 이유가 없다 — 자료는 팀 이름으로 갈린다.
+// 찬양대의 자막 이미지 만들기는 별개 화면이다(features/choir).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { nextServiceDate } from '../../lib/nextServiceDate';
@@ -20,6 +24,9 @@ function useIsMobile() {
   }, []);
   return mobile;
 }
+
+/* 악보를 올리는 팀 — 준비찬양(찬양팀)과 찬양대. 방송실·예배준비는 악보를 다루지 않는다 */
+const SCORE_CATEGORIES = ['준비찬양', '찬양대'];
 
 const SERVICE_TYPES = ['주일낮예배', '주일오후예배', '수요예배', '금요기도회', '월삭감사예배'];
 /* 팀은 교회마다 다르므로 서버에서 받는다. 초대받지 않은 팀은 목록에 없다 —
@@ -117,6 +124,8 @@ export default function WorshipPrepPanel() {
   const [serviceDate, setServiceDate] = useState(upcoming.serviceDate);
   const [team, setTeam] = useState('');
   const [myTeams, setMyTeams] = useState<string[]>([]);
+  /* 팀 이름 → 분류. 찬양대인지에 따라 화면의 이름표가 달라진다 */
+  const [teamCategories, setTeamCategories] = useState<Record<string, string>>({});
   const [songs, setSongs] = useState<SongRow[]>([newRow()]);
   const [draftReady, setDraftReady] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
@@ -135,19 +144,22 @@ export default function WorshipPrepPanel() {
      null 은 아직 확인 전 — 그때는 폼도 안내도 그리지 않는다. 잠깐 보였다 사라지면 더 헷갈린다. */
   const [editable, setEditable] = useState<{ admin: boolean; teams: Record<string, string> } | null>(null);
 
-  /* 내가 든 준비찬양 팀만 고를 수 있다. 초대받지 않은 팀은 목록에 없다 */
+  /* 내가 든 팀만 고를 수 있다. 초대받지 않은 팀은 목록에 없다.
+     준비찬양과 찬양대를 함께 둔다 — 헵시바 같은 찬양대도 반주자를 위해 악보를 올린다.
+     자료는 팀 이름으로 갈리므로 섞이지 않는다. */
   useEffect(() => {
     (async () => {
       try {
         const me = await (await fetch('/api/membership/me')).json();
         const categories = (me?.teamCategories ?? {}) as Record<string, string>;
+        setTeamCategories(categories);
         const mine = Object.entries(categories)
-          .filter(([, category]) => category === '준비찬양')
+          .filter(([, category]) => SCORE_CATEGORIES.includes(category))
           .map(([name]) => name);
-        /* 관리자는 모든 준비찬양 팀을 본다 */
+        /* 관리자는 악보를 쓰는 모든 팀을 본다 */
         const list = me?.churchRole === 'admin'
           ? ((await (await fetch('/api/teams')).json())?.teams ?? [])
-            .filter((t: { category: string }) => t.category === '준비찬양')
+            .filter((t: { category: string }) => SCORE_CATEGORIES.includes(t.category))
             .map((t: { name: string }) => t.name)
           : mine;
         setMyTeams(list);
@@ -170,6 +182,8 @@ export default function WorshipPrepPanel() {
     [editable],
   );
   const canEdit = canEditTeam(team);
+  /* 화면 이름은 고른 팀을 따른다 — 헵시바 담당자에게 '준비찬양'이라고 하면 남의 화면 같다 */
+  const screenName = teamCategories[team] === '찬양대' ? '찬양대 악보' : '준비찬양';
 
   useEffect(() => {
     try {
@@ -370,7 +384,7 @@ export default function WorshipPrepPanel() {
     const filled = songs.filter((song) => song.title.trim());
 
     setSaveStatus('saving');
-    setSaveMessage('준비찬양을 저장하고 있습니다...');
+    setSaveMessage(`${screenName}을(를) 저장하고 있습니다...`);
     try {
       const formData = new FormData();
       const payloadSongs = await Promise.all(filled.map(async (song, index) => {
@@ -532,7 +546,7 @@ export default function WorshipPrepPanel() {
       <div className="content-grid">
         <section className="panel form-panel">
           <div className="panel-heading">
-            <div><span className="step-number">01</span><h2>준비찬양</h2></div>
+            <div><span className="step-number">01</span><h2>{screenName}</h2></div>
             {canEdit && <span className="required-note">* 곡 1개 이상</span>}
           </div>
 
@@ -603,7 +617,7 @@ export default function WorshipPrepPanel() {
 
           {canEdit && (
             <button className="primary-button" onClick={() => void handleSave()} disabled={!isValid || saveStatus === 'saving'}>
-              {saveStatus === 'saving' ? '저장 중...' : '준비찬양 저장'}
+              {saveStatus === 'saving' ? '저장 중...' : `${screenName} 저장`}
             </button>
           )}
           {saveMessage && <p className={`field-program-message ${saveStatus}`}>{saveMessage}</p>}

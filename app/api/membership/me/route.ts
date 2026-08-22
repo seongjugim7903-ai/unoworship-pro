@@ -68,8 +68,10 @@ export async function GET() {
       can: {
         /* 설교대지는 목회자와 관리자만. 남에게는 화면 자체를 보여주지 않는다 */
         sermon: isAdmin || membership.isPreacher,
-        /* 준비찬양·찬양대는 그 카테고리 팀에 든 사람만 */
-        worship: inCategory('준비찬양'),
+        /* 곡·악보는 준비찬양 팀과 찬양대가 함께 쓴다 — 반주자는 어느 팀이든 악보를 본다.
+           자료는 팀 이름으로 갈리므로 화면 하나로 충분하다(worship_prep_songs.team). */
+        worship: inCategory('준비찬양') || inCategory('찬양대'),
+        /* 자막 이미지 만들기는 찬양대만 */
         choir: inCategory('찬양대'),
         /* 방송실·예배준비 — 그 팀에 든 사람만 화면이 보인다 */
         broadcast: inCategory('방송실'),
@@ -78,7 +80,7 @@ export async function GET() {
         board: membership.churchRole !== null,
         postBoard: isAdmin || mine.some((team) => membership.teams[team] === 'leader'),
         /* 올리고 고치는 것은 담당자만 */
-        editWorship: leadsCategory('준비찬양'),
+        editWorship: leadsCategory('준비찬양') || leadsCategory('찬양대'),
         editChoir: leadsCategory('찬양대'),
         editPrep: leadsCategory('예배준비'),
       },

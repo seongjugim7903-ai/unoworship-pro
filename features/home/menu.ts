@@ -30,11 +30,11 @@ export interface MenuItem {
 }
 
 /* 이름은 '무엇을 하러 가는가'로 적는다 — 화면 이름이 아니라 하는 일이다.
-   찬양대(헵시바)와 준비찬양은 다루는 것이 다르지만 하는 일은 둘 다 '찬양 올리기'다.
-   무엇이 다른지는 아래 한 줄이 말한다. */
+   찬양대(헵시바)는 두 가지를 한다. 가사로 자막 이미지를 만드는 일과, 반주자를 위해
+   악보를 올리는 일이다. 둘 다 '찬양 올리기'로 적으면 어느 쪽인지 알 수 없어 나눠 적는다. */
 export const MENU: MenuItem[] = [
-  { id: 'choir', label: '찬양 올리기', desc: '찬양대 가사 · 자막 이미지 만들기', can: 'choir' },
-  { id: 'worship', label: '찬양 올리기', desc: '준비찬양 곡 · 악보 올리기', can: 'worship' },
+  { id: 'worship', label: '찬양 올리기', desc: '곡 · 악보 올리기 (반주자가 봅니다)', can: 'worship' },
+  { id: 'choir', label: '자막 만들기', desc: '가사 넣고 자막 이미지 만들기', can: 'choir' },
   { id: 'sermon', label: '설교대지 올리기', desc: '설교 대지 · 주보 정리', can: 'sermon' },
   { id: 'broadcast', label: '방송실', desc: '모든 팀 자료 · 예배 운영', can: 'broadcast' },
   { id: 'prep', label: '예배준비', desc: '새신자 · 준비 항목 챙기기', can: 'prep' },
@@ -42,9 +42,9 @@ export const MENU: MenuItem[] = [
 
 /** 서브페이지 이름표 — 홈의 큰 버튼과 달리 '지금 어디인지'를 말한다 */
 export const VIEW_TITLE: Record<Exclude<View, 'home'>, string> = {
-  choir: '헵시바 선교단',
+  choir: '자막 만들기',
   sermon: '설교대지',
-  worship: '준비찬양',
+  worship: '찬양 올리기',
   broadcast: '방송실',
   prep: '예배준비',
   board: '게시판',
