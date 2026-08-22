@@ -2,7 +2,11 @@
 
 :root { color-scheme: light; font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif; }
 * { box-sizing: border-box; }
-html, body { min-width: 0; overflow-x: hidden; }
+/* 가로 스크롤은 문서 뿌리에서만 막는다. body 에 overflow 를 주면 그 순간 body 가
+   스크롤 컨테이너가 되어, 안쪽 position:sticky 가 붙을 자리를 잃는다 —
+   머리(.team-top)와 한 줄(.page-crumb)이 스크롤에 딸려 올라가던 원인이 이것이었다. */
+html { overflow-x: hidden; }
+html, body { min-width: 0; }
 body { margin: 0; background: #f5f7fb; color: #172033; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
@@ -516,7 +520,7 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
   color: #fff;
 }
 /* 로고 자리 — 담당자가 정한 팀 이름이 그대로 온다 */
-.team-logo { font-size: 18px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+.team-logo { border: 0; padding: 0; background: none; color: #fff; text-align: left; cursor: pointer; font-size: 18px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
 .team-logo small { display: block; margin-top: 3px; color: rgba(255, 255, 255, .56); font-size: 11px; font-weight: 700; letter-spacing: .2em; }
 .team-top-right { display: flex; align-items: center; gap: 10px; }
 .team-user { color: rgba(255, 255, 255, .84); font-size: 12px; font-weight: 700; }
@@ -569,3 +573,16 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .invite-later > summary::after { content: ' ▾'; color: #9aa3b5; font-size: 12px; }
 .invite-later[open] > summary::after { content: ' ▴'; }
 .invite-later[open] > summary { display: block; margin-bottom: 12px; }
+
+/* 머리 아래 한 줄 — 지금 어디인지와 나가는 길(app/WorkspaceTabs.tsx) */
+.page-crumb { position: sticky; top: 66px; z-index: 80; display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid #e7ebf3; background: rgba(245, 247, 251, .94); backdrop-filter: blur(6px); }
+.crumb-back { border: 0; padding: 0; background: none; color: #5a3f92; font-size: 13px; font-weight: 800; cursor: pointer; }
+.crumb-title { color: #46506a; font-size: 13px; font-weight: 800; }
+.page-crumb + .site-shell { padding-top: 16px; }
+.team-menu-line { display: block; height: 1px; margin: 5px 4px; background: #eceff5; }
+
+/* 내 정보 — 사진은 카카오에서 온다(features/membership/ProfilePanel.tsx) */
+.profile-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.profile-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: #eef1fa; }
+.profile-avatar.is-letter { display: flex; align-items: center; justify-content: center; color: #5a3f92; font-size: 26px; font-weight: 800; }
+.profile-name { display: block; color: #263247; font-size: 18px; font-weight: 800; }

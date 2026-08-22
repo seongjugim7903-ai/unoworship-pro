@@ -8,6 +8,10 @@
 
 export type FeatureId = 'choir' | 'sermon' | 'worship' | 'broadcast' | 'prep';
 
+/* 팀 페이지는 홈 하나와 그 아래 서브페이지들이다. 게시판·내 정보도 새 창이 아니라
+   같은 구조 안의 한 자리다 — 머리(팀 이름·내 이름·삼선)는 어느 자리에서도 그대로 있다. */
+export type View = 'home' | 'board' | 'profile' | FeatureId;
+
 export interface Can {
   sermon: boolean;
   worship: boolean;
@@ -25,21 +29,26 @@ export interface MenuItem {
   can: keyof Can;
 }
 
+/* 이름은 '무엇을 하러 가는가'로 적는다 — 화면 이름이 아니라 하는 일이다.
+   찬양대(헵시바)와 준비찬양은 다루는 것이 다르지만 하는 일은 둘 다 '찬양 올리기'다.
+   무엇이 다른지는 아래 한 줄이 말한다. */
 export const MENU: MenuItem[] = [
-  { id: 'choir', label: '자막 올리기', desc: '찬양대 가사 · 자막 이미지 만들기', can: 'choir' },
-  { id: 'sermon', label: '설교대지', desc: '설교 대지 · 주보 정리', can: 'sermon' },
-  { id: 'worship', label: '준비찬양', desc: '팀별 찬양 준비 · 악보', can: 'worship' },
+  { id: 'choir', label: '찬양 올리기', desc: '찬양대 가사 · 자막 이미지 만들기', can: 'choir' },
+  { id: 'worship', label: '찬양 올리기', desc: '준비찬양 곡 · 악보 올리기', can: 'worship' },
+  { id: 'sermon', label: '설교대지 올리기', desc: '설교 대지 · 주보 정리', can: 'sermon' },
   { id: 'broadcast', label: '방송실', desc: '모든 팀 자료 · 예배 운영', can: 'broadcast' },
   { id: 'prep', label: '예배준비', desc: '새신자 · 준비 항목 챙기기', can: 'prep' },
 ];
 
-/** 화면 위쪽에 다는 이름 — 홈의 큰 버튼과 달리 '어디에 있는지'를 말한다 */
-export const FEATURE_TITLE: Record<FeatureId, string> = {
+/** 서브페이지 이름표 — 홈의 큰 버튼과 달리 '지금 어디인지'를 말한다 */
+export const VIEW_TITLE: Record<Exclude<View, 'home'>, string> = {
   choir: '헵시바 선교단',
   sermon: '설교대지',
   worship: '준비찬양',
   broadcast: '방송실',
   prep: '예배준비',
+  board: '게시판',
+  profile: '내 정보',
 };
 
 export const NO_ACCESS: Can = {
@@ -49,3 +58,38 @@ export const NO_ACCESS: Can = {
 export const ALL_ACCESS: Can = {
   sermon: true, worship: true, choir: true, broadcast: true, prep: true, board: true,
 };
+
+/** 지금 로그인한 사람 — 화면 여러 곳이 같은 것을 묻는다. 한 번만 부르고 나눠 쓴다. */
+export interface Me {
+  name: string;
+  churchRole: string | null;
+  /** 팀 이름 → leader | member */
+  teams: Record<string, string>;
+  /** 팀 이름 → 준비찬양 | 찬양대 … */
+  teamCategories: Record<string, string>;
+  can: Can;
+}
+
+const UNKNOWN: Me = { name: '', churchRole: null, teams: {}, teamCategories: {}, can: NO_ACCESS };
+
+/**
+ * /api/membership/me 한 번 부르기.
+ *
+ * 저장 환경이 없는 배포나 조회 실패에서는 막지 않는다 — 화면이 통째로 비면
+ * 손쓸 방법이 없다. 무엇을 할 수 있는지는 어차피 서버가 다시 본다.
+ */
+export async function loadMe(): Promise<Me> {
+  try {
+    const me = await (await fetch('/api/membership/me')).json();
+    if (me?.unavailable) return { ...UNKNOWN, can: ALL_ACCESS };
+    return {
+      name: String(me?.name ?? '').trim(),
+      churchRole: me?.churchRole ?? null,
+      teams: (me?.teams ?? {}) as Record<string, string>,
+      teamCategories: (me?.teamCategories ?? {}) as Record<string, string>,
+      can: { ...NO_ACCESS, ...(me?.can ?? {}) },
+    };
+  } catch {
+    return { ...UNKNOWN, can: ALL_ACCESS };
+  }
+}
