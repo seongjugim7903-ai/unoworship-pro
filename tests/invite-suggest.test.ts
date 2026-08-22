@@ -25,8 +25,18 @@ describe('romanizeKorean', () => {
 });
 
 describe('suggestSlugs', () => {
-  it('짧은 것을 먼저 준다', () => {
-    expect(suggestSlugs('헵시바', 2026)).toEqual(['hepsiba', 'hepsiba-team', 'hepsiba-2026']);
+  it('성경 이름은 제 철자로 준다 — 헵시바는 Hephzibah 다', () => {
+    expect(suggestSlugs('헵시바', 2026)).toEqual(['hephzibah', 'hephzibah-team', 'hepsiba']);
+  });
+
+  it('사전에 있는 낱말이 섞여도 이어 붙인다', () => {
+    expect(suggestSlugs('헵시바 선교단')[0]).toBe('hephzibah-mission');
+    expect(suggestSlugs('시온찬양대')[0]).toBe('zion-choir');
+    expect(suggestSlugs('주일1부')[0]).toBe('sunday-1bu');
+  });
+
+  it('사전에 없는 이름은 소리대로 옮긴다', () => {
+    expect(suggestSlugs('새싹부')[0]).toBe('saessakbu');
   });
 
   it('내놓는 것은 모두 주소 규칙을 통과한다', () => {
