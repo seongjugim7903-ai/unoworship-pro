@@ -503,3 +503,69 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .invite-fold > summary::-webkit-details-marker { display: none; }
 .invite-fold > summary::before { content: '✓ '; }
 .invite-fold[open] > summary { margin-bottom: 10px; }
+
+/* ── 팀 홈 ────────────────────────────────────────────────────────────────
+   매주 여는 첫 화면. 상단 바는 팀 색(랜딩과 같은 보라)으로 두어 '우리 팀 자리'라는
+   느낌을 남기고, 본문은 나머지 화면과 같은 밝은 카드로 둔다 — 여기서 일을 시작한다. */
+.team-home { min-height: 100vh; min-height: 100dvh; background: #f5f7fb; }
+.team-top {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: max(14px, env(safe-area-inset-top)) 18px 14px;
+  background: linear-gradient(120deg, #1a1b3a 0%, #2b2455 52%, #45327a 100%);
+  color: #fff;
+}
+/* 로고 자리 — 담당자가 정한 팀 이름이 그대로 온다 */
+.team-logo { font-size: 18px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+.team-logo small { display: block; margin-top: 3px; color: rgba(255, 255, 255, .56); font-size: 11px; font-weight: 700; letter-spacing: .2em; }
+.team-top-right { display: flex; align-items: center; gap: 10px; }
+.team-user { color: rgba(255, 255, 255, .84); font-size: 12px; font-weight: 700; }
+.team-menu-btn { width: 38px; height: 38px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 10px; background: rgba(255, 255, 255, .1); color: #fff; font-size: 16px; }
+.team-menu-btn:hover { background: rgba(255, 255, 255, .2); }
+.team-menu-scrim { position: fixed; inset: 0; z-index: 110; border: 0; padding: 0; background: transparent; }
+.team-menu {
+  position: absolute; right: 16px; top: calc(100% - 4px); z-index: 120;
+  display: grid; gap: 2px; min-width: 190px; padding: 6px;
+  border-radius: 12px; background: #fff; box-shadow: 0 14px 36px rgba(15, 20, 40, .26);
+}
+.team-menu button, .team-menu a { display: block; width: 100%; padding: 11px 12px; border: 0; border-radius: 8px; background: none; color: #263247; font-size: 14px; font-weight: 700; text-align: left; text-decoration: none; }
+.team-menu button:hover, .team-menu a:hover { background: #f2f5fa; }
+.team-menu .danger { color: #b4405a; }
+
+.home-shell { display: grid; gap: 14px; max-width: 720px; margin: 0 auto; padding: 18px 16px calc(30px + env(safe-area-inset-bottom)); }
+.home-card { padding: 16px 18px; border: 1px solid #e4e9f1; border-radius: 14px; background: #fff; }
+.home-card h2 { margin: 0; color: #46506a; font-size: 14px; }
+.home-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.home-when { color: #5a3f92; font-size: 13px; font-weight: 800; }
+.home-more { border: 0; background: none; color: #5a3f92; font-size: 12px; font-weight: 800; cursor: pointer; }
+.home-empty { margin: 0; color: #98a1b4; font-size: 13px; }
+
+.home-actions { display: grid; gap: 10px; }
+.home-action { display: grid; gap: 3px; padding: 15px 16px; border: 1px solid #dbe2ee; border-radius: 12px; background: #fff; text-align: left; transition: .15s; }
+.home-action:hover { border-color: #b9c4d8; }
+.home-action strong { color: #263247; font-size: 16px; font-weight: 800; }
+.home-action span { color: #7c869b; font-size: 12px; }
+/* 첫 줄은 그 사람이 오늘 하러 들어온 일이다 — 눈이 먼저 닿게 둔다 */
+.home-action.primary { border-color: transparent; background: linear-gradient(120deg, #3f2f7d, #5a3f92); }
+.home-action.primary strong { color: #fff; }
+.home-action.primary span { color: rgba(255, 255, 255, .72); }
+
+.home-songs { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.home-song { display: flex; align-items: baseline; gap: 8px; color: #263247; font-size: 14px; }
+.home-song span { color: #98a1b4; font-size: 12px; }
+.home-play { display: inline-block; margin-top: 14px; padding: 10px 14px; border-radius: 10px; background: #eef1fa; color: #46356f; font-size: 13px; font-weight: 800; text-decoration: none; }
+.home-play:hover { background: #e3e8f7; }
+
+.home-post { display: flex; align-items: baseline; gap: 9px; width: 100%; padding: 10px 0; border: 0; border-top: 1px solid #eef1f7; background: none; text-align: left; cursor: pointer; }
+.home-post:first-of-type { border-top: 0; }
+.home-chip { flex: 0 0 auto; padding: 2px 8px; border-radius: 99px; background: #eef1fa; color: #5a5f7a; font-size: 11px; font-weight: 800; }
+.home-post-title { flex: 1 1 auto; overflow: hidden; color: #263247; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.home-post-meta { flex: 0 0 auto; color: #98a1b4; font-size: 11px; }
+
+/* 나중에 할 일 — 접어 두고 처음 한 번만 편다(features/membership/LeaderHomePanel.tsx) */
+.invite-later > summary { list-style: none; cursor: pointer; }
+.invite-later > summary::-webkit-details-marker { display: none; }
+.invite-later > summary h2 { display: inline; }
+.invite-later > summary::after { content: ' ▾'; color: #9aa3b5; font-size: 12px; }
+.invite-later[open] > summary::after { content: ' ▴'; }
+.invite-later[open] > summary { display: block; margin-bottom: 12px; }

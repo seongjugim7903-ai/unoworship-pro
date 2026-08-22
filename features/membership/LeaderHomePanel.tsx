@@ -145,7 +145,7 @@ export default function LeaderHomePanel() {
       {/* 초대는 재촉하지 않는다 — 접어 두고, 처음 한 번만 펴서 무엇이 좋아지는지 보여 준다 */}
       <section className="panel">
         <details
-          className="invite-fold"
+          className="invite-later"
           open={inviteOpen}
           onToggle={(event) => setInviteOpen((event.target as HTMLDetailsElement).open)}
         >
