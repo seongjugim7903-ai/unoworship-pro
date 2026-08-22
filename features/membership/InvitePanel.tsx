@@ -220,8 +220,9 @@ export default function InvitePanel({ code }: { code: string }) {
             : '교회에 참여했습니다.'}
         </p>
         <div className="gate-actions">
+          {/* 담당자는 팀 홈으로 — 거기서 앱 설치와 자기 일부터 한다. 팀원 초대는 그 아래 접혀 있다 */}
           <Link className="gate-primary" href={result?.teamRole === 'leader' ? '/my' : '/'}>
-            {result?.teamRole === 'leader' ? '팀원 초대 링크 받기' : '시작하기'}
+            시작하기
           </Link>
         </div>
       </div>

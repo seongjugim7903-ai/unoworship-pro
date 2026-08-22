@@ -4,12 +4,15 @@
 //
 // 담당자가 여기서 할 일은 순서가 있다.
 //   1. 앱 설치      예배 중에 쓸 화면이라 홈 화면에 있어야 한다
-//   2. 팀원 초대     주소를 정하고 링크를 복사해 단톡방에 붙여넣는다
-//                    한 번 보내고 나면 접어 둔다 — 할 일이 끝난 자리가 화면을 차지하면
-//                    다음에 열었을 때 아직 할 일이 남은 것으로 보인다. 다시 펼 수 있다.
-//   3. 팀 자료로     준비찬양·찬양대 화면으로 들어간다
+//   2. 자기 일을     자막 협조·준비찬양 화면으로 들어간다. 담당자 혼자서도 끝나는 일이다
+//   3. 팀원 초대     준비되면 그때. 접어 두고 처음 한 번만 무엇이 좋아지는지 보여 준다
 //
-// 그래서 화면도 그 순서로 둔다. 초대 링크는 1회용이 아니라서 나중에 다시 와도 복사할 수 있다.
+// 팀원 초대를 2번에 두지 않는 이유가 있다. 헵시바처럼 몇 십 년을 단톡방으로 해 온 팀은
+// 팀원 전원에게 앱을 깔라고 하는 것 자체가 반발을 부른다. 담당자가 먼저 혼자 써서
+// 자막이 편해지는 것을 겪고, 팀원은 나중에 '팀장이 올려 둔 것을 보러' 들어오는 순서가 맞다.
+// 그래서 화면이 초대를 재촉하지 않는다 — 할 일로 보이면 안 하는 것이 밀린 일이 된다.
+//
+// 초대 링크는 1회용이 아니라서 나중에 다시 와도 만들고 복사할 수 있다.
 //
 // 주소는 담당자가 직접 정한다 — 카페 이름을 정하듯이. /join/J95XAF 는 단톡방에 붙었을 때
 // 무엇인지 알 수 없지만 /join/ulju-sunday1 은 누가 봐도 우리 팀이다.
@@ -34,12 +37,18 @@ interface Team {
 
 type Phase = 'checking' | 'ready' | 'none';
 
+/** 초대 안내를 이미 한 번 보여 줬는지 — 팀이 여러 개여도 화면당 한 번이면 된다 */
+const INTRO_KEY = 'ulju:invite-intro:v1';
+
 export default function LeaderHomePanel() {
   const [phase, setPhase] = useState<Phase>('checking');
   const [myTeams, setMyTeams] = useState<Team[]>([]);
   const [codes, setCodes] = useState<Code[]>([]);
   const [environment, setEnvironment] = useState<InstallEnvironment>('standalone');
   const [message, setMessage] = useState('');
+  /* 팀원 초대 안내를 펴 둘지 — 처음 들어온 한 번만 편다. 무엇이 좋아지는지 한 번은
+     알아야 나중에 스스로 찾아온다. 그 뒤로는 접어 둔다: 펴져 있으면 밀린 일로 보인다. */
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -66,6 +75,15 @@ export default function LeaderHomePanel() {
     void load();
   }, [load]);
 
+  /* 처음 들어온 한 번만 초대 안내를 편다. 브라우저에 적어 두므로 다음에 열면 접혀 있다 */
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(INTRO_KEY) === '1') return;
+      window.localStorage.setItem(INTRO_KEY, '1');
+      setInviteOpen(true);
+    } catch { /* 적어 둘 수 없으면 접힌 채로 시작한다 — 재촉하지 않는 쪽으로 기운다 */ }
+  }, []);
+
   if (phase === 'checking') {
     return <main className="site-shell"><section className="panel"><p className="field-hint">확인하는 중...</p></section></main>;
   }
@@ -83,6 +101,8 @@ export default function LeaderHomePanel() {
   }
 
   const installed = environment === 'standalone';
+  /* 찬양대만 맡은 담당자에게는 '자막 협조'가 곧 자기 일이다 — 그 말로 안내한다 */
+  const choirOnly = myTeams.length > 0 && myTeams.every((team) => team.category === '찬양대');
 
   return (
     <main className="site-shell">
@@ -111,32 +131,50 @@ export default function LeaderHomePanel() {
       </section>
 
       <section className="panel">
-        <h2>2. 팀원 초대</h2>
+        <h2>2. {choirOnly ? '자막 협조 올리기' : '팀 자료'}</h2>
         <p className="field-hint">
-          링크를 복사해 <b>팀 단톡방에 붙여넣으세요.</b> 받은 사람은 링크를 누르고
-          카카오로 로그인하면 끝입니다 — 코드를 적을 일이 없습니다.
+          {choirOnly
+            ? '가사를 넣으면 자막 이미지가 만들어집니다. 만든 이미지는 그 자리에서 카카오톡으로 보낼 수 있어, 지금 단톡방에 올리시던 그대로 쓰시면 됩니다.'
+            : '곡과 악보를 올리고 예배를 준비하는 곳입니다.'}
         </p>
-
-        {myTeams.map((team) => (
-          <TeamInvite
-            key={team.name}
-            team={team}
-            code={codes.find((item) => item.kind === 'team_join' && item.team === team.name)?.code ?? null}
-            onDone={load}
-            onMessage={setMessage}
-          />
-        ))}
-
-        <p className="field-hint">
-          링크가 엉뚱한 곳으로 퍼졌으면 <b>주소를 바꾸면</b> 됩니다.
-          이전 주소는 즉시 무효가 되고, 이미 들어온 팀원은 그대로입니다.
-        </p>
+        <Link className="primary-button" href="/">
+          {choirOnly ? '자막 협조 올리러 가기' : '팀 자료로 가기'}
+        </Link>
       </section>
 
+      {/* 초대는 재촉하지 않는다 — 접어 두고, 처음 한 번만 펴서 무엇이 좋아지는지 보여 준다 */}
       <section className="panel">
-        <h2>3. 팀 자료</h2>
-        <p className="field-hint">곡과 악보를 올리고 예배를 준비하는 곳입니다.</p>
-        <Link className="primary-button" href="/">팀 자료로 가기</Link>
+        <details
+          className="invite-fold"
+          open={inviteOpen}
+          onToggle={(event) => setInviteOpen((event.target as HTMLDetailsElement).open)}
+        >
+          <summary><h2>3. 팀원 초대 — 준비되시면 그때</h2></summary>
+
+          <p className="field-hint">
+            지금 안 하셔도 됩니다. <b>담당자 혼자서도 다 됩니다.</b> 나중에 부르시면 이렇게 달라집니다.
+          </p>
+          <ul className="field-hint">
+            <li>팀원이 곡 제목으로 <b>악보를 검색</b>합니다 — 단톡방에서 사진을 다시 찾을 일이 없어집니다.</li>
+            <li>팀원은 <b>보기만</b> 합니다. 올리고 고치는 것은 담당자만이라 자료가 섞이지 않습니다.</li>
+            <li>링크를 누르고 카카오로 로그인하면 끝입니다 — 팀원이 코드를 적을 일이 없습니다.</li>
+          </ul>
+
+          {myTeams.map((team) => (
+            <TeamInvite
+              key={team.name}
+              team={team}
+              code={codes.find((item) => item.kind === 'team_join' && item.team === team.name)?.code ?? null}
+              onDone={load}
+              onMessage={setMessage}
+            />
+          ))}
+
+          <p className="field-hint">
+            링크가 엉뚱한 곳으로 퍼졌으면 <b>주소를 바꾸면</b> 됩니다.
+            이전 주소는 즉시 무효가 되고, 이미 들어온 팀원은 그대로입니다.
+          </p>
+        </details>
       </section>
 
       {message && <section className="panel"><p className="info-message">{message}</p></section>}
@@ -159,7 +197,9 @@ interface TeamInviteProps {
 
 /** 팀 하나의 초대 주소 — 정하고, 중복을 확인하고, 링크를 복사한다 */
 function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
-  const [editing, setEditing] = useState(!code);
+  /* 아직 주소가 없어도 입력칸을 먼저 열지 않는다 — 열려 있으면 지금 정해야 하는 일로 보인다.
+     '초대 주소 정하기'를 눌러야 열린다. 초대는 담당자가 준비됐을 때 시작한다. */
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [check, setCheck] = useState<CheckState>({ kind: 'idle' });
   const [busy, setBusy] = useState(false);
@@ -258,6 +298,13 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
         {team.category && <span className="field-hint">{team.category}</span>}
       </div>
 
+      {/* 아직 주소를 안 정했으면 여기서 멈춘다 — 눌러야 입력칸이 열린다 */}
+      {!link && !editing && (
+        <button type="button" className="secondary-button" onClick={() => setEditing(true)}>
+          초대 주소 정하기
+        </button>
+      )}
+
       {/* 보내고 나면 접는다. 다시 필요할 때 펴면 링크가 그대로 있다 */}
       {link && !editing && sent && (
         <details className="invite-fold">
@@ -333,11 +380,10 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
           >
             {code ? '이 주소로 바꾸기' : '이 주소로 만들기'}
           </button>
-          {code && (
-            <button type="button" className="text-button" onClick={() => { setEditing(false); setDraft(''); }}>
-              취소
-            </button>
-          )}
+          {/* 열어 봤다가 그만두는 길 — 처음 정하는 자리에도 있어야 한다. 초대는 미룰 수 있는 일이다 */}
+          <button type="button" className="text-button" onClick={() => { setEditing(false); setDraft(''); }}>
+            취소
+          </button>
         </>
       )}
     </div>
