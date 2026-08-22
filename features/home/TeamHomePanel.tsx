@@ -51,6 +51,29 @@ function dayLabel(value: string | null): string {
   return `${Number(month)}월 ${Number(day)}일`;
 }
 
+/** 26.8.23 — 버튼 안에 들어가는 짧은 날짜. 괄호에 넣어 언제 것인지 보이게 한다 */
+function shortDate(value: string): string {
+  const [year, month, day] = value.split('-');
+  if (!year || !month || !day) return value;
+  return `${year.slice(2)}.${Number(month)}.${Number(day)}`;
+}
+
+/**
+ * 악보 버튼에 붙는 말.
+ *
+ * 올려 둔 것이 늘 다음 주 것은 아니다 — 이번 주 것을 아직 안 올렸으면 지난주 것이
+ * 가장 최근이다. 그때 '다음주'라고 적으면 화면이 거짓말을 한다. 날짜를 보고 말한다.
+ */
+function playLabel(value: string): string {
+  const today = new Date();
+  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const when = new Date(`${value}T00:00:00`).getTime();
+  if (Number.isNaN(when)) return '악보보기';
+  if (when > midnight) return '다음주 악보보기';
+  if (when === midnight) return '오늘 악보보기';
+  return '지난주 악보보기';
+}
+
 export default function TeamHomePanel({ me, onOpen }: TeamHomeProps) {
   const [posts, setPosts] = useState<BoardPost[]>([]);
   const [prep, setPrep] = useState<PrepSong[]>([]);
@@ -138,14 +161,14 @@ export default function TeamHomePanel({ me, onOpen }: TeamHomeProps) {
               </li>
             ))}
           </ol>
-          {/* 반주자는 이 링크를 아이패드에 띄워 놓고 연주한다 */}
+          {/* 반주자는 이 버튼을 아이패드에 띄워 놓고 연주한다 — 언제 것인지 괄호에 적는다 */}
           <a
             className="home-play"
             href={`/worship/play?team=${encodeURIComponent(prepTeam)}`}
             target="_blank"
             rel="noreferrer"
           >
-            🎹 연주용 악보 보기
+            🎹 {nextDate ? `${playLabel(nextDate)} (${shortDate(nextDate)})` : '악보보기'}
           </a>
         </section>
       )}

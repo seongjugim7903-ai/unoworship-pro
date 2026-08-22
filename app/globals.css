@@ -557,8 +557,9 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .home-songs { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .home-song { display: flex; align-items: baseline; gap: 8px; color: #263247; font-size: 14px; }
 .home-song span { color: #98a1b4; font-size: 12px; }
-.home-play { display: inline-block; margin-top: 14px; padding: 10px 14px; border-radius: 10px; background: #eef1fa; color: #46356f; font-size: 13px; font-weight: 800; text-decoration: none; }
-.home-play:hover { background: #e3e8f7; }
+/* 악보 버튼 — 반주자가 예배 중에 누르는 자리라 손가락이 닿는 크기로 둔다 */
+.home-play { display: block; margin-top: 14px; padding: 14px 16px; border: 1px solid #d5d9ee; border-radius: 12px; background: #eef1fa; color: #46356f; font-size: 15px; font-weight: 800; text-align: center; text-decoration: none; }
+.home-play:hover { border-color: #b9bfe4; background: #e3e8f7; }
 
 .home-post { display: flex; align-items: baseline; gap: 9px; width: 100%; padding: 10px 0; border: 0; border-top: 1px solid #eef1f7; background: none; text-align: left; cursor: pointer; }
 .home-post:first-of-type { border-top: 0; }
