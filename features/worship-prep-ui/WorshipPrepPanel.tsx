@@ -129,6 +129,11 @@ export default function WorshipPrepPanel() {
   /* 검색 결과의 악보 썸네일을 눌렀을 때 크게 볼 곡.
      데스크톱은 '저장 곡' 자리에 펼치고, 모바일은 전체 화면으로 띄운다. */
   const [sheetPreview, setSheetPreview] = useState<LibrarySong | null>(null);
+  /* 곡과 악보를 올리고 고치는 것은 그 팀 담당자만이다. 서버가 같은 규칙으로 막지만
+     (features/membership/guard.ts requireTeamEditor), 막히는 것을 눌러 보고 알게 하면
+     다 적은 것이 날아간다. 그래서 팀원에게는 입력칸과 저장 버튼을 아예 그리지 않는다.
+     null 은 아직 확인 전 — 그때는 폼도 안내도 그리지 않는다. 잠깐 보였다 사라지면 더 헷갈린다. */
+  const [editable, setEditable] = useState<{ admin: boolean; teams: Record<string, string> } | null>(null);
 
   /* 내가 든 준비찬양 팀만 고를 수 있다. 초대받지 않은 팀은 목록에 없다 */
   useEffect(() => {
@@ -147,11 +152,24 @@ export default function WorshipPrepPanel() {
           : mine;
         setMyTeams(list);
         setTeam((prev) => (prev && list.includes(prev) ? prev : (list[0] ?? '')));
+        /* 저장 환경이 없는 배포에서는 막지 않는다 — 화면이 통째로 잠기면 손쓸 방법이 없다 */
+        setEditable(me?.unavailable
+          ? { admin: true, teams: {} }
+          : { admin: me?.churchRole === 'admin', teams: (me?.teams ?? {}) as Record<string, string> });
       } catch {
         setMyTeams([]);
+        /* 확인이 안 되면 그리기는 한다 — 저장할 때 서버가 다시 본다 */
+        setEditable({ admin: true, teams: {} });
       }
     })();
   }, []);
+
+  /** 그 팀 자료를 고칠 수 있는가. 확인 전에는 null */
+  const canEditTeam = useCallback(
+    (name: string) => (editable ? editable.admin || editable.teams[name] === 'leader' : null),
+    [editable],
+  );
+  const canEdit = canEditTeam(team);
 
   useEffect(() => {
     try {
@@ -498,8 +516,11 @@ export default function WorshipPrepPanel() {
                         <img src={sheetSrc(item)!} alt={`${item.title} 악보`} loading="lazy" />
                       </button>
                     )}
-                    <button type="button" className="text-button danger"
-                      onClick={() => handleDeleteLibrarySong(item)}>빼기</button>
+                    {/* 라이브러리에서 빼는 것은 그 팀 담당자만 — 남의 팀 곡에는 안 보인다 */}
+                    {canEditTeam(item.team) && (
+                      <button type="button" className="text-button danger"
+                        onClick={() => handleDeleteLibrarySong(item)}>빼기</button>
+                    )}
                   </article>
                 ))}
               </div>
@@ -512,20 +533,22 @@ export default function WorshipPrepPanel() {
         <section className="panel form-panel">
           <div className="panel-heading">
             <div><span className="step-number">01</span><h2>준비찬양</h2></div>
-            <span className="required-note">* 곡 1개 이상</span>
+            {canEdit && <span className="required-note">* 곡 1개 이상</span>}
           </div>
 
-          <div className="field-grid service-fields">
-            <label>정기예배<select value={serviceType} onChange={(event) => handleServiceTypeChange(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
-            <label>일자<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
-          </div>
+          {canEdit && (
+            <div className="field-grid service-fields">
+              <label>정기예배<select value={serviceType} onChange={(event) => handleServiceTypeChange(event.target.value)}>{SERVICE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label>
+              <label>일자<input type="date" value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} /></label>
+            </div>
+          )}
 
           {/* 반주자 아이패드에서 이 주소를 북마크해 연주 중에 본다 */}
           <a className="play-link" href={`/worship/play?team=${encodeURIComponent(team)}`} target="_blank" rel="noreferrer">
             🎹 연주용 악보 보기
           </a>
 
-          {keyFlow.length > 0 && (
+          {canEdit && keyFlow.length > 0 && (
             <div className="key-flow" aria-label="조 흐름">
               {keyFlow.map((step, index) => (
                 <span className="key-flow-step" key={`${step.label}-${index}`}>
@@ -541,7 +564,15 @@ export default function WorshipPrepPanel() {
           )}
           <label>찬양팀<select value={team} onChange={(event) => setTeam(event.target.value)}>{myTeams.map((name) => <option key={name}>{name}</option>)}</select></label>
 
-          {isMobile ? (
+          {/* 팀원에게는 여기서 화면이 끝난다 — 아래 '저장 곡'에서 악보를 본다 */}
+          {canEdit === false && (
+            <p className="field-hint">
+              곡과 악보는 <b>담당자가 올립니다.</b> 옆(모바일은 아래)의 <b>{team} 저장 곡</b>에서
+              악보를 보실 수 있습니다. 연주 중에는 <b>🎹 연주용 악보 보기</b>가 편합니다.
+            </p>
+          )}
+
+          {canEdit && (isMobile ? (
             <>
               {/* 기본 필드 아래 찬양제목 탭 — 손으로 좌우 드래그·탭 이동 */}
               <div className="song-tabs" role="tablist">
@@ -568,14 +599,16 @@ export default function WorshipPrepPanel() {
               </div>
               <button className="secondary-button" type="button" onClick={addSong}>+ 곡 추가</button>
             </>
-          )}
+          ))}
 
-          <button className="primary-button" onClick={() => void handleSave()} disabled={!isValid || saveStatus === 'saving'}>
-            {saveStatus === 'saving' ? '저장 중...' : '준비찬양 저장'}
-          </button>
+          {canEdit && (
+            <button className="primary-button" onClick={() => void handleSave()} disabled={!isValid || saveStatus === 'saving'}>
+              {saveStatus === 'saving' ? '저장 중...' : '준비찬양 저장'}
+            </button>
+          )}
           {saveMessage && <p className={`field-program-message ${saveStatus}`}>{saveMessage}</p>}
 
-          {songs.some((song) => song.title.trim()) && (
+          {canEdit && songs.some((song) => song.title.trim()) && (
             <div className="setlist-preview">
               <p className="setlist-preview-label">준비 곡 순서</p>
               <ol>

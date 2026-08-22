@@ -102,6 +102,23 @@ export default function ChoirRequestPanel() {
   const [kakaoShareBusy, setKakaoShareBusy] = useState(false);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
   const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
+  /* 지난 곡을 지우는 것은 찬양대 담당자만이다 — 서버도 같은 규칙으로 막는다
+     (features/membership/guard.ts requireCategoryEditor). 올리고 고치는 것은 팀원도 한다.
+     여기는 곡을 부탁하는 자리라 막지 않는다(app/api/choir-requests POST 참조). */
+  const [canDelete, setCanDelete] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await (await fetch('/api/membership/me')).json();
+        /* 저장 환경이 없는 배포에서는 막지 않는다 — 화면이 통째로 잠기면 손쓸 방법이 없다 */
+        setCanDelete(Boolean(me?.unavailable || me?.can?.editChoir));
+      } catch {
+        /* 확인이 안 되면 그리기는 한다 — 지울 때 서버가 다시 본다 */
+        setCanDelete(true);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     try {
@@ -514,13 +531,15 @@ export default function ChoirRequestPanel() {
                 </div>
                 <div className="search-result-actions">
                   <button className="text-button" onClick={() => handleEditSearchResult(request)}>수정</button>
-                  <button
-                    className="text-button danger"
-                    onClick={() => void handleDeleteSearchResult(request)}
-                    disabled={deletingRequestId === request.id}
-                  >
-                    {deletingRequestId === request.id ? '삭제 중' : '삭제'}
-                  </button>
+                  {canDelete && (
+                    <button
+                      className="text-button danger"
+                      onClick={() => void handleDeleteSearchResult(request)}
+                      disabled={deletingRequestId === request.id}
+                    >
+                      {deletingRequestId === request.id ? '삭제 중' : '삭제'}
+                    </button>
+                  )}
                 </div>
               </article>
             ))}
