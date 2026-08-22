@@ -587,3 +587,8 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .profile-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: #eef1fa; }
 .profile-avatar.is-letter { display: flex; align-items: center; justify-content: center; color: #5a3f92; font-size: 26px; font-weight: 800; }
 .profile-name { display: block; color: #263247; font-size: 18px; font-weight: 800; }
+
+/* 댓글 삭제 — 자기 댓글에만 붙는다. 옆에 조용히 두고 색으로만 구분한다 */
+.board-comment-del { margin-left: 8px; border: 0; padding: 0; background: none; color: #b4405a; font-size: 11px; font-weight: 700; cursor: pointer; }
+.board-comment-del:hover { text-decoration: underline; }
+.board-comment-del:disabled { color: #b6bcc8; cursor: default; }

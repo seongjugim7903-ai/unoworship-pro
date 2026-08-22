@@ -24,6 +24,8 @@ interface Comment {
   created_at: string;
   author_name: string;
   body: string;
+  /** 서버가 붙여 준다 — 자기 댓글이거나 관리자면 지울 수 있다 */
+  canDelete?: boolean;
 }
 
 function when(iso: string) {
@@ -55,6 +57,7 @@ export default function BoardPanel() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentBody, setCommentBody] = useState('');
   const [commenting, setCommenting] = useState(false);
+  const [deletingComment, setDeletingComment] = useState('');
 
   /* 수정 중인 글 — 열린 글 안에서 제목/내용/분류를 바로 고친다 */
   const [editId, setEditId] = useState<string | null>(null);
@@ -146,6 +149,26 @@ export default function BoardPanel() {
       setMessage(error instanceof Error ? error.message : '글을 수정하지 못했습니다.');
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  /* 잘못 올린 댓글을 스스로 거둘 수 없으면 그다음부터 아무도 안 쓴다.
+     지운 것은 되돌릴 수 없으므로 한 번 묻는다 — 서버도 주인을 다시 확인한다. */
+  const removeComment = async (postId: string, commentId: string) => {
+    if (deletingComment) return;
+    if (!window.confirm('이 댓글을 지울까요? 되돌릴 수 없습니다.')) return;
+    setDeletingComment(commentId);
+    setMessage('');
+    try {
+      const res = await fetch(`/api/board/comments?id=${encodeURIComponent(commentId)}`, { method: 'DELETE' });
+      const json = await res.json() as { ok?: boolean; message?: string };
+      if (!res.ok || !json.ok) throw new Error(json.message ?? '댓글을 지우지 못했습니다.');
+      await loadComments(postId);
+      setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p)));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '댓글을 지우지 못했습니다.');
+    } finally {
+      setDeletingComment('');
     }
   };
 
@@ -263,7 +286,19 @@ export default function BoardPanel() {
               <div className="board-comments">
                 {comments.map((c) => (
                   <div className="board-comment" key={c.id}>
-                    <p className="board-comment-meta">{c.author_name || '익명'} · {when(c.created_at)}</p>
+                    <p className="board-comment-meta">
+                      {c.author_name || '익명'} · {when(c.created_at)}
+                      {c.canDelete && (
+                        <button
+                          type="button"
+                          className="board-comment-del"
+                          onClick={() => void removeComment(post.id, c.id)}
+                          disabled={deletingComment === c.id}
+                        >
+                          {deletingComment === c.id ? '지우는 중' : '삭제'}
+                        </button>
+                      )}
+                    </p>
                     <p className="board-comment-body">{c.body}</p>
                   </div>
                 ))}
