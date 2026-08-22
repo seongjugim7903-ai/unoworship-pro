@@ -592,3 +592,10 @@ label input:focus, label select:focus, label textarea:focus { border-color: #766
 .board-comment-del { margin-left: 8px; border: 0; padding: 0; background: none; color: #b4405a; font-size: 11px; font-weight: 700; cursor: pointer; }
 .board-comment-del:hover { text-decoration: underline; }
 .board-comment-del:disabled { color: #b6bcc8; cursor: default; }
+
+/* 초대 주소 예시 — 팀 이름을 로마자로 옮겨 먼저 지어 둔 것(lib/inviteSuggest.ts) */
+.invite-suggest { margin: 10px 0 4px; }
+.invite-suggest-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 7px; }
+.invite-suggest-chip { padding: 7px 12px; border: 1px solid #d3dbe8; border-radius: 99px; background: #fff; color: #46506a; font-size: 13px; font-weight: 700; }
+.invite-suggest-chip:hover { border-color: #9fb0cc; background: #f4f7fc; }
+.invite-suggest-chip.is-picked { border-color: transparent; background: #5a3f92; color: #fff; }

@@ -16,12 +16,17 @@
 //
 // 주소는 담당자가 직접 정한다 — 카페 이름을 정하듯이. /join/J95XAF 는 단톡방에 붙었을 때
 // 무엇인지 알 수 없지만 /join/ulju-sunday1 은 누가 봐도 우리 팀이다.
+//
+// 다만 '영문으로 지으세요'라고만 하면 거기서 멈춘다 — 헵시바를 영어로 어떻게 쓰는지가
+// 담당자의 일이 아니다. 그래서 팀 이름을 로마자로 옮겨 먼저 지어 놓고 보여 준다.
+// 누르면 그대로 들어가고, 마음에 안 들면 고치면 된다(lib/inviteSuggest.ts).
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { detectEnvironment, installSteps, type InstallEnvironment } from '../../lib/pwaInstall';
 import { isKakaoShareConfigured, shareInviteLinkToKakao } from '../../lib/kakaoShare';
 import { isValidInviteSlug, normalizeInviteCode } from './inviteCode';
+import { suggestSlugs } from '../../lib/inviteSuggest';
 
 interface Code {
   id: string;
@@ -220,6 +225,8 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
 
   const slug = normalizeInviteCode(draft);
   const link = code ? `${window.location.origin}/join/${code}` : null;
+  /* 팀 이름을 로마자로 옮긴 후보들. 해가 바뀌어도 같은 것이 나오도록 렌더마다 새로 세지 않는다 */
+  const suggestions = useMemo(() => suggestSlugs(team.name, new Date().getFullYear()), [team.name]);
 
   useEffect(() => {
     if (!editing) return;
@@ -300,9 +307,16 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
 
       {/* 아직 주소를 안 정했으면 여기서 멈춘다 — 눌러야 입력칸이 열린다 */}
       {!link && !editing && (
-        <button type="button" className="secondary-button" onClick={() => setEditing(true)}>
-          초대 주소 정하기
-        </button>
+        <>
+          {suggestions[0] && (
+            <p className="field-hint">
+              예를 들면 <b>/join/{suggestions[0]}</b> 같은 주소입니다. 눌러서 정하시면 됩니다.
+            </p>
+          )}
+          <button type="button" className="secondary-button" onClick={() => setEditing(true)}>
+            초대 주소 정하기
+          </button>
+        </>
       )}
 
       {/* 보내고 나면 접는다. 다시 필요할 때 펴면 링크가 그대로 있다 */}
@@ -350,6 +364,27 @@ function TeamInvite({ team, code, onDone, onMessage }: TeamInviteProps) {
           <p className="invite-link-box">
             {window.location.origin}/join/<b>{slug || '...'}</b>
           </p>
+
+          {/* 먼저 지어 놓은 것 — 누르면 그대로 들어간다. 고쳐 쓰셔도 된다 */}
+          {suggestions.length > 0 && (
+            <div className="invite-suggest">
+              <span className="field-hint">이런 주소는 어떠세요? 눌러서 쓰시고, 고치셔도 됩니다.</span>
+              <div className="invite-suggest-row">
+                {suggestions.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`invite-suggest-chip${slug === item ? ' is-picked' : ''}`}
+                    onClick={() => setDraft(item)}
+                    disabled={busy}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <label>
             초대 주소 정하기
             <span className="field-hint">영문 소문자·숫자·하이픈. 나중에 바꿀 수 있습니다.</span>
